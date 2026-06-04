@@ -48,8 +48,8 @@ impl SpectralData {
         for k in 0..self.wavelengths.len() {
             let d = self.d_min[k] + c[0] * self.dye[0][k] + c[1] * self.dye[1][k] + c[2] * self.dye[2][k];
             let lt = self.illuminant[k] * 10f32.powf(-d);
-            for i in 0..3 {
-                out[i] += lt * self.sensor[i][k];
+            for (i, s) in self.sensor.iter().enumerate() {
+                out[i] += lt * s[k];
             }
         }
         out
