@@ -3,3 +3,4 @@
 .DS_Store
 /app/node_modules
 /app/dist
+/samples

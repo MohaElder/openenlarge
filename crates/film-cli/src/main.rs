@@ -50,7 +50,17 @@ struct Cli {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let img = decode_tiff(&cli.input).with_context(|| format!("decoding {:?}", cli.input))?;
+    let ext = cli
+        .input
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    let img = match ext.as_str() {
+        "tif" | "tiff" => decode_tiff(&cli.input),
+        _ => film_core::decode::decode_raw(&cli.input),
+    }
+    .with_context(|| format!("decoding {:?}", cli.input))?;
 
     let rect = cli.base_rect.as_ref().and_then(|v| {
         if v.len() == 4 {
