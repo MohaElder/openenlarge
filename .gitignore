@@ -7,3 +7,5 @@
 /app/src-tauri/target
 /app/build
 /app/.svelte-kit
+
+/.superpowers
