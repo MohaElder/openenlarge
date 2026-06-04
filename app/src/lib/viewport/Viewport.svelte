@@ -40,7 +40,11 @@
   async function render() {
     if (!id || !imgW || !vpW) { src = ""; return; }
     const v = deriveView(interactive ? scale : fit, cx, cy, imgW, imgH, vpW, vpH, raw);
-    try { src = await api.renderView(id, params, v); } catch { /* keep previous frame */ }
+    try {
+      src = await api.renderView(id, params, v);
+      // New bitmap matches the committed view → drop the live pan transform.
+      tx = 0; ty = 0;
+    } catch { /* keep previous frame */ }
   }
   function schedule() { if (timer) clearTimeout(timer); timer = setTimeout(render, 100); }
 
@@ -70,9 +74,12 @@
     scale = ns;
   }
 
-  // Unified pointer gesture: distinguish a tap (toggle zoom) from a drag (pan).
-  // Using on:click separately caused the post-drag click to snap back to Fit.
+  // Unified pointer gesture: a tap toggles zoom, a drag pans. During a pan we
+  // apply an instant CSS translate (tx,ty) to the current bitmap for smooth
+  // feedback, then commit to cx/cy + render on release (transform cleared when
+  // the new bitmap arrives, so there's no jump).
   let lastX = 0, lastY = 0, downX = 0, downY = 0, moved = false, panning = false;
+  let tx = 0, ty = 0;
   function onDown(e: PointerEvent) {
     if (!interactive) return;
     downX = lastX = e.clientX; downY = lastY = e.clientY;
@@ -84,29 +91,35 @@
     if (!interactive || !(e.buttons & 1)) return;
     if (Math.abs(e.clientX - downX) > 3 || Math.abs(e.clientY - downY) > 3) moved = true;
     if (panning && moved) {
-      cx -= (e.clientX - lastX) / scale;
-      cy -= (e.clientY - lastY) / scale;
+      tx += e.clientX - lastX;
+      ty += e.clientY - lastY;
     }
     lastX = e.clientX; lastY = e.clientY;
   }
   function onUp(e: PointerEvent) {
-    if (interactive && !moved) {
-      // tap → toggle Fit <-> 100% centered on the tapped point
+    if (!interactive) return;
+    if (panning && moved) {
+      // commit the live translate into the image-space centre, keep tx/ty until
+      // the re-render lands (render() clears them) to avoid a flash-back.
+      cx -= tx / scale;
+      cy -= ty / scale;
+    } else if (!moved) {
       const [ix, iy] = imgPoint(e);
       if (zoomed) { scale = fit; cx = imgW / 2; cy = imgH / 2; }
       else { scale = 1.0; cx = ix; cy = iy; }
     }
     panning = false; moved = false;
   }
+  function onCancel() { tx = 0; ty = 0; panning = false; moved = false; }
 </script>
 
 <div
   class="vp" class:interactive class:zoomed
   bind:this={el}
   on:wheel={onWheel}
-  on:pointerdown={onDown} on:pointermove={onMove} on:pointerup={onUp} on:pointerleave={onUp}
+  on:pointerdown={onDown} on:pointermove={onMove} on:pointerup={onUp} on:pointercancel={onCancel}
 >
-  {#if src}<img {src} alt="preview" draggable="false" />{:else}<div class="hint">…</div>{/if}
+  {#if src}<img {src} alt="preview" draggable="false" style="transform: translate({tx}px, {ty}px)" />{:else}<div class="hint">…</div>{/if}
   {#if id && interactive}<div class="zoom">{label}</div>{/if}
 </div>
 
