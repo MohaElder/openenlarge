@@ -67,6 +67,34 @@ pub fn invert_c(rgb: [f32; 3], p: &InversionParams) -> [f32; 3] {
     out
 }
 
+/// Mode B: Ĉ = M_post · log10(M_pre · (base / I)), then per-channel tone.
+///
+/// Steps mirror the spec:
+///  1. normalize r = base / I   (removes orange mask)
+///  2. linear mix  M_pre · r    (sensor↔dye crosstalk; identity by default)
+///  3. log10                    (into Beer-Lambert density space)
+///  4. density unmix M_post     (identity by default)
+///  5. tone (exposure, black, gamma)
+pub fn invert_b(rgb: [f32; 3], p: &InversionParams) -> [f32; 3] {
+    let r = Vector3::new(
+        (rgb[0] / p.base[0].max(EPS)).max(EPS),
+        (rgb[1] / p.base[1].max(EPS)).max(EPS),
+        (rgb[2] / p.base[2].max(EPS)).max(EPS),
+    );
+    let mixed = p.m_pre * r;
+    let dens = Vector3::new(
+        -(mixed[0].max(EPS)).log10(),
+        -(mixed[1].max(EPS)).log10(),
+        -(mixed[2].max(EPS)).log10(),
+    );
+    let unmixed = p.m_post * dens;
+    [
+        tone(unmixed[0], p),
+        tone(unmixed[1], p),
+        tone(unmixed[2], p),
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -104,5 +132,25 @@ mod tests {
         let bright = invert_c([0.5, 0.5, 0.5], &p);
         let dark = invert_c([0.1, 0.1, 0.1], &p);
         assert!(dark[0] > bright[0]);
+    }
+
+    #[test]
+    fn mode_b_identity_matrices_match_mode_c() {
+        let p = InversionParams { base: [0.7, 0.6, 0.5], gamma: 1.0, ..Default::default() };
+        let probe = [0.3, 0.25, 0.2];
+        let b = invert_b(probe, &p);
+        let c = invert_c(probe, &p);
+        for ch in 0..3 {
+            assert!((b[ch] - c[ch]).abs() < 1e-5, "ch {ch}: b={} c={}", b[ch], c[ch]);
+        }
+    }
+
+    #[test]
+    fn mode_b_base_pixel_is_black() {
+        let p = InversionParams { base: [0.7, 0.6, 0.5], gamma: 1.0, ..Default::default() };
+        let out = invert_b([0.7, 0.6, 0.5], &p);
+        for ch in 0..3 {
+            assert!(out[ch].abs() < 1e-4, "ch {ch} = {}", out[ch]);
+        }
     }
 }
