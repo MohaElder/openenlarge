@@ -27,6 +27,10 @@ pub fn sample_base(img: &Image, rect: Option<Rect>) -> [f32; 3] {
     }
     let mut base = [0.0f32; 3];
     for c in 0..3 {
+        if chans[c].is_empty() {
+            base[c] = 0.0;
+            continue;
+        }
         chans[c].sort_by(|a, b| a.partial_cmp(b).unwrap());
         let idx = ((chans[c].len() as f32) * 0.95) as usize;
         let idx = idx.min(chans[c].len().saturating_sub(1));
@@ -61,5 +65,13 @@ mod tests {
         }
         let base = sample_base(&img, Some(Rect { x: 0, y: 0, w: 2, h: 2 }));
         assert!((base[0] - 0.9).abs() < 1e-6);
+    }
+
+    #[test]
+    fn sample_base_empty_region_is_zero_no_panic() {
+        let img = Image::new(4, 4);
+        // zero-area rect must not panic
+        let base = sample_base(&img, Some(Rect { x: 0, y: 0, w: 0, h: 0 }));
+        assert_eq!(base, [0.0, 0.0, 0.0]);
     }
 }
