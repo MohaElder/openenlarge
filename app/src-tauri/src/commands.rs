@@ -16,6 +16,13 @@ const THUMB_EDGE: u32 = 320;
 const AUTOWB_EDGE: u32 = 256;
 const PREVIEW_JPEG_QUALITY: u8 = 88;
 
+fn default_invert_params() -> InvertParams {
+    InvertParams {
+        mode: "b".into(), stock: "none".into(), base_rect: None,
+        exposure: 1.0, black: 0.0, gamma: 0.4545, auto_wb: true, temp: 0.0, tint: 0.0,
+    }
+}
+
 fn decode_any(path: &Path) -> Result<film_core::Image, String> {
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
     match ext.as_str() {
@@ -94,15 +101,22 @@ pub fn develop_image(id: String, session: State<Session>) -> Result<ImageEntry, 
     let (w, h) = (full.width as u32, full.height as u32);
     drop(full);
 
+    let small = proxy(&working, THUMB_EDGE);
+    let ip = resolve_params(&default_invert_params(), &thumb, base);
+    let inv_thumb = invert_image(&small, &ip, Mode::B);
+    let thumbnail = to_jpeg_b64(&inv_thumb, false, 82)?;
+
     let mut images = session.images.lock().unwrap();
     let img = images.get_mut(&id).ok_or("unknown image id")?;
     img.metadata.width = w;
     img.metadata.height = h;
+    img.thumbnail = thumbnail.clone();
     img.developed = Some(Developed { working, thumb, base });
     Ok(ImageEntry {
         id: id.clone(),
+        path: img.path.clone(),
         file_name: img.file_name.clone(),
-        thumbnail: img.thumbnail.clone(),
+        thumbnail,
         metadata: img.metadata.clone(),
         developed: true,
     })
@@ -149,6 +163,19 @@ pub fn render_view(id: String, params: InvertParams, view: ViewSpec, session: St
     let ip = resolve_params(&params, &dev.thumb, dev.base);
     let inv = invert_image(&scaled, &ip, mode_from(&params.mode));
     to_jpeg_b64(&inv, false, PREVIEW_JPEG_QUALITY)
+}
+
+/// Render a small (~320px) inverted JPEG of the developed image at the given
+/// params — used to live-refresh the Library grid cell while editing.
+#[tauri::command]
+pub fn thumbnail(id: String, params: InvertParams, session: State<Session>) -> Result<String, String> {
+    let images = session.images.lock().unwrap();
+    let img = images.get(&id).ok_or("unknown image id")?;
+    let dev = img.developed.as_ref().ok_or("not developed")?;
+    let small = proxy(&dev.working, THUMB_EDGE);
+    let ip = resolve_params(&params, &dev.thumb, dev.base);
+    let inv = invert_image(&small, &ip, mode_from(&params.mode));
+    to_jpeg_b64(&inv, false, 82)
 }
 
 /// Re-decode the file at full resolution and export a 16-bit TIFF.

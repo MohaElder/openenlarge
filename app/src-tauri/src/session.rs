@@ -53,6 +53,7 @@ pub struct InvertParams {
 #[derive(Debug, Clone, Serialize)]
 pub struct ImageEntry {
     pub id: String,
+    pub path: String,
     pub file_name: String,
     pub thumbnail: String,
     pub metadata: Metadata,
@@ -90,6 +91,7 @@ impl Session {
         drop(id_guard);
         let entry = ImageEntry {
             id: id.clone(),
+            path: img.path.clone(),
             file_name: img.file_name.clone(),
             thumbnail: img.thumbnail.clone(),
             metadata: img.metadata.clone(),
