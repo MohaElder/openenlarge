@@ -32,6 +32,7 @@ pub fn run() {
             commands::render_view,
             commands::thumbnail,
             commands::export_image,
+            commands::as_shot_wb,
         ])
         .run(tauri::generate_context!())
         .expect("error while running RedRoom");

@@ -37,16 +37,28 @@ impl Default for Quality {
 pub struct InvertParams {
     pub mode: String,
     pub stock: String,
-    /// Reserved for manual base-rect sampling from the UI; not yet consumed by
-    /// the develop-on-working-image flow.
     #[allow(dead_code)]
     pub base_rect: Option<[usize; 4]>,
+    /// Exposure in EV stops (−5..5); converted to a multiplier (2^ev) downstream.
     pub exposure: f32,
     pub black: f32,
     pub gamma: f32,
+    /// Vestigial: WB is now absolute (Kelvin); the UI "Auto" button reseeds via
+    /// the `as_shot_wb` command instead. Kept in the wire contract for now.
+    #[allow(dead_code)]
     pub auto_wb: bool,
+    /// Kelvin (e.g. 5500) and green↔magenta tint (−150..150).
     pub temp: f32,
     pub tint: f32,
+    // Creative finishing (UI −100..100; 0 = identity).
+    pub contrast: f32,
+    pub highlights: f32,
+    pub shadows: f32,
+    pub whites: f32,
+    pub blacks: f32,
+    pub texture: f32,
+    pub vibrance: f32,
+    pub saturation: f32,
 }
 
 /// What the frontend gets per image.

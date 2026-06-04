@@ -7,6 +7,8 @@ use crate::session::{CachedImage, Developed, ImageEntry, InvertParams, Quality, 
 use film_core::calibrate::{auto_wb_gains, sample_base};
 use film_core::decode::{decode_raw, decode_tiff};
 use film_core::engine::{invert_image, params_for_stock, InversionParams, Mode};
+use film_core::finish::{finish_image, FinishParams};
+use film_core::wb::{gains_to_cct, wb_from_kelvin};
 use film_core::spectral::Stock;
 use serde::Deserialize;
 use std::path::Path;
@@ -19,7 +21,10 @@ const PREVIEW_JPEG_QUALITY: u8 = 88;
 fn default_invert_params() -> InvertParams {
     InvertParams {
         mode: "b".into(), stock: "none".into(), base_rect: None,
-        exposure: 1.0, black: 0.0, gamma: 0.4545, auto_wb: true, temp: 0.0, tint: 0.0,
+        exposure: 0.0, black: 0.0, gamma: 0.4545, auto_wb: true,
+        temp: 5500.0, tint: 0.0,
+        contrast: 0.0, highlights: 0.0, shadows: 0.0, whites: 0.0, blacks: 0.0,
+        texture: 0.0, vibrance: 0.0, saturation: 0.0,
     }
 }
 
@@ -44,29 +49,34 @@ fn mode_from(s: &str) -> Mode {
 }
 
 fn build_params(p: &InvertParams, base: [f32; 3]) -> InversionParams {
+    let exposure = 2f32.powf(p.exposure); // EV stops → linear multiplier
     match stock_from(&p.stock) {
-        Some(s) if p.mode == "b" => params_for_stock(s, base, p.exposure, p.black, p.gamma),
-        _ => InversionParams { base, exposure: p.exposure, black: p.black, gamma: p.gamma, ..Default::default() },
+        Some(s) if p.mode == "b" => params_for_stock(s, base, exposure, p.black, p.gamma),
+        _ => InversionParams { base, exposure, black: p.black, gamma: p.gamma, ..Default::default() },
     }
 }
 
-fn wb_from_temp_tint(temp: f32, tint: f32) -> [f32; 3] {
-    let r = (1.0 + 0.4 * temp + 0.2 * tint).max(0.1);
-    let g = (1.0 - 0.4 * tint).max(0.1);
-    let b = (1.0 - 0.4 * temp + 0.2 * tint).max(0.1);
-    [r, g, b]
+fn wb_from_params(temp: f32, tint: f32) -> [f32; 3] {
+    wb_from_kelvin(temp, tint / 150.0)
 }
 
-fn resolve_params(p: &InvertParams, autowb_src: &film_core::Image, base: [f32; 3]) -> InversionParams {
-    let manual = wb_from_temp_tint(p.temp, p.tint);
+fn resolve_params(p: &InvertParams, _autowb_src: &film_core::Image, base: [f32; 3]) -> InversionParams {
     let mut ip = build_params(p, base);
-    ip.wb = manual;
-    if p.auto_wb {
-        let first = invert_image(autowb_src, &ip, mode_from(&p.mode));
-        let auto = auto_wb_gains(&first);
-        ip.wb = [manual[0] * auto[0], manual[1] * auto[1], manual[2] * auto[2]];
-    }
+    ip.wb = wb_from_params(p.temp, p.tint);
     ip
+}
+
+fn finish_from(p: &InvertParams) -> FinishParams {
+    FinishParams {
+        contrast: p.contrast / 100.0,
+        highlights: p.highlights / 100.0,
+        shadows: p.shadows / 100.0,
+        whites: p.whites / 100.0,
+        blacks: p.blacks / 100.0,
+        texture: p.texture / 100.0,
+        vibrance: p.vibrance / 100.0,
+        saturation: p.saturation / 100.0,
+    }
 }
 
 /// LIGHT import: thumbnail (embedded preview if available) + metadata + stored
@@ -102,8 +112,10 @@ pub fn develop_image(id: String, session: State<Session>) -> Result<ImageEntry, 
     drop(full);
 
     let small = proxy(&working, THUMB_EDGE);
-    let ip = resolve_params(&default_invert_params(), &thumb, base);
+    let defaults = default_invert_params();
+    let ip = resolve_params(&defaults, &thumb, base);
     let inv_thumb = invert_image(&small, &ip, Mode::B);
+    let inv_thumb = finish_image(&inv_thumb, &finish_from(&defaults));
     let thumbnail = to_jpeg_b64(&inv_thumb, false, 82)?;
 
     let mut images = session.images.lock().unwrap();
@@ -162,7 +174,8 @@ pub fn render_view(id: String, params: InvertParams, view: ViewSpec, session: St
     }
     let ip = resolve_params(&params, &dev.thumb, dev.base);
     let inv = invert_image(&scaled, &ip, mode_from(&params.mode));
-    to_jpeg_b64(&inv, false, PREVIEW_JPEG_QUALITY)
+    let fin = finish_image(&inv, &finish_from(&params));
+    to_jpeg_b64(&fin, false, PREVIEW_JPEG_QUALITY)
 }
 
 /// Render a small (~320px) inverted JPEG of the developed image at the given
@@ -175,7 +188,8 @@ pub fn thumbnail(id: String, params: InvertParams, session: State<Session>) -> R
     let small = proxy(&dev.working, THUMB_EDGE);
     let ip = resolve_params(&params, &dev.thumb, dev.base);
     let inv = invert_image(&small, &ip, mode_from(&params.mode));
-    to_jpeg_b64(&inv, false, 82)
+    let fin = finish_image(&inv, &finish_from(&params));
+    to_jpeg_b64(&fin, false, 82)
 }
 
 /// Re-decode the file at full resolution and export a 16-bit TIFF.
@@ -190,7 +204,30 @@ pub fn export_image(id: String, params: InvertParams, out_path: String, session:
     let full = decode_any(Path::new(&path))?;
     let ip = resolve_params(&params, &thumb, base);
     let inv = invert_image(&full, &ip, mode_from(&params.mode));
-    film_core::export::write_tiff16(&inv, Path::new(&out_path)).map_err(|e| format!("{e}"))
+    let fin = finish_image(&inv, &finish_from(&params));
+    film_core::export::write_tiff16(&fin, Path::new(&out_path)).map_err(|e| format!("{e}"))
+}
+
+/// Estimated as-shot white point for the developed image, as (Kelvin, tint).
+/// The UI seeds the Temp/Tint sliders with this when an image becomes active.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct AsShotWb { pub temp: f32, pub tint: f32 }
+
+#[tauri::command]
+pub fn as_shot_wb(id: String, session: State<Session>) -> Result<AsShotWb, String> {
+    let (base, thumb) = {
+        let images = session.images.lock().unwrap();
+        let img = images.get(&id).ok_or("unknown image id")?;
+        let dev = img.developed.as_ref().ok_or("not developed")?;
+        (dev.base, dev.thumb.clone())
+    };
+    // Lock released — the inversion + gray-world estimate run unlocked.
+    let neutral = default_invert_params();
+    let ip = build_params(&neutral, base);
+    let first = invert_image(&thumb, &ip, mode_from(&neutral.mode));
+    let gains = auto_wb_gains(&first);
+    let (temp, tint) = gains_to_cct(gains);
+    Ok(AsShotWb { temp, tint: tint * 150.0 }) // back to UI −150..150
 }
 
 #[cfg(test)]
@@ -198,10 +235,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn wb_temp_tint_directions() {
-        let warm = wb_from_temp_tint(0.5, 0.0);
-        assert!(warm[0] > 1.0 && warm[2] < 1.0);
-        let green = wb_from_temp_tint(0.0, -0.5);
-        assert!(green[1] > 1.0);
+    fn wb_from_params_directions() {
+        let warm = wb_from_params(3000.0, 0.0);
+        let cool = wb_from_params(9000.0, 0.0);
+        assert!(warm[0] < cool[0], "warm should cut red vs cool");
+        // wb_from_kelvin normalises green to 1.0; negative tint (green cast)
+        // suppresses R and B relative to G, i.e. R < 1 at neutral temp.
+        let green = wb_from_params(5500.0, -150.0);
+        assert!(green[0] < 1.0, "negative tint suppresses red relative to green");
+        assert!(green[2] < 1.0, "negative tint suppresses blue relative to green");
     }
 }
