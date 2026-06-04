@@ -51,9 +51,17 @@
     else if (e.key === "ArrowDown") idx += cols;
     idx = Math.max(0, Math.min(list.length - 1, idx));
     activeId.set(list[idx].id);
-    await tick();
-    scrollEl?.querySelector(`[data-id="${list[idx].id}"]`)?.scrollIntoView({ block: "nearest" });
   }
+
+  // Keep the active image visible in the grid whenever selection changes
+  // (from the grid, the filmstrip, or arrow keys) — only if it's in this folder.
+  async function revealActive() {
+    await tick();
+    if (scrollEl && $activeId) {
+      scrollEl.querySelector(`[data-id="${$activeId}"]`)?.scrollIntoView({ block: "nearest" });
+    }
+  }
+  $: $activeId, revealActive();
 </script>
 
 <div class="center">

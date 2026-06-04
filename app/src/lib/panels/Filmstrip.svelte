@@ -16,9 +16,17 @@
     else return;
     e.preventDefault();
     activeId.set(list[idx].id);
-    await tick();
-    stripEl?.querySelector(`[data-id="${list[idx].id}"]`)?.scrollIntoView({ inline: "nearest", block: "nearest" });
   }
+
+  // Keep the active image visible in the strip whenever selection changes
+  // (from the strip, the grid, or arrow keys).
+  async function revealActive() {
+    await tick();
+    if (stripEl && $activeId) {
+      stripEl.querySelector(`[data-id="${$activeId}"]`)?.scrollIntoView({ inline: "nearest", block: "nearest" });
+    }
+  }
+  $: $activeId, revealActive();
 </script>
 
 <div class="strip" bind:this={stripEl} tabindex="0" role="listbox" aria-label="Imported images" on:keydown={onKey}>
