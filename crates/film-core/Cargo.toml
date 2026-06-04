@@ -1,0 +1,10 @@
+[package]
+name = "film-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+nalgebra = { workspace = true }
+tiff = { workspace = true }
+rawler = { workspace = true }
+thiserror = { workspace = true }
