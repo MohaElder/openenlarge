@@ -93,6 +93,7 @@ dependencies = [
  "base64 0.22.1",
  "film-core",
  "image",
+ "rawler",
  "serde",
  "serde_json",
  "tauri",
