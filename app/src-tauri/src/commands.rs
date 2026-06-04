@@ -66,6 +66,8 @@ fn resolve_params(p: &InvertParams, _autowb_src: &film_core::Image, base: [f32; 
     ip
 }
 
+fn finish_default() -> bool { true }
+
 fn finish_from(p: &InvertParams) -> FinishParams {
     FinishParams {
         contrast: p.contrast / 100.0,
@@ -148,6 +150,10 @@ pub struct ViewSpec {
     pub out_w: u32,
     pub out_h: u32,
     pub raw: bool,
+    /// When false, return the inverted+graded preview BEFORE the finishing layer
+    /// (the GPU applies finishing live). Defaults true for the legacy path/export.
+    #[serde(default = "finish_default")]
+    pub finish: bool,
 }
 
 #[tauri::command]
@@ -174,8 +180,8 @@ pub fn render_view(id: String, params: InvertParams, view: ViewSpec, session: St
     }
     let ip = resolve_params(&params, &dev.thumb, dev.base);
     let inv = invert_image(&scaled, &ip, mode_from(&params.mode));
-    let fin = finish_image(&inv, &finish_from(&params));
-    to_jpeg_b64(&fin, false, PREVIEW_JPEG_QUALITY)
+    let out = if view.finish { finish_image(&inv, &finish_from(&params)) } else { inv };
+    to_jpeg_b64(&out, false, PREVIEW_JPEG_QUALITY)
 }
 
 /// Render a small (~320px) inverted JPEG of the developed image at the given
@@ -233,6 +239,16 @@ pub fn as_shot_wb(id: String, session: State<Session>) -> Result<AsShotWb, Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn viewspec_finish_defaults_true_and_parses_false() {
+        let d: ViewSpec = serde_json::from_str(
+            r#"{"crop":[0,0,10,10],"out_w":10,"out_h":10,"raw":false}"#).unwrap();
+        assert!(d.finish, "finish should default to true when omitted");
+        let f: ViewSpec = serde_json::from_str(
+            r#"{"crop":[0,0,10,10],"out_w":10,"out_h":10,"raw":false,"finish":false}"#).unwrap();
+        assert!(!f.finish);
+    }
 
     #[test]
     fn wb_from_params_directions() {
