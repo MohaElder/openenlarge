@@ -1,5 +1,5 @@
-//! In-memory session: decoded images (full-res + proxy) keyed by id, plus serde
-//! types shared with the frontend.
+//! In-memory session: lightweight image records (path + thumbnail + metadata),
+//! with decoded working data filled in lazily by `develop_image`.
 
 use crate::metadata::Metadata;
 use film_core::Image;
@@ -7,10 +7,39 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Mutex;
 
+/// Preview render quality: caps the decoded working-image resolution.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Quality {
+    Performance,
+    Quality,
+}
+
+impl Quality {
+    /// Max long-edge (px) for the working image. Quality = no cap.
+    pub fn cap(self) -> u32 {
+        match self {
+            Quality::Performance => 4096,
+            Quality::Quality => u32::MAX,
+        }
+    }
+}
+
+#[allow(clippy::derivable_impls)]
+impl Default for Quality {
+    fn default() -> Self {
+        Quality::Performance
+    }
+}
+
+/// Knobs the UI sends for an inversion (mirrors the engine's exposed controls).
 #[derive(Debug, Clone, Deserialize)]
 pub struct InvertParams {
-    pub mode: String,            // "b" | "c"
-    pub stock: String,           // "none" | "portra400" | "fujic200"
+    pub mode: String,
+    pub stock: String,
+    /// Reserved for manual base-rect sampling from the UI; not yet consumed by
+    /// the develop-on-working-image flow.
+    #[allow(dead_code)]
     pub base_rect: Option<[usize; 4]>,
     pub exposure: f32,
     pub black: f32,
@@ -20,30 +49,37 @@ pub struct InvertParams {
     pub tint: f32,
 }
 
+/// What the frontend gets per image.
 #[derive(Debug, Clone, Serialize)]
 pub struct ImageEntry {
     pub id: String,
     pub file_name: String,
     pub thumbnail: String,
     pub metadata: Metadata,
+    pub developed: bool,
 }
 
-pub struct CachedImage {
-    pub full_res: Image,
-    pub proxy: Image,
-    pub thumb_img: Image,
-    /// Film base (orange mask), sampled once at import — avoids re-sorting the
-    /// whole proxy on every render.
+/// Decoded working data, present once an image is developed.
+pub struct Developed {
+    pub working: Image,
+    pub thumb: Image,
     pub base: [f32; 3],
+}
+
+/// A session image: always has path/metadata/thumbnail; `developed` is lazy.
+pub struct CachedImage {
+    pub path: String,
     pub file_name: String,
     pub metadata: Metadata,
     pub thumbnail: String,
+    pub developed: Option<Developed>,
 }
 
 #[derive(Default)]
 pub struct Session {
     pub images: Mutex<HashMap<String, CachedImage>>,
     pub next_id: Mutex<u64>,
+    pub quality: Mutex<Quality>,
 }
 
 impl Session {
@@ -57,6 +93,7 @@ impl Session {
             file_name: img.file_name.clone(),
             thumbnail: img.thumbnail.clone(),
             metadata: img.metadata.clone(),
+            developed: img.developed.is_some(),
         };
         self.images.lock().unwrap().insert(id, img);
         entry
@@ -66,19 +103,34 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn dummy(name: &str) -> CachedImage {
-        let img = Image { width: 1, height: 1, pixels: vec![[0.0; 3]], ir: None };
-        CachedImage { full_res: img.clone(), proxy: img.clone(), thumb_img: img, base: [1.0; 3],
-            file_name: name.to_string(), metadata: Metadata::default(), thumbnail: "data:,".to_string() }
-    }
+
     #[test]
-    fn insert_assigns_unique_incrementing_ids() {
+    fn quality_cap_values() {
+        assert_eq!(Quality::Performance.cap(), 4096);
+        assert_eq!(Quality::Quality.cap(), u32::MAX);
+        assert_eq!(Quality::default(), Quality::Performance);
+    }
+
+    #[test]
+    fn quality_deserializes_from_lowercase() {
+        let p: Quality = serde_json::from_str("\"performance\"").unwrap();
+        let q: Quality = serde_json::from_str("\"quality\"").unwrap();
+        assert_eq!(p, Quality::Performance);
+        assert_eq!(q, Quality::Quality);
+    }
+
+    #[test]
+    fn insert_reports_undeveloped_then_assigns_ids() {
         let s = Session::default();
-        let a = s.insert(dummy("a.dng"));
-        let b = s.insert(dummy("b.raf"));
-        assert_eq!(a.id, "img0");
-        assert_eq!(b.id, "img1");
-        assert_eq!(s.images.lock().unwrap().len(), 2);
-        assert_eq!(a.file_name, "a.dng");
+        let img = CachedImage {
+            path: "/x/a.dng".into(),
+            file_name: "a.dng".into(),
+            metadata: Metadata::default(),
+            thumbnail: "data:,".into(),
+            developed: None,
+        };
+        let e = s.insert(img);
+        assert_eq!(e.id, "img0");
+        assert!(!e.developed);
     }
 }
