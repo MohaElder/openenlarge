@@ -1,7 +1,7 @@
 //! Tauri commands orchestrating film-core for the RedRoom UI.
 
 use crate::convert::{crop, proxy, resize_to};
-use crate::encode::to_png_b64;
+use crate::encode::{to_jpeg_b64, to_png_b64};
 use crate::metadata::extract;
 use crate::session::{CachedImage, ImageEntry, InvertParams, Session};
 use film_core::calibrate::{auto_wb_gains, sample_base, Rect};
@@ -14,6 +14,7 @@ use tauri::State;
 
 const PROXY_EDGE: u32 = 2048;
 const THUMB_EDGE: u32 = 256;
+const PREVIEW_JPEG_QUALITY: u8 = 88;
 
 fn decode_any(path: &Path) -> Result<film_core::Image, String> {
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
@@ -75,8 +76,9 @@ pub fn import_image(path: String, session: State<Session>) -> Result<ImageEntry,
     let thumb_img = proxy(&full, THUMB_EDGE);
     let thumbnail = to_png_b64(&thumb_img, true)?;
     let metadata = extract(p, full.width as u32, full.height as u32);
+    let base = sample_base(&proxy_img, None);
     let file_name = p.file_name().and_then(|s| s.to_str()).unwrap_or("image").to_string();
-    let cached = CachedImage { full_res: full, proxy: proxy_img, thumb_img, file_name, metadata, thumbnail };
+    let cached = CachedImage { full_res: full, proxy: proxy_img, thumb_img, base, file_name, metadata, thumbnail };
     Ok(session.insert(cached))
 }
 
@@ -130,12 +132,11 @@ pub fn render_view(id: String, params: InvertParams, view: ViewSpec, session: St
     let scaled = resize_to(&cropped, view.out_w.max(1), view.out_h.max(1));
 
     if view.raw {
-        return to_png_b64(&scaled, true);
+        return to_jpeg_b64(&scaled, true, PREVIEW_JPEG_QUALITY);
     }
-    let base = sample_base(&img.proxy, None);
-    let ip = resolve_params(&params, &img.thumb_img, base);
+    let ip = resolve_params(&params, &img.thumb_img, img.base);
     let inv = invert_image(&scaled, &ip, mode_from(&params.mode));
-    to_png_b64(&inv, false)
+    to_jpeg_b64(&inv, false, PREVIEW_JPEG_QUALITY)
 }
 
 #[tauri::command]

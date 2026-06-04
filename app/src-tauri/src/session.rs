@@ -32,6 +32,9 @@ pub struct CachedImage {
     pub full_res: Image,
     pub proxy: Image,
     pub thumb_img: Image,
+    /// Film base (orange mask), sampled once at import — avoids re-sorting the
+    /// whole proxy on every render.
+    pub base: [f32; 3],
     pub file_name: String,
     pub metadata: Metadata,
     pub thumbnail: String,
@@ -65,8 +68,8 @@ mod tests {
     use super::*;
     fn dummy(name: &str) -> CachedImage {
         let img = Image { width: 1, height: 1, pixels: vec![[0.0; 3]], ir: None };
-        CachedImage { full_res: img.clone(), proxy: img.clone(), thumb_img: img, file_name: name.to_string(),
-            metadata: Metadata::default(), thumbnail: "data:,".to_string() }
+        CachedImage { full_res: img.clone(), proxy: img.clone(), thumb_img: img, base: [1.0; 3],
+            file_name: name.to_string(), metadata: Metadata::default(), thumbnail: "data:,".to_string() }
     }
     #[test]
     fn insert_assigns_unique_incrementing_ids() {
