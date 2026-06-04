@@ -1,0 +1,24 @@
+:root {
+  --bg-0: #0a0a0c;
+  --bg-1: #141418;
+  --glass-bg: rgba(28, 28, 34, 0.55);
+  --glass-brd: rgba(255, 255, 255, 0.08);
+  --glass-hi: rgba(255, 255, 255, 0.04);
+  --text: #e8e8ea;
+  --text-dim: #9a9aa2;
+  --accent: #e03434;
+  --accent-dim: #7a1e1e;
+  --radius: 14px;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background:
+    radial-gradient(1200px 800px at 70% -10%, #1a1320 0%, transparent 60%),
+    radial-gradient(900px 600px at -10% 110%, #101820 0%, transparent 55%),
+    var(--bg-0);
+  color: var(--text);
+  font: 13px/1.4 -apple-system, system-ui, sans-serif;
+  overflow: hidden;
+}
+button { font: inherit; color: var(--text); cursor: pointer; }
