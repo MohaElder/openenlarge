@@ -1,13 +1,25 @@
 <script lang="ts">
-  import { tick } from "svelte";
+  import { tick, onMount } from "svelte";
   import { images, activeId, selectedFolder, gridZoom } from "../store";
   let scrollEl: HTMLDivElement;
+  let containerW = 800;
   $: shown = $images.filter((i) => {
     const dir = i.path.replace(/\\/g, "/").split("/").slice(0, -1).join("/");
     return dir === $selectedFolder;
   });
-  $: minCol = 130 + ($gridZoom / 100) * 230; // 130–360px cell width
   const GAP = 12;
+  const MIN = 130;
+  // 130px at zoom 0 → full container width at zoom 100 (1 image per row).
+  $: maxCol = Math.max(MIN, containerW - 4);
+  $: minCol = MIN + ($gridZoom / 100) * (maxCol - MIN);
+
+  onMount(() => {
+    const measure = () => { if (scrollEl) containerW = scrollEl.clientWidth; };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (scrollEl) ro.observe(scrollEl);
+    return () => ro.disconnect();
+  });
 
   // ctrl/cmd + scroll (and trackpad pinch) resize thumbnails; plain scroll scrolls.
   function onWheel(e: WheelEvent) {
