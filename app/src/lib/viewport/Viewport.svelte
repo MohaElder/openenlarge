@@ -44,7 +44,12 @@
   }
   function schedule() { if (timer) clearTimeout(timer); timer = setTimeout(render, 100); }
 
-  $: if (id && vpW && imgW && (params, scale, cx, cy, raw)) schedule();
+  function maybeRender() {
+    if (id && vpW && imgW) schedule();
+  }
+  // Re-render whenever any of these change (listed as a reactive dependency
+  // sequence so their *values* aren't used as a gating condition).
+  $: id, vpW, imgH, imgW, params, scale, cx, cy, raw, maybeRender();
 
   function imgPoint(e: { clientX: number; clientY: number }): [number, number] {
     const v = deriveView(scale, cx, cy, imgW, imgH, vpW, vpH);
