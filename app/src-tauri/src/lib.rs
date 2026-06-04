@@ -12,6 +12,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             commands::import_image,
+            commands::develop_image,
+            commands::set_quality,
             commands::render_view,
             commands::export_image,
         ])

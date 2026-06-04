@@ -3,8 +3,8 @@
 use crate::convert::{crop, proxy, resize_to};
 use crate::encode::{to_jpeg_b64, to_png_b64};
 use crate::metadata::extract;
-use crate::session::{CachedImage, ImageEntry, InvertParams, Session};
-use film_core::calibrate::{auto_wb_gains, sample_base, Rect};
+use crate::session::{CachedImage, Developed, ImageEntry, InvertParams, Quality, Session};
+use film_core::calibrate::{auto_wb_gains, sample_base};
 use film_core::decode::{decode_raw, decode_tiff};
 use film_core::engine::{invert_image, params_for_stock, InversionParams, Mode};
 use film_core::spectral::Stock;
@@ -12,8 +12,8 @@ use serde::Deserialize;
 use std::path::Path;
 use tauri::State;
 
-const PROXY_EDGE: u32 = 2048;
-const THUMB_EDGE: u32 = 256;
+const THUMB_EDGE: u32 = 320;
+const AUTOWB_EDGE: u32 = 256;
 const PREVIEW_JPEG_QUALITY: u8 = 88;
 
 fn decode_any(path: &Path) -> Result<film_core::Image, String> {
@@ -43,8 +43,6 @@ fn build_params(p: &InvertParams, base: [f32; 3]) -> InversionParams {
     }
 }
 
-/// Manual white-balance gains from Temp/Tint controls (each ~[-1,1]).
-/// temp>0 warms (more R, less B); tint>0 pushes magenta (less G).
 fn wb_from_temp_tint(temp: f32, tint: f32) -> [f32; 3] {
     let r = (1.0 + 0.4 * temp + 0.2 * tint).max(0.1);
     let g = (1.0 - 0.4 * tint).max(0.1);
@@ -52,10 +50,6 @@ fn wb_from_temp_tint(temp: f32, tint: f32) -> [f32; 3] {
     [r, g, b]
 }
 
-/// Build the final inversion params: matrices/exposure from `build_params`, plus
-/// manual Temp/Tint WB and (if `auto_wb`) gray-world gains from a first pass over
-/// `autowb_src`. Auto gains are computed on a small fixed image (the thumbnail)
-/// for consistency between preview and export, independent of zoom/crop.
 fn resolve_params(p: &InvertParams, autowb_src: &film_core::Image, base: [f32; 3]) -> InversionParams {
     let manual = wb_from_temp_tint(p.temp, p.tint);
     let mut ip = build_params(p, base);
@@ -68,18 +62,56 @@ fn resolve_params(p: &InvertParams, autowb_src: &film_core::Image, base: [f32; 3
     ip
 }
 
+/// LIGHT import: thumbnail (embedded preview if available) + metadata + stored
+/// path. No full decode — the heavy work happens in `develop_image`.
 #[tauri::command]
 pub fn import_image(path: String, session: State<Session>) -> Result<ImageEntry, String> {
     let p = Path::new(&path);
-    let full = decode_any(p)?;
-    let proxy_img = proxy(&full, PROXY_EDGE);
-    let thumb_img = proxy(&full, THUMB_EDGE);
-    let thumbnail = to_png_b64(&thumb_img, true)?;
-    let metadata = extract(p, full.width as u32, full.height as u32);
-    let base = sample_base(&proxy_img, None);
+    let thumbnail = match decode_tiff(p) {
+        Ok(prev) => to_png_b64(&proxy(&prev, THUMB_EDGE), true)?,
+        Err(_) => "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==".to_string(),
+    };
+    let metadata = extract(p, 0, 0);
     let file_name = p.file_name().and_then(|s| s.to_str()).unwrap_or("image").to_string();
-    let cached = CachedImage { full_res: full, proxy: proxy_img, thumb_img, base, file_name, metadata, thumbnail };
+    let cached = CachedImage { path, file_name, metadata, thumbnail, developed: None };
     Ok(session.insert(cached))
+}
+
+/// HEAVY step: decode the file, build the working image at the quality cap, a
+/// small auto-WB thumb, and sample the base. Drops full_res. Returns the updated
+/// entry (real dimensions + developed=true).
+#[tauri::command]
+pub fn develop_image(id: String, session: State<Session>) -> Result<ImageEntry, String> {
+    let cap = session.quality.lock().unwrap().cap();
+    let path = {
+        let images = session.images.lock().unwrap();
+        images.get(&id).ok_or("unknown image id")?.path.clone()
+    };
+    let full = decode_any(Path::new(&path))?;
+    let working = proxy(&full, cap);
+    let thumb = proxy(&full, AUTOWB_EDGE);
+    let base = sample_base(&working, None);
+    let (w, h) = (full.width as u32, full.height as u32);
+    drop(full);
+
+    let mut images = session.images.lock().unwrap();
+    let img = images.get_mut(&id).ok_or("unknown image id")?;
+    img.metadata.width = w;
+    img.metadata.height = h;
+    img.developed = Some(Developed { working, thumb, base });
+    Ok(ImageEntry {
+        id: id.clone(),
+        file_name: img.file_name.clone(),
+        thumbnail: img.thumbnail.clone(),
+        metadata: img.metadata.clone(),
+        developed: true,
+    })
+}
+
+#[tauri::command]
+pub fn set_quality(quality: Quality, session: State<Session>) -> Result<(), String> {
+    *session.quality.lock().unwrap() = quality;
+    Ok(())
 }
 
 /// The visible region to render, in FULL-RES pixel coordinates, plus the output
@@ -92,40 +124,20 @@ pub struct ViewSpec {
     pub raw: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Source {
-    Proxy,
-    FullRes,
-}
-
-/// Cheapest source with enough detail: proxy when the crop sampled at proxy scale
-/// already meets the output width; otherwise full-res.
-fn choose_source(crop_w_full: f64, out_w: u32, proxy_scale: f64) -> Source {
-    if crop_w_full * proxy_scale >= out_w as f64 {
-        Source::Proxy
-    } else {
-        Source::FullRes
-    }
-}
-
 #[tauri::command]
 pub fn render_view(id: String, params: InvertParams, view: ViewSpec, session: State<Session>) -> Result<String, String> {
     let images = session.images.lock().unwrap();
     let img = images.get(&id).ok_or("unknown image id")?;
+    let dev = img.developed.as_ref().ok_or("not developed")?;
 
-    let proxy_scale = img.proxy.width as f64 / img.full_res.width.max(1) as f64;
-    let source = choose_source(view.crop[2], view.out_w, proxy_scale);
-    let (src_img, s_scale) = match source {
-        Source::Proxy => (&img.proxy, proxy_scale),
-        Source::FullRes => (&img.full_res, 1.0),
-    };
+    let s_scale = dev.working.width as f64 / img.metadata.width.max(1) as f64;
 
     let cx = (view.crop[0] * s_scale).max(0.0).round() as usize;
     let cy = (view.crop[1] * s_scale).max(0.0).round() as usize;
     let cw = (view.crop[2] * s_scale).round().max(1.0) as usize;
     let ch = (view.crop[3] * s_scale).round().max(1.0) as usize;
 
-    let cropped = crop(src_img, cx, cy, cw, ch);
+    let cropped = crop(&dev.working, cx, cy, cw, ch);
     if cropped.pixels.is_empty() {
         return Err("empty crop".into());
     }
@@ -134,19 +146,23 @@ pub fn render_view(id: String, params: InvertParams, view: ViewSpec, session: St
     if view.raw {
         return to_jpeg_b64(&scaled, true, PREVIEW_JPEG_QUALITY);
     }
-    let ip = resolve_params(&params, &img.thumb_img, img.base);
+    let ip = resolve_params(&params, &dev.thumb, dev.base);
     let inv = invert_image(&scaled, &ip, mode_from(&params.mode));
     to_jpeg_b64(&inv, false, PREVIEW_JPEG_QUALITY)
 }
 
+/// Re-decode the file at full resolution and export a 16-bit TIFF.
 #[tauri::command]
 pub fn export_image(id: String, params: InvertParams, out_path: String, session: State<Session>) -> Result<(), String> {
-    let images = session.images.lock().unwrap();
-    let img = images.get(&id).ok_or("unknown image id")?;
-    let rect = params.base_rect.map(|r| Rect { x: r[0], y: r[1], w: r[2], h: r[3] });
-    let base = sample_base(&img.proxy, rect);
-    let ip = resolve_params(&params, &img.thumb_img, base);
-    let inv = invert_image(&img.full_res, &ip, mode_from(&params.mode));
+    let (path, base, thumb) = {
+        let images = session.images.lock().unwrap();
+        let img = images.get(&id).ok_or("unknown image id")?;
+        let dev = img.developed.as_ref().ok_or("not developed")?;
+        (img.path.clone(), dev.base, dev.thumb.clone())
+    };
+    let full = decode_any(Path::new(&path))?;
+    let ip = resolve_params(&params, &thumb, base);
+    let inv = invert_image(&full, &ip, mode_from(&params.mode));
     film_core::export::write_tiff16(&inv, Path::new(&out_path)).map_err(|e| format!("{e}"))
 }
 
@@ -155,8 +171,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn choose_source_uses_proxy_at_fit_fullres_when_zoomed() {
-        assert_eq!(choose_source(4000.0, 250, 0.5), Source::Proxy);
-        assert_eq!(choose_source(250.0, 250, 0.5), Source::FullRes);
+    fn wb_temp_tint_directions() {
+        let warm = wb_from_temp_tint(0.5, 0.0);
+        assert!(warm[0] > 1.0 && warm[2] < 1.0);
+        let green = wb_from_temp_tint(0.0, -0.5);
+        assert!(green[1] > 1.0);
     }
 }
