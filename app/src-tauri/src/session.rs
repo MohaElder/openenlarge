@@ -31,6 +31,7 @@ pub struct ImageEntry {
 pub struct CachedImage {
     pub full_res: Image,
     pub proxy: Image,
+    pub thumb_img: Image,
     pub file_name: String,
     pub metadata: Metadata,
     pub thumbnail: String,
@@ -64,7 +65,7 @@ mod tests {
     use super::*;
     fn dummy(name: &str) -> CachedImage {
         let img = Image { width: 1, height: 1, pixels: vec![[0.0; 3]], ir: None };
-        CachedImage { full_res: img.clone(), proxy: img, file_name: name.to_string(),
+        CachedImage { full_res: img.clone(), proxy: img.clone(), thumb_img: img, file_name: name.to_string(),
             metadata: Metadata::default(), thumbnail: "data:,".to_string() }
     }
     #[test]

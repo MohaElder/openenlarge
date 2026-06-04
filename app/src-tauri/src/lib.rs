@@ -12,8 +12,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             commands::import_image,
-            commands::raw_preview,
-            commands::inverted_preview,
+            commands::render_view,
             commands::export_image,
         ])
         .run(tauri::generate_context!())
