@@ -5,6 +5,8 @@
 use crate::Image;
 
 const EPS: f32 = 1e-5;
+/// Unsharp-mask gain at texture = ±1 (empirical).
+const USM_GAIN: f32 = 1.5;
 
 /// Creative controls. UI sends −100..100 (and EV for exposure, handled upstream);
 /// these are pre-scaled to −1..1 by the caller. 0.0 everywhere = identity.
@@ -62,11 +64,48 @@ pub fn finish_pixel(rgb: [f32; 3], p: &FinishParams) -> [f32; 3] {
     apply_saturation(toned, p)
 }
 
-/// Apply finishing to a whole image. Texture (spatial) is added in Task 2.
+/// Separable 3-tap Gaussian (radius 1, weights 1/4,1/2,1/4). Edges clamp. Small
+/// radius keeps it cheap; texture is a local effect.
+fn blur(img: &Image) -> Image {
+    let (w, h) = (img.width, img.height);
+    let idx = |x: usize, y: usize| y * w + x;
+    let mut tmp = vec![[0.0_f32; 3]; w * h];
+    // Horizontal
+    for y in 0..h {
+        for x in 0..w {
+            let xl = x.saturating_sub(1);
+            let xr = (x + 1).min(w - 1);
+            let (a, b, c) = (img.pixels[idx(xl, y)], img.pixels[idx(x, y)], img.pixels[idx(xr, y)]);
+            tmp[idx(x, y)] = std::array::from_fn(|i| 0.25 * a[i] + 0.5 * b[i] + 0.25 * c[i]);
+        }
+    }
+    // Vertical
+    let mut out = vec![[0.0_f32; 3]; w * h];
+    for y in 0..h {
+        let yu = y.saturating_sub(1);
+        let yd = (y + 1).min(h - 1);
+        for x in 0..w {
+            let (a, b, c) = (tmp[idx(x, yu)], tmp[idx(x, y)], tmp[idx(x, yd)]);
+            out[idx(x, y)] = std::array::from_fn(|i| 0.25 * a[i] + 0.5 * b[i] + 0.25 * c[i]);
+        }
+    }
+    Image { width: w, height: h, pixels: out, ir: None } // scratch image: ir restored by apply_texture
+}
+
+/// Unsharp mask: out = v + amount * (v − blur(v)). amount in −1..1.
+fn apply_texture(img: &Image, amount: f32) -> Image {
+    let b = blur(img);
+    let k = USM_GAIN * amount;
+    let pixels = img.pixels.iter().zip(b.pixels.iter())
+        .map(|(&v, &lo)| std::array::from_fn(|c| (v[c] + k * (v[c] - lo[c])).clamp(0.0, 1.0)))
+        .collect();
+    Image { width: img.width, height: img.height, pixels, ir: img.ir.clone() }
+}
+
 pub fn finish_image(img: &Image, p: &FinishParams) -> Image {
     let pixels = img.pixels.iter().map(|&px| finish_pixel(px, p)).collect();
-    // NOTE: texture (a spatial unsharp pass) is added here in Task 2.
-    Image { width: img.width, height: img.height, pixels, ir: img.ir.clone() }
+    let toned = Image { width: img.width, height: img.height, pixels, ir: img.ir.clone() };
+    if p.texture.abs() > EPS { apply_texture(&toned, p.texture) } else { toned }
 }
 
 #[cfg(test)]
@@ -148,5 +187,36 @@ mod tests {
                 assert!((o[c] - s[c]).abs() < 1e-4, "c={c} out={} src={}", o[c], s[c]);
             }
         }
+    }
+
+    #[test]
+    fn texture_zero_is_identity() {
+        // A 5x5 ramp; texture=0 must return the same pixels (up to f32 round-trip).
+        let mut px = Vec::new();
+        for i in 0..25 { let v = i as f32 / 25.0; px.push([v, v, v]); }
+        let img = Image { width: 5, height: 5, pixels: px.clone(), ir: None };
+        let out = finish_image(&img, &FinishParams::default());
+        for (o, s) in out.pixels.iter().zip(px.iter()) {
+            for c in 0..3 {
+                assert!((o[c] - s[c]).abs() < 1e-5, "c={c} out={} src={}", o[c], s[c]);
+            }
+        }
+    }
+
+    #[test]
+    fn positive_texture_increases_edge_contrast() {
+        // Vertical step edge: left half 0.4, right half 0.6 (5x5).
+        let mut px = Vec::new();
+        for _y in 0..5 {
+            for x in 0..5 { let v = if x < 2 { 0.4 } else { 0.6 }; px.push([v, v, v]); }
+        }
+        let img = Image { width: 5, height: 5, pixels: px, ir: None };
+        let p = FinishParams { texture: 1.0, ..Default::default() };
+        let out = finish_image(&img, &p);
+        // The bright side of the edge (x=2) should be pushed brighter than its
+        // flat-region neighbour (x=4).
+        let edge = out.pixels[2 * 5 + 2][0];
+        let flat = out.pixels[2 * 5 + 4][0];
+        assert!(edge > flat, "edge {edge} flat {flat}");
     }
 }
