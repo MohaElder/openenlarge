@@ -4,3 +4,6 @@
 /app/node_modules
 /app/dist
 /samples
+/app/src-tauri/target
+/app/build
+/app/.svelte-kit

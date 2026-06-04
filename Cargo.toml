@@ -1,6 +1,7 @@
 [workspace]
 resolver = "2"
 members = ["crates/film-core", "crates/film-cli"]
+exclude = ["app/src-tauri"]
 
 [workspace.dependencies]
 nalgebra = "0.33"
