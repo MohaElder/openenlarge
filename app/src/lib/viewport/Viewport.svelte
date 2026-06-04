@@ -2,6 +2,8 @@
   import { onMount } from "svelte";
   import { api, type InvertParams } from "../api";
   import { previewSrc } from "../store";
+  import { FinishRenderer, webgl2Available } from "./gl/renderer";
+  import { finishUniforms } from "./gl/uniforms";
 
   export let id: string | null;
   export let params: InvertParams;
@@ -10,47 +12,40 @@
   export let raw = false;
   export let interactive = true;
 
-  // Max rendered long edge. The whole image is rendered at the zoom resolution
-  // (capped here) so panning is pure CSS with no re-fetch. True 1:1 for images
-  // up to this size; larger files (e.g. 100MP) are rendered slightly soft.
   const CAP = 5000;
-
-  // Breathing room (Lightroom-style): the editable canvas is the image plus a
-  // PAD-px margin. At Fit the image floats with this margin; when zoomed you can
-  // pan PAD px past each edge. Only applies to the interactive (Develop) canvas.
   const PAD = 60;
 
   let el: HTMLDivElement;
+  let canvas: HTMLCanvasElement | null = null;
+  let renderer: FinishRenderer | null = null;
+  // GPU path: only the interactive, non-raw develop canvas, when WebGL2 exists.
+  const useGL = interactive && !raw && webgl2Available();
+
   let src = "";
   let vpW = 0, vpH = 0;
-  let scale = 0;        // display px per image px (0 = uninitialised → Fit)
-  let cx = 0, cy = 0;   // image-space point centred in the viewport
+  let scale = 0;
+  let cx = 0, cy = 0;
   let prevId: string | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
-  let animating = false;                                   // tap-toggle zoom in flight
+  let histTimer: ReturnType<typeof setTimeout> | null = null;
+  let animating = false;
   let animTimer: ReturnType<typeof setTimeout> | null = null;
 
-  // Only treat dimensions as usable once both image AND viewport are measured;
-  // otherwise `fit` would be a bogus 1.0 (=100%) and the first frame magnifies.
   $: ready = imgW > 0 && imgH > 0 && vpW > 0 && vpH > 0;
   $: pad = interactive ? PAD : 0;
-  $: avW = Math.max(1, vpW - 2 * pad);   // padded viewport the image must fit/cover
+  $: avW = Math.max(1, vpW - 2 * pad);
   $: avH = Math.max(1, vpH - 2 * pad);
   $: fit = ready ? Math.min(avW / imgW, avH / imgH) : 0;
-  $: eff = interactive ? (scale > 0 ? scale : fit) : fit; // effective display scale
+  $: eff = interactive ? (scale > 0 ? scale : fit) : fit;
   $: zoomed = interactive && eff > fit + 1e-6;
   $: label = eff <= fit + 1e-6 ? "Fit" : Math.round(eff * 100) + "%";
 
-  // Keep (cx,cy) so the image covers the padded viewport when zoomed in, while
-  // allowing up to PAD px of background past each edge. Below the padded-fit size
-  // (e.g. at Fit) the axis stays centred, so the image floats with its margin.
   function clampCenter() {
     const halfW = avW / 2 / eff, halfH = avH / 2 / eff;
     cx = imgW * eff <= avW ? imgW / 2 : Math.max(halfW, Math.min(imgW - halfW, cx));
     cy = imgH * eff <= avH ? imgH / 2 : Math.max(halfH, Math.min(imgH - halfH, cy));
   }
 
-  // Bitmap = the whole image at `eff` scale; position it so (cx,cy) is centred.
   $: dispW = imgW * eff;
   $: dispH = imgH * eff;
   $: left = vpW / 2 - cx * eff;
@@ -62,41 +57,79 @@
   }
   onMount(() => {
     measure();
+    if (useGL && canvas) {
+      const r = new FinishRenderer(canvas);
+      if (r.available) renderer = r;
+    }
     const ro = new ResizeObserver(measure);
     if (el) ro.observe(el);
     return () => ro.disconnect();
   });
 
-  // Reset to Fit when the image changes — but only once `fit` is known, so the
-  // first frame is never accidentally magnified to 100%.
   $: if (id !== prevId) { prevId = id; scale = 0; cx = imgW / 2; cy = imgH / 2; }
   $: if (interactive && scale === 0 && fit > 0) scale = fit;
 
-  // Render the WHOLE image at the effective scale (capped). Pan does NOT call
-  // this — only image/params/zoom-level/viewport changes do.
+  // Decode a JPEG data-URL to an <img> we can upload as a texture.
+  function loadImage(url: string): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => resolve(im);
+      im.onerror = reject;
+      im.src = url;
+    });
+  }
+
+  // Fetch the source preview. With GL, request the PRE-FINISH image (finish:false)
+  // and apply finishing in the shader; otherwise fetch the finished image.
   async function render() {
     if (!id || !imgW || !vpW) { src = ""; return; }
     const rscale = Math.min(eff, CAP / Math.max(imgW, imgH));
     const out_w = Math.max(1, Math.round(imgW * rscale));
     const out_h = Math.max(1, Math.round(imgH * rscale));
     try {
-      src = await api.renderView(id, params, { crop: [0, 0, imgW, imgH], out_w, out_h, raw });
-      if (interactive && !raw) previewSrc.set(src);
+      const data = await api.renderView(id, params, {
+        crop: [0, 0, imgW, imgH], out_w, out_h, raw, finish: !(useGL && renderer),
+      });
+      if (useGL && renderer) {
+        const im = await loadImage(data);
+        renderer.setSource(im, out_w, out_h);
+        drawGL();
+      } else {
+        src = data;
+        if (interactive && !raw) previewSrc.set(src);
+      }
     } catch { /* keep previous frame */ }
   }
+
+  function drawGL() {
+    if (!renderer) return;
+    renderer.setUniforms(finishUniforms(params));
+    renderer.draw();
+    // Publish a snapshot for the histogram (debounced; toDataURL is cheap-ish).
+    if (canvas) {
+      if (histTimer) clearTimeout(histTimer);
+      const cv = canvas;
+      histTimer = setTimeout(() => previewSrc.set(cv.toDataURL("image/jpeg", 0.8)), 120);
+    }
+  }
+
   function schedule() { if (timer) clearTimeout(timer); timer = setTimeout(render, 80); }
   function scheduleIfReady() { if (id && vpW && imgW) { clampCenter(); schedule(); } }
 
-  // Re-render on image / params / zoom-level / viewport changes (NOT on pan).
-  $: id, vpW, vpH, imgW, imgH, params, raw, eff, scheduleIfReady();
+  // Re-fetch the SOURCE only when the inversion / zoom / view changes. In Plan 2A
+  // exposure/temp/tint are still baked by the backend, so they live in this key.
+  $: srcKey = `${id}|${raw}|${eff}|${vpW}|${vpH}|${params.mode}|${params.stock}|${params.exposure}|${params.temp}|${params.tint}`;
+  $: srcKey, imgW, imgH, scheduleIfReady();
+
+  // Finishing-only change → GPU redraw, no backend fetch.
+  $: finishKey = `${params.contrast}|${params.highlights}|${params.shadows}|${params.whites}|${params.blacks}|${params.texture}|${params.vibrance}|${params.saturation}`;
+  $: if (useGL) { finishKey; if (renderer) drawGL(); }
 
   function imgPoint(e: { clientX: number; clientY: number }): [number, number] {
     const rect = el.getBoundingClientRect();
     return [(e.clientX - rect.left - left) / eff, (e.clientY - rect.top - top) / eff];
   }
 
-  // Animate a tap-toggle zoom (~180ms); live gestures (pan/scroll) cancel it so
-  // the CSS transition never lags the drag or fights wheel zoom.
   function startAnim() {
     animating = true;
     if (animTimer) clearTimeout(animTimer);
@@ -118,8 +151,6 @@
     scale = ns;
   }
 
-  // Tap toggles Fit↔100%; drag pans (only when zoomed). Pan moves (cx,cy) which
-  // repositions the bitmap via CSS instantly — no re-render.
   let lastX = 0, lastY = 0, downX = 0, downY = 0, moved = false, panning = false;
   function onDown(e: PointerEvent) {
     if (!interactive) return;
@@ -156,7 +187,13 @@
   on:wheel={onWheel}
   on:pointerdown={onDown} on:pointermove={onMove} on:pointerup={onUp} on:pointercancel={onCancel}
 >
-  {#if src}
+  {#if useGL}
+    <canvas
+      bind:this={canvas} class:anim={animating}
+      style="position:absolute; width:{dispW}px; height:{dispH}px; left:{left}px; top:{top}px;"
+    ></canvas>
+    {#if !id}<div class="hint">…</div>{/if}
+  {:else if src}
     <img
       {src} alt="preview" draggable="false" class:anim={animating}
       style="position:absolute; width:{dispW}px; height:{dispH}px; left:{left}px; top:{top}px;"
@@ -171,8 +208,8 @@
   .vp.interactive { cursor: zoom-in; }
   .vp.zoomed { cursor: grab; }
   .vp.zoomed:active { cursor: grabbing; }
-  img { display: block; will-change: left, top, width, height; }
-  img.anim { transition: left 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+  img, canvas { display: block; will-change: left, top, width, height; }
+  img.anim, canvas.anim { transition: left 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
     top 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
     width 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
     height 180ms cubic-bezier(0.22, 0.61, 0.36, 1); }
