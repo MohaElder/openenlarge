@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { api, type InvertParams } from "../api";
+  import { previewSrc } from "../store";
 
   export let id: string | null;
   export let params: InvertParams;
@@ -14,6 +15,11 @@
   // up to this size; larger files (e.g. 100MP) are rendered slightly soft.
   const CAP = 5000;
 
+  // Breathing room (Lightroom-style): the editable canvas is the image plus a
+  // PAD-px margin. At Fit the image floats with this margin; when zoomed you can
+  // pan PAD px past each edge. Only applies to the interactive (Develop) canvas.
+  const PAD = 60;
+
   let el: HTMLDivElement;
   let src = "";
   let vpW = 0, vpH = 0;
@@ -21,20 +27,27 @@
   let cx = 0, cy = 0;   // image-space point centred in the viewport
   let prevId: string | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let animating = false;                                   // tap-toggle zoom in flight
+  let animTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Only treat dimensions as usable once both image AND viewport are measured;
   // otherwise `fit` would be a bogus 1.0 (=100%) and the first frame magnifies.
   $: ready = imgW > 0 && imgH > 0 && vpW > 0 && vpH > 0;
-  $: fit = ready ? Math.min(vpW / imgW, vpH / imgH) : 0;
+  $: pad = interactive ? PAD : 0;
+  $: avW = Math.max(1, vpW - 2 * pad);   // padded viewport the image must fit/cover
+  $: avH = Math.max(1, vpH - 2 * pad);
+  $: fit = ready ? Math.min(avW / imgW, avH / imgH) : 0;
   $: eff = interactive ? (scale > 0 ? scale : fit) : fit; // effective display scale
   $: zoomed = interactive && eff > fit + 1e-6;
   $: label = eff <= fit + 1e-6 ? "Fit" : Math.round(eff * 100) + "%";
 
-  // Keep (cx,cy) so the image always covers the viewport when zoomed in.
+  // Keep (cx,cy) so the image covers the padded viewport when zoomed in, while
+  // allowing up to PAD px of background past each edge. Below the padded-fit size
+  // (e.g. at Fit) the axis stays centred, so the image floats with its margin.
   function clampCenter() {
-    const halfW = vpW / 2 / eff, halfH = vpH / 2 / eff;
-    cx = imgW * eff <= vpW ? imgW / 2 : Math.max(halfW, Math.min(imgW - halfW, cx));
-    cy = imgH * eff <= vpH ? imgH / 2 : Math.max(halfH, Math.min(imgH - halfH, cy));
+    const halfW = avW / 2 / eff, halfH = avH / 2 / eff;
+    cx = imgW * eff <= avW ? imgW / 2 : Math.max(halfW, Math.min(imgW - halfW, cx));
+    cy = imgH * eff <= avH ? imgH / 2 : Math.max(halfH, Math.min(imgH - halfH, cy));
   }
 
   // Bitmap = the whole image at `eff` scale; position it so (cx,cy) is centred.
@@ -68,6 +81,7 @@
     const out_h = Math.max(1, Math.round(imgH * rscale));
     try {
       src = await api.renderView(id, params, { crop: [0, 0, imgW, imgH], out_w, out_h, raw });
+      if (interactive && !raw) previewSrc.set(src);
     } catch { /* keep previous frame */ }
   }
   function schedule() { if (timer) clearTimeout(timer); timer = setTimeout(render, 80); }
@@ -81,8 +95,21 @@
     return [(e.clientX - rect.left - left) / eff, (e.clientY - rect.top - top) / eff];
   }
 
+  // Animate a tap-toggle zoom (~180ms); live gestures (pan/scroll) cancel it so
+  // the CSS transition never lags the drag or fights wheel zoom.
+  function startAnim() {
+    animating = true;
+    if (animTimer) clearTimeout(animTimer);
+    animTimer = setTimeout(() => (animating = false), 200);
+  }
+  function stopAnim() {
+    if (animTimer) { clearTimeout(animTimer); animTimer = null; }
+    animating = false;
+  }
+
   function onWheel(e: WheelEvent) {
     if (!interactive) return;
+    stopAnim();
     e.preventDefault();
     const [ix, iy] = imgPoint(e);
     const ns = Math.min(8, Math.max(fit, eff * Math.exp(-e.deltaY * 0.0015)));
@@ -96,6 +123,7 @@
   let lastX = 0, lastY = 0, downX = 0, downY = 0, moved = false, panning = false;
   function onDown(e: PointerEvent) {
     if (!interactive) return;
+    stopAnim();
     downX = lastX = e.clientX; downY = lastY = e.clientY; moved = false;
     panning = zoomed;
     (e.target as Element).setPointerCapture?.(e.pointerId);
@@ -113,6 +141,7 @@
   function onUp(e: PointerEvent) {
     if (interactive && !moved) {
       const [ix, iy] = imgPoint(e);
+      startAnim();
       if (zoomed) { scale = fit; cx = imgW / 2; cy = imgH / 2; }
       else { scale = 1.0; cx = ix; cy = iy; }
     }
@@ -129,7 +158,7 @@
 >
   {#if src}
     <img
-      {src} alt="preview" draggable="false"
+      {src} alt="preview" draggable="false" class:anim={animating}
       style="position:absolute; width:{dispW}px; height:{dispH}px; left:{left}px; top:{top}px;"
     />
   {:else}<div class="hint">…</div>{/if}
@@ -143,6 +172,10 @@
   .vp.zoomed { cursor: grab; }
   .vp.zoomed:active { cursor: grabbing; }
   img { display: block; will-change: left, top, width, height; }
+  img.anim { transition: left 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    top 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    width 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    height 180ms cubic-bezier(0.22, 0.61, 0.36, 1); }
   .hint { color: var(--text-dim); position: absolute; inset: 0; display: grid; place-items: center; }
   .zoom { position: absolute; bottom: 8px; right: 10px; font-size: 11px; color: var(--text-dim);
     background: rgba(0,0,0,0.45); padding: 2px 8px; border-radius: 6px; z-index: 2; }

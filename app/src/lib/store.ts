@@ -19,3 +19,6 @@ export const allDeveloped = derived(images, ($i) => $i.length > 0 && $i.every((x
 export const selectedFolder = writable<string | null>(null);
 export const gridZoom = writable<number>(55);
 export const undevelopedCount = derived(images, ($i) => $i.filter((x) => !x.developed).length);
+
+/** Data-URL of the latest rendered develop preview; drives the histogram. */
+export const previewSrc = writable<string>("");
