@@ -21,6 +21,8 @@ pub struct InversionParams {
     pub black: f32,
     /// Output gamma encoding exponent (sRGB-ish ~ 1/2.2 applied as power).
     pub gamma: f32,
+    /// Per-channel white-balance gain applied in linear light before gamma.
+    pub wb: [f32; 3],
 }
 
 impl Default for InversionParams {
@@ -32,6 +34,7 @@ impl Default for InversionParams {
             exposure: 1.0,
             black: 0.0,
             gamma: 1.0 / 2.2,
+            wb: [1.0, 1.0, 1.0],
         }
     }
 }
@@ -47,9 +50,10 @@ pub fn invert_naive(rgb: [f32; 3], p: &InversionParams) -> [f32; 3] {
     })
 }
 
-/// Apply exposure, black point, and output gamma to a linear density-output value.
-fn tone(mut v: f32, p: &InversionParams) -> f32 {
-    v = (v * p.exposure - p.black).max(0.0);
+/// Apply white-balance gain, exposure, black point, and output gamma to a linear
+/// density-output value.
+fn tone(v: f32, gain: f32, p: &InversionParams) -> f32 {
+    let v = (v * p.exposure * gain - p.black).max(0.0);
     v.powf(p.gamma)
 }
 
@@ -59,7 +63,7 @@ pub fn invert_c(rgb: [f32; 3], p: &InversionParams) -> [f32; 3] {
     std::array::from_fn(|c| {
         let t = (rgb[c] / p.base[c].max(EPS)).clamp(EPS, 1.0);
         let density = -t.log10(); // 0 at base, grows as pixel darkens
-        tone(density, p)
+        tone(density, p.wb[c], p)
     })
 }
 
@@ -86,9 +90,9 @@ pub fn invert_b(rgb: [f32; 3], p: &InversionParams) -> [f32; 3] {
     );
     let unmixed = p.m_post * dens;
     [
-        tone(unmixed[0], p),
-        tone(unmixed[1], p),
-        tone(unmixed[2], p),
+        tone(unmixed[0], p.wb[0], p),
+        tone(unmixed[1], p.wb[1], p),
+        tone(unmixed[2], p.wb[2], p),
     ]
 }
 
@@ -133,6 +137,7 @@ pub fn params_for_stock(
         exposure,
         black,
         gamma,
+        wb: [1.0, 1.0, 1.0],
     }
 }
 
@@ -260,6 +265,20 @@ mod tests {
         let b = invert_b(probe, &stock);
         let diff: f32 = (0..3).map(|c| (a[c] - b[c]).abs()).sum();
         assert!(diff > 1e-3, "stock M_post should change B output; diff={diff}");
+    }
+
+    #[test]
+    fn wb_gain_scales_channels_before_gamma() {
+        // A per-channel wb gain must brighten/darken that channel's output.
+        let base = [0.7, 0.6, 0.5];
+        let probe = [0.3, 0.25, 0.2];
+        let neutral = InversionParams { base, gamma: 1.0, ..Default::default() };
+        let warmed = InversionParams { base, gamma: 1.0, wb: [1.5, 1.0, 0.5], ..Default::default() };
+        let a = invert_b(probe, &neutral);
+        let b = invert_b(probe, &warmed);
+        assert!(b[0] > a[0], "R gain 1.5 should brighten R: {} vs {}", b[0], a[0]);
+        assert!((b[1] - a[1]).abs() < 1e-6, "G gain 1.0 unchanged");
+        assert!(b[2] < a[2], "B gain 0.5 should darken B: {} vs {}", b[2], a[2]);
     }
 
     #[test]

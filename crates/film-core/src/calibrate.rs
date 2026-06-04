@@ -41,6 +41,38 @@ pub fn sample_base(img: &Image, rect: Option<Rect>) -> [f32; 3] {
     base
 }
 
+/// Gray-world white-balance gains computed from the brightest ~20% of an
+/// (already inverted) image: per-channel multipliers that map the bright region's
+/// mean color to neutral. Returns `[1,1,1]` for an empty image. Apply as
+/// `InversionParams.wb` on a subsequent inversion to neutralize a global cast.
+pub fn auto_wb_gains(img: &Image) -> [f32; 3] {
+    if img.pixels.is_empty() {
+        return [1.0, 1.0, 1.0];
+    }
+    let mut lums: Vec<f32> = img.pixels.iter().map(|p| (p[0] + p[1] + p[2]) / 3.0).collect();
+    lums.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    let thresh = lums[((lums.len() as f32 * 0.8) as usize).min(lums.len() - 1)];
+    let (mut sum, mut n) = ([0.0f64; 3], 0u64);
+    for p in &img.pixels {
+        if (p[0] + p[1] + p[2]) / 3.0 >= thresh {
+            for c in 0..3 {
+                sum[c] += p[c] as f64;
+            }
+            n += 1;
+        }
+    }
+    if n == 0 {
+        return [1.0, 1.0, 1.0];
+    }
+    let mean = [sum[0] / n as f64, sum[1] / n as f64, sum[2] / n as f64];
+    let gray = (mean[0] + mean[1] + mean[2]) / 3.0;
+    [
+        (gray / mean[0].max(1e-6)) as f32,
+        (gray / mean[1].max(1e-6)) as f32,
+        (gray / mean[2].max(1e-6)) as f32,
+    ]
+}
+
 /// Concentration levels used to build the fitting patch grid (6³ = 216 patches).
 const FIT_LEVELS: [f32; 6] = [0.0, 0.4, 0.8, 1.2, 1.6, 2.0];
 
@@ -119,6 +151,21 @@ mod tests {
         // zero-area rect must not panic
         let base = sample_base(&img, Some(Rect { x: 0, y: 0, w: 0, h: 0 }));
         assert_eq!(base, [0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn auto_wb_gains_neutralize_a_global_cast() {
+        // A uniformly magenta-cast gray (R,B high vs G) -> gains restore neutral.
+        let cast = [0.6f32, 0.5, 0.4];
+        let img = Image { width: 4, height: 4, pixels: vec![cast; 16], ir: None };
+        let g = auto_wb_gains(&img);
+        // green is the reference (smallest gain), red/blue corrected toward it
+        assert!(g[2] > g[1] && g[1] > g[0], "expected B>G>R gains, got {g:?}");
+        // applying the gains makes the patch neutral
+        let corrected = [cast[0] * g[0], cast[1] * g[1], cast[2] * g[2]];
+        let mx = corrected.iter().cloned().fold(f32::MIN, f32::max);
+        let mn = corrected.iter().cloned().fold(f32::MAX, f32::min);
+        assert!(mx - mn < 1e-4, "not neutral after wb: {corrected:?}");
     }
 
     #[test]
