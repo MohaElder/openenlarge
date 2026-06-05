@@ -1,10 +1,10 @@
 //! Best-effort image metadata for the Library panel. Camera/lens/exposure come
 //! from rawler when the file is a RAW/DNG; dimensions + file size are always set.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-#[derive(Debug, Clone, Serialize, Default, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct Metadata {
     pub camera: Option<String>,
     pub lens: Option<String>,

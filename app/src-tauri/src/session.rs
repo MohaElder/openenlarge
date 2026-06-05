@@ -103,6 +103,9 @@ pub struct ImageEntry {
     pub metadata: Metadata,
     pub developed: bool,
     pub has_ir: bool,
+    /// True when the referenced file is missing on disk (restored from catalog).
+    #[serde(default)]
+    pub offline: bool,
 }
 
 /// Decoded working data, present once an image is developed.
@@ -124,16 +127,12 @@ pub struct CachedImage {
 #[derive(Default)]
 pub struct Session {
     pub images: Mutex<HashMap<String, CachedImage>>,
-    pub next_id: Mutex<u64>,
     pub quality: Mutex<Quality>,
 }
 
 impl Session {
-    pub fn insert(&self, img: CachedImage) -> ImageEntry {
-        let mut id_guard = self.next_id.lock().unwrap();
-        let id = format!("img{}", *id_guard);
-        *id_guard += 1;
-        drop(id_guard);
+    /// Insert a cached image under an explicit (catalog-assigned) id.
+    pub fn insert_with_id(&self, id: String, img: CachedImage) -> ImageEntry {
         let entry = ImageEntry {
             id: id.clone(),
             path: img.path.clone(),
@@ -142,6 +141,7 @@ impl Session {
             metadata: img.metadata.clone(),
             developed: img.developed.is_some(),
             has_ir: img.developed.as_ref().map(|d| d.working.ir.is_some()).unwrap_or(false),
+            offline: false,
         };
         self.images.lock().unwrap().insert(id, img);
         entry
@@ -168,7 +168,7 @@ mod tests {
     }
 
     #[test]
-    fn insert_reports_undeveloped_then_assigns_ids() {
+    fn insert_reports_undeveloped() {
         let s = Session::default();
         let img = CachedImage {
             path: "/x/a.dng".into(),
@@ -177,9 +177,10 @@ mod tests {
             thumbnail: "data:,".into(),
             developed: None,
         };
-        let e = s.insert(img);
-        assert_eq!(e.id, "img0");
+        let e = s.insert_with_id("abc".into(), img);
+        assert_eq!(e.id, "abc");
         assert!(!e.developed);
+        assert!(!e.offline);
     }
 
     #[test]
@@ -189,7 +190,7 @@ mod tests {
             path: "/x/a.tif".into(), file_name: "a.tif".into(),
             metadata: Metadata::default(), thumbnail: "data:,".into(), developed: None,
         };
-        let e = s.insert(img);
+        let e = s.insert_with_id("xyz".into(), img);
         assert!(!e.has_ir);
     }
 
