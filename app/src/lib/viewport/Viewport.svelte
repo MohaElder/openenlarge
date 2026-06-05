@@ -248,7 +248,7 @@
     }
     panning = false; moved = false;
   }
-  function onCancel() { panning = false; moved = false; }
+  function onCancel() { painting = false; pending = []; panning = false; moved = false; }
 </script>
 
 <div
