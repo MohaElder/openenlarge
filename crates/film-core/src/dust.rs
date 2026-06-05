@@ -254,7 +254,7 @@ mod tests {
         assert_eq!(m.x0, 0, "window clamped to left edge");
         assert!(m.w > 0, "partial dab produces a non-empty mask");
         // pixel (0,50): center (0.5, 50.5), distance ≈1.58 < 3 → masked.
-        let bit = m.bits[(50 - m.y0) * m.w + 0];
+        let bit = m.bits[(50 - m.y0) * m.w];
         assert!(bit, "on-image pixel at col 0 should be masked");
     }
 

@@ -169,8 +169,8 @@ fn color_mix(rgb: [f32; 3], cm: &ColorMix) -> [f32; 3] {
     let mut sat_factor = 1.0_f32;
     let mut hue_delta = 0.0_f32;
     let mut lum_delta = 0.0_f32;
-    for i in 0..8 {
-        let w = band_weight(h, BAND_CENTERS[i]);
+    for (i, &center) in BAND_CENTERS.iter().enumerate() {
+        let w = band_weight(h, center);
         if w <= 0.0 {
             continue;
         }
@@ -723,8 +723,8 @@ mod tests {
         let cg = ColorGrade::default();
         for v in [0.1, 0.5, 0.9] {
             let out = color_grade([v, v, v], &cg);
-            for c in 0..3 {
-                assert!((out[c] - v).abs() < 1e-5, "v={v} c={c} out={}", out[c]);
+            for (c, &oc) in out.iter().enumerate() {
+                assert!((oc - v).abs() < 1e-5, "v={v} c={c} out={oc}");
             }
         }
     }
@@ -950,8 +950,8 @@ mod tests {
         let a = sample(0.0);
         let b = sample(120.0);
         let c = [0.6, 0.5, 0.3];
-        let ab = point_color(c, &vec![a, b]);
-        let ba = point_color(c, &vec![b, a]);
+        let ab = point_color(c, &[a, b]);
+        let ba = point_color(c, &[b, a]);
         for k in 0..3 {
             assert!((ab[k] - ba[k]).abs() < 1e-5, "order matters {ab:?} {ba:?}");
         }

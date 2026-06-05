@@ -80,8 +80,8 @@ mod tests {
     #[test]
     fn neutral_is_unity() {
         let g = wb_from_kelvin(NEUTRAL_K, 0.0);
-        for c in 0..3 {
-            assert!((g[c] - 1.0).abs() < 0.05, "c{c}={}", g[c]);
+        for (c, &gc) in g.iter().enumerate() {
+            assert!((gc - 1.0).abs() < 0.05, "c{c}={gc}");
         }
     }
 
