@@ -217,3 +217,28 @@ inpaint so it runs once per upload).
 **User-verified (E2E):** dust heals correctly and exposure stays instant with dust on; the
 post→pre-invert heal-domain change looks equivalent to the prior CPU-fallback heal. CPU
 `render_view` is now used only for raw view and no-WebGL2.
+
+## GPU Develop — Plan 3b results (2026-06-05) — ARC COMPLETE
+
+Phase 6 landed on `main`: export now renders through the SAME WebGL2 shader as the preview
+(single source of truth). Rust decodes full-res, `bake_working` applies geometry + pre-invert
+dust/IR heal, ships half-float bytes + resolved uniforms; a dedicated offscreen `FinishRenderer`
+runs invert→finish into an FBO and reads back (RGBA8 for 8-bit formats, RGBA16F→f32 for 16-bit);
+Rust builds an `Image` and encodes with the existing encoders. Oversize (> `MAX_TEXTURE_SIZE`),
+no-WebGL2, or a non-renderable FBO format → unchanged CPU `export_image` fallback.
+
+**User-verified (E2E):** preview unregressed after the `draw()` split; JPEG / 8-bit PNG / 16-bit
+TIFF export correctly; GPU export pixel-matches the CPU export. Because export reuses
+`bake_working`, preview and export now heal in the same (pre-invert) domain.
+
+**Known minor (deferred):** on the oversize/null fallback path, `export_begin` has already stashed
+a full-res half-float buffer in `Session.pending_export` that the GPU path won't consume; it's
+bounded (overwritten by the next export, released by `export_finish` on success) but lingers until
+then. Add an `export_cancel` / release on fallback if it ever matters.
+
+### Whole arc summary (Plans 1 → 3b, all on `main`)
+1. **rayon** — `invert_image`/`finish_image`/`apply_texture` multi-core.
+2. **GPU inversion** — decode-once RGBA16F upload, two-pass invert→finish shader, exposure/temp/
+   tint/zoom with no backend round-trip; killed the per-frame base64-JPEG path.
+3. **dust/IR on GPU** — Rust-baked pre-invert heal keeps dust/IR images on the fast path.
+4. **GPU export** — same shader for preview and export, CPU fallback for edge cases.
