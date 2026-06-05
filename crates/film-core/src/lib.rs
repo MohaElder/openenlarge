@@ -6,5 +6,6 @@ pub mod export;
 pub mod spectral;
 pub mod finish;
 pub mod wb;
+pub mod dust;
 
 pub use image::Image;
