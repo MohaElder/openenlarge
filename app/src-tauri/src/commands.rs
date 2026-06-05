@@ -2,9 +2,9 @@
 
 use crate::convert::{crop, orient, orient_dims, proxy, resize_to, rotate};
 use crate::encode::{to_jpeg_b64, to_png_b64, write_jpeg, write_png, write_tiff8};
-use crate::gpu_upload::{bake_geometry, bake_working, capped_dims, pack_rgba16f, resolve_to_uniforms, BakeSpec, ResolvedInversion, MAX_GPU_EDGE};
+use crate::gpu_upload::{bake_geometry, bake_working, capped_dims, image_from_rgba8, image_from_rgba_f32, pack_rgba16f, resolve_to_uniforms, BakeSpec, ResolvedInversion, MAX_GPU_EDGE};
 use crate::metadata::extract;
-use crate::session::{CachedImage, Developed, ImageEntry, InvertParams, Quality, Session};
+use crate::session::{CachedImage, Developed, ImageEntry, InvertParams, PreparedExport, Quality, Session};
 use film_core::calibrate::{auto_wb_gains, sample_base};
 use film_core::decode::{decode_raw, decode_tiff};
 use film_core::dust::{self, Stamp};
@@ -583,6 +583,103 @@ pub fn export_image(
     if let Err(e) = crate::exif_write::write_exif(out, &eff) {
         eprintln!("[exif] embed failed for {out_path}: {e}");
     }
+    Ok(())
+}
+
+/// Dims + resolved inversion uniforms handed back to the frontend so it can
+/// upload the baked source and render invert+finish offscreen.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ExportPrep {
+    pub w: u32,
+    pub h: u32,
+    pub uniforms: ResolvedInversion,
+}
+
+/// Decode full-res, bake geometry + pre-invert heal, stash the half-float bytes,
+/// and return the dims + resolved inversion uniforms. The frontend then renders
+/// the GPU invert+finish offscreen and calls export_finish with the readback.
+#[tauri::command]
+pub fn export_begin(id: String, params: InvertParams, spec: BakeSpec, session: State<Session>) -> Result<ExportPrep, String> {
+    ensure_resident(&session, &id)?;
+    let (path, base) = {
+        let images = session.images.lock().unwrap();
+        let img = images.get(&id).ok_or("unknown image id")?;
+        let dev = img.developed.as_ref().ok_or("not developed")?;
+        (img.path.clone(), dev.base)
+    };
+    let full = decode_any(Path::new(&path))?;
+    let baked = bake_working(&full, &spec);           // geometry + pre-invert heal, full-res
+    let (w, h, bytes) = pack_rgba16f(&baked, u32::MAX); // no cap for export
+    let uniforms = resolve_to_uniforms(&params, base);
+    *session.pending_export.lock().unwrap() = Some(PreparedExport { w, h, bytes });
+    Ok(ExportPrep { w, h, uniforms })
+}
+
+/// Return the stashed half-float bytes for upload (consumes nothing; kept until export_finish).
+#[tauri::command]
+pub fn export_pixels(session: State<Session>) -> Result<tauri::ipc::Response, String> {
+    let guard = session.pending_export.lock().unwrap();
+    let prep = guard.as_ref().ok_or("no prepared export")?;
+    Ok(tauri::ipc::Response::new(prep.bytes.clone()))
+}
+
+/// `bit16 = true` → `data` is f32 RGBA (4 floats/px); else RGBA8 (4 bytes/px).
+#[derive(Debug, Clone, Deserialize)]
+pub struct ExportReadback {
+    pub w: u32,
+    pub h: u32,
+    pub bit16: bool,
+}
+
+/// Build an Image from the GPU readback and encode it with the chosen format.
+#[allow(clippy::too_many_arguments)]
+#[tauri::command]
+pub fn export_finish(
+    id: String,
+    out_path: String,
+    readback: ExportReadback,
+    data: Vec<u8>,
+    format: ExportFormat,
+    meta_override: Option<MetaOverride>,
+    session: State<Session>,
+) -> Result<(), String> {
+    let img = if readback.bit16 {
+        // data is little-endian f32 RGBA
+        let floats: Vec<f32> = data
+            .chunks_exact(4)
+            .map(|b| f32::from_le_bytes([b[0], b[1], b[2], b[3]]))
+            .collect();
+        image_from_rgba_f32(readback.w, readback.h, &floats)
+    } else {
+        image_from_rgba8(readback.w, readback.h, &data)
+    };
+    let out = Path::new(&out_path);
+    match format.kind.as_str() {
+        "tiff" => {
+            if format.bit_depth == 16 {
+                film_core::export::write_tiff16(&img, out).map_err(|e| format!("{e}"))
+            } else {
+                write_tiff8(&img, out)
+            }
+        }
+        "png" => write_png(&img, out, format.bit_depth),
+        "jpeg" => write_jpeg(&img, out, format.quality, format.max_bytes),
+        other => Err(format!("unknown export format: {other}")),
+    }?;
+
+    // Best-effort EXIF embed, mirroring export_image. The pixel file is already
+    // written and valid; a metadata failure is logged but never fails the export.
+    let metadata = {
+        let images = session.images.lock().unwrap();
+        images.get(&id).map(|i| i.metadata.clone())
+    };
+    if let Some(md) = metadata {
+        let eff = effective_metadata(&md, meta_override.as_ref());
+        if let Err(e) = crate::exif_write::write_exif(out, &eff) {
+            eprintln!("[exif] embed failed for {out_path}: {e}");
+        }
+    }
+    *session.pending_export.lock().unwrap() = None; // release the buffer
     Ok(())
 }
 
