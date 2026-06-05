@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { clampRect, conform, applyDrag, default80, toScreen, MIN } from "./cropMath";
+import { clampRect, conform, applyDrag, default80, toScreen, MIN, constrainToRotated } from "./cropMath";
 import type { Rect } from "./types";
 
 const r = (x: number, y: number, w: number, h: number): Rect => ({ x, y, w, h });
@@ -74,5 +74,19 @@ describe("toScreen", () => {
   it("maps a normalized rect into the image's screen rect", () => {
     const s = toScreen(r(0.5, 0, 0.5, 1), { left: 100, top: 50, width: 200, height: 100 });
     expect(s).toEqual({ left: 200, top: 50, width: 100, height: 100 });
+  });
+});
+
+describe("constrainToRotated", () => {
+  it("is identity at 0 deg", () => {
+    const c = constrainToRotated({ x: 0.1, y: 0.1, w: 0.8, h: 0.8 }, 0, 100, 80);
+    expect(c).toEqual({ x: 0.1, y: 0.1, w: 0.8, h: 0.8 });
+  });
+  it("shrinks (centered) so all corners stay in the rotated image", () => {
+    const full = { x: 0.05, y: 0.05, w: 0.9, h: 0.9 };
+    const c = constrainToRotated(full, 12, 100, 80);
+    expect(c.w).toBeLessThan(full.w);
+    expect(c.x + c.w / 2).toBeCloseTo(0.5, 3);
+    expect(c.y + c.h / 2).toBeCloseTo(0.5, 3);
   });
 });

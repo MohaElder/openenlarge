@@ -123,3 +123,33 @@ export function conform(r: Rect, aspect: number): Rect {
 export function default80(): Rect {
   return { x: 0.1, y: 0.1, w: 0.8, h: 0.8 };
 }
+
+/** Shrink `rect` about its centre to the largest factor where all four corners,
+ *  inverse-rotated by `deg` about the oriented-image centre, stay inside the
+ *  image — so a straightened crop never includes the blank wedges. ow/oh are the
+ *  oriented pixel dims (rotation must be computed in pixel space). */
+export function constrainToRotated(rect: Rect, deg: number, ow: number, oh: number): Rect {
+  if (Math.abs(deg) < 1e-4) return rect;
+  const rad = (deg * Math.PI) / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const cx = ow / 2, cy = oh / 2;
+  const inside = (s: number): boolean => {
+    const rw = rect.w * s, rh = rect.h * s;
+    const rx = rect.x + (rect.w - rw) / 2, ry = rect.y + (rect.h - rh) / 2;
+    const corners: Array<[number, number]> = [
+      [rx, ry], [rx + rw, ry], [rx, ry + rh], [rx + rw, ry + rh],
+    ];
+    for (const [nx, ny] of corners) {
+      const dx = nx * ow - cx, dy = ny * oh - cy;
+      const sx = cos * dx + sin * dy + cx;
+      const sy = -sin * dx + cos * dy + cy;
+      if (sx < 0 || sx > ow || sy < 0 || sy > oh) return false;
+    }
+    return true;
+  };
+  if (inside(1)) return rect;
+  let lo = 0, hi = 1;
+  for (let i = 0; i < 24; i++) { const mid = (lo + hi) / 2; if (inside(mid)) lo = mid; else hi = mid; }
+  const s = lo, rw = rect.w * s, rh = rect.h * s;
+  return { x: rect.x + (rect.w - rw) / 2, y: rect.y + (rect.h - rh) / 2, w: rw, h: rh };
+}
