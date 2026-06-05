@@ -4,6 +4,8 @@
   import type { Rect } from "./types";
   import CropOverlay from "./CropOverlay.svelte";
   import type { ScreenRect } from "./cropMath";
+  import SpinOverlay from "../viewport/SpinOverlay.svelte";
+  import { spinGeometry } from "../viewport/spin";
 
   export let id: string | null;
   export let params: InvertParams;
@@ -37,6 +39,8 @@
   $: dispH = imgH * fit;
   $: imgScreen = { left: (vpW - dispW) / 2, top: (vpH - dispH) / 2, width: dispW, height: dispH } as ScreenRect;
 
+  let spinOverlay: SpinOverlay;
+  let prevRot90 = rot90;
   let lastKey = "";
   async function render() {
     if (!id || !imgW || !vpW) return;
@@ -53,6 +57,13 @@
   // Re-fetch the oriented image only on discrete changes (NOT the live angle).
   $: key = `${id}|${vpW}|${vpH}|${imgW}|${imgH}|${rot90}|${flipH}|${flipV}|${params.mode}|${params.stock}|${params.exposure}|${params.temp}|${params.tint}|${params.contrast}|${params.highlights}|${params.shadows}|${params.whites}|${params.blacks}|${params.texture}|${params.vibrance}|${params.saturation}`;
   $: if (key !== lastKey) { lastKey = key; render(); }
+
+  // Animate a single 90° turn: snapshot the current (old) frame and spin it.
+  $: if (rot90 !== prevRot90) {
+    const g = src ? spinGeometry(prevRot90, rot90, imgW, imgH, vpW, vpH, PAD) : null;
+    if (g && spinOverlay) spinOverlay.spin(src, g.rect, g.dir, g.k);
+    prevRot90 = rot90;
+  }
 </script>
 
 <div class="cropvp" bind:this={el}>
@@ -61,6 +72,7 @@
       style="position:absolute; left:{imgScreen.left}px; top:{imgScreen.top}px; width:{dispW}px; height:{dispH}px; transform:rotate({angle}deg);" />
     <CropOverlay bind:rect img={imgScreen} {lockRatio} {angle} on:custom on:straighten />
   {:else}<div class="hint">…</div>{/if}
+  <SpinOverlay bind:this={spinOverlay} />
 </div>
 
 <style>
