@@ -128,6 +128,63 @@ pub fn apply(img: &mut Image, stamps: &[Stamp]) {
     inpaint_masked(img, &mask, RADIUS);
 }
 
+/// Build a whole-frame defect `Mask` from an IR plane. IR is high where the film is
+/// clean and low where a defect blocks it. `clean` = 95th-percentile IR (robust to the
+/// defect minority); a pixel is a defect when `0 < ir < clean * t`, where `t` comes from
+/// `sensitivity` (0..100 → t 0.5..0.95). `ir==0` (straighten out-of-frame) is never a
+/// defect. The mask is dilated by 1px to cover defect edges.
+pub fn ir_defect_mask(w: usize, h: usize, ir: &[f32], sensitivity: f32) -> Mask {
+    let empty = Mask { x0: 0, y0: 0, w: 0, h: 0, bits: Vec::new() };
+    if w == 0 || h == 0 || ir.len() != w * h {
+        return empty;
+    }
+    let mut sorted: Vec<f32> = ir.iter().copied().filter(|v| *v > 0.0).collect();
+    if sorted.is_empty() {
+        return empty;
+    }
+    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+    let clean = sorted[((sorted.len() as f32 * 0.95) as usize).min(sorted.len() - 1)];
+    let t = 0.5 + 0.45 * (sensitivity.clamp(0.0, 100.0) / 100.0);
+    let thr = clean * t;
+
+    let mut raw = vec![false; w * h];
+    for i in 0..w * h {
+        let v = ir[i];
+        if v > 0.0 && v < thr {
+            raw[i] = true;
+        }
+    }
+    // Dilate by 1px (8-neighborhood).
+    let mut bits = raw.clone();
+    for y in 0..h {
+        for x in 0..w {
+            if !raw[y * w + x] {
+                continue;
+            }
+            for dy in -1i32..=1 {
+                for dx in -1i32..=1 {
+                    let nx = x as i32 + dx;
+                    let ny = y as i32 + dy;
+                    if nx >= 0 && ny >= 0 && (nx as usize) < w && (ny as usize) < h {
+                        bits[ny as usize * w + nx as usize] = true;
+                    }
+                }
+            }
+        }
+    }
+    Mask { x0: 0, y0: 0, w, h, bits }
+}
+
+/// Detect defects from `ir` and inpaint them in place over the whole frame. No-op when
+/// `ir` length doesn't match the image or no defects are found.
+pub fn apply_ir(img: &mut Image, ir: &[f32], sensitivity: f32) {
+    if ir.len() != img.pixels.len() {
+        return;
+    }
+    let mask = ir_defect_mask(img.width, img.height, ir, sensitivity);
+    inpaint_masked(img, &mask, RADIUS);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -196,5 +253,56 @@ mod tests {
         apply(&mut img, &[Stamp { cx: 10.0, cy: 10.0, r: 1.5 }]);
         let p = img.pixels[10 * n + 10];
         assert!(p[0] > 0.1 && p[2] > 0.4, "dark speck healed toward field, got {:?}", p);
+    }
+
+    #[test]
+    fn ir_defect_mask_flags_low_ir_and_ignores_clean() {
+        let n = 11usize;
+        let mut ir = vec![0.9_f32; n * n];
+        ir[5 * n + 5] = 0.1;
+        let m = ir_defect_mask(n, n, &ir, 50.0); // sensitivity 50 → t=0.725 → thr=0.6525
+        assert_eq!((m.x0, m.y0, m.w, m.h), (0, 0, n, n), "ir mask spans the whole frame");
+        assert!(m.bits[5 * n + 5], "defect pixel flagged");
+        assert!(!m.bits[0], "clean corner not flagged");
+    }
+
+    #[test]
+    fn ir_defect_mask_sensitivity_widens_detection() {
+        let n = 11usize;
+        let mut ir = vec![0.9_f32; n * n];
+        ir[5 * n + 5] = 0.7; // a FAINT defect (just below clean)
+        let low = ir_defect_mask(n, n, &ir, 0.0);   // t=0.5 → thr=0.45 → 0.7 not flagged
+        let high = ir_defect_mask(n, n, &ir, 100.0); // t=0.95 → thr=0.855 → 0.7 flagged
+        assert!(!low.bits[5 * n + 5], "faint defect missed at low sensitivity");
+        assert!(high.bits[5 * n + 5], "faint defect caught at high sensitivity");
+    }
+
+    #[test]
+    fn ir_defect_mask_skips_zero_ir_corners() {
+        let n = 5usize;
+        let mut ir = vec![0.9_f32; n * n];
+        ir[0] = 0.0;
+        let m = ir_defect_mask(n, n, &ir, 100.0);
+        assert!(!m.bits[0], "ir==0 (out-of-frame) is not a defect");
+    }
+
+    #[test]
+    fn apply_ir_heals_defect_colocated_with_low_ir() {
+        let n = 21usize;
+        let mut img = Image { width: n, height: n, pixels: vec![[0.4, 0.4, 0.4]; n * n], ir: None };
+        let mid = 10 * n + 10;
+        img.pixels[mid] = [1.0, 1.0, 1.0];
+        let mut ir = vec![0.9_f32; n * n];
+        ir[mid] = 0.05;
+        apply_ir(&mut img, &ir, 50.0);
+        assert!(img.pixels[mid][0] < 0.6, "speck healed toward field, got {:?}", img.pixels[mid]);
+    }
+
+    #[test]
+    fn apply_ir_noop_on_length_mismatch() {
+        let mut img = Image { width: 4, height: 4, pixels: vec![[0.3; 3]; 16], ir: None };
+        let before = img.clone();
+        apply_ir(&mut img, &[0.1; 9], 50.0);
+        assert_eq!(img, before);
     }
 }
