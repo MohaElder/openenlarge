@@ -43,7 +43,17 @@ fn decode_image(cur: &mut io::Cursor<&[u8]>) -> io::Result<Image> {
     let width = read_u32_le(cur)? as usize;
     let height = read_u32_le(cur)? as usize;
     let has_ir = read_u8(cur)?;
-    let n = width * height;
+    let n = width
+        .checked_mul(height)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "cache dims overflow"))?;
+    let remaining = (cur.get_ref().len()).saturating_sub(cur.position() as usize);
+    let per_pixel: usize = if has_ir == 1 { 16 } else { 12 }; // 3×f32 RGB (+ 1×f32 IR)
+    let needed = n
+        .checked_mul(per_pixel)
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "cache size overflow"))?;
+    if needed > remaining {
+        return Err(io::Error::new(io::ErrorKind::InvalidData, "cache truncated/corrupt"));
+    }
     let mut pixels = Vec::with_capacity(n);
     for _ in 0..n {
         let r = read_f32_le(cur)?;
@@ -234,6 +244,39 @@ mod tests {
 
         let _ = std::fs::remove_file(&path_with);
         let _ = std::fs::remove_file(&path_without);
+    }
+
+    #[test]
+    fn read_rejects_corrupt_dims_without_panicking() {
+        // Round-trip a tiny image, then overwrite the file so the stored
+        // dimensions claim far more pixels than the payload contains.
+        let path = std::env::temp_dir().join(format!(
+            "oe-cache-corrupt-{}.oecache",
+            std::process::id()
+        ));
+        let img = make_image_no_ir(2, 2);
+        let thumb = make_image_no_ir(1, 1);
+        write(&path, [0.0; 3], &img, &thumb).unwrap();
+
+        // Build a payload with a valid header but no pixel data (truncated):
+        // layout matches write(): base 3×f32, then working: width u32, height u32, has_ir u8,
+        // (no pixels), then thumb would follow — but we stop here to simulate truncation.
+        let mut payload: Vec<u8> = Vec::new();
+        for &v in [0.0f32, 0.0, 0.0].iter() {
+            payload.extend_from_slice(&v.to_le_bytes()); // base r, g, b
+        }
+        payload.extend_from_slice(&9999u32.to_le_bytes()); // working width
+        payload.extend_from_slice(&9999u32.to_le_bytes()); // working height
+        payload.push(0u8);                                 // working has_ir = false
+        // (no pixel data — truncated)
+        let comp = zstd::encode_all(&payload[..], 3).unwrap();
+        let mut bytes = vec![0u8]; // leading has_ir byte (uncompressed)
+        bytes.extend_from_slice(&comp);
+        std::fs::write(&path, &bytes).unwrap();
+
+        let res = read(&path);
+        let _ = std::fs::remove_file(&path);
+        assert!(res.is_err(), "corrupt cache must return Err, not panic/abort");
     }
 
     #[test]

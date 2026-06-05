@@ -74,6 +74,7 @@ fn effective_metadata(
 const THUMB_EDGE: u32 = 320;
 const AUTOWB_EDGE: u32 = 256;
 const PREVIEW_JPEG_QUALITY: u8 = 88;
+const CACHE_WORKING_CAP: u32 = 4096;
 
 fn default_invert_params() -> InvertParams {
     InvertParams {
@@ -278,23 +279,39 @@ pub fn develop_image(
     let inv_thumb = finish_image(&inv_thumb, &finish_from(&defaults));
     let thumbnail = to_jpeg_b64(&inv_thumb, false, 82)?;
 
-    // Build a cache-bounded copy of working (≤4096 long edge) for the sidecar.
+    // Build a cache-bounded copy of working (≤CACHE_WORKING_CAP long edge) for the sidecar.
     // Clone thumb too before the move into Developed.
-    let cache_working = if working.width.max(working.height) > 4096 {
-        crate::convert::proxy(&working, 4096)
+    let cache_working = if working.width.max(working.height) > CACHE_WORKING_CAP as usize {
+        crate::convert::proxy(&working, CACHE_WORKING_CAP)
     } else {
         working.clone()
     };
     let cache_thumb = thumb.clone();
 
-    let mut images = session.images.lock().unwrap();
-    let img = images.get_mut(&id).ok_or("unknown image id")?;
-    img.metadata.width = w;
-    img.metadata.height = h;
-    img.thumbnail = thumbnail.clone();
-    img.developed = Some(Developed { working, thumb, base });
-    let metadata_json = metadata_to_json(&img.metadata)?;
-    if let Err(e) = catalog.update_image_render(&id, &thumbnail, &metadata_json) {
+    // Mutate session state and build the entry inside the lock, then release
+    // the guard before the expensive cache write (tens of MB, zstd + file IO).
+    let (entry, metadata_json) = {
+        let mut images = session.images.lock().unwrap();
+        let img = images.get_mut(&id).ok_or("unknown image id")?;
+        img.metadata.width = w;
+        img.metadata.height = h;
+        img.thumbnail = thumbnail.clone();
+        img.developed = Some(Developed { working, thumb, base });
+        let metadata_json = metadata_to_json(&img.metadata)?;
+        let entry = ImageEntry {
+            id: id.clone(),
+            path: img.path.clone(),
+            file_name: img.file_name.clone(),
+            thumbnail,
+            metadata: img.metadata.clone(),
+            developed: true,
+            has_ir,
+            offline: false,
+        };
+        (entry, metadata_json)
+    }; // lock released here
+
+    if let Err(e) = catalog.update_image_render(&id, &entry.thumbnail, &metadata_json) {
         eprintln!("[catalog] update_image_render failed for {id}: {e}");
     }
 
@@ -303,16 +320,7 @@ pub fn develop_image(
         eprintln!("[cache] write failed for {id}: {e}");
     }
 
-    Ok(ImageEntry {
-        id: id.clone(),
-        path: img.path.clone(),
-        file_name: img.file_name.clone(),
-        thumbnail,
-        metadata: img.metadata.clone(),
-        developed: true,
-        has_ir,
-        offline: false,
-    })
+    Ok(entry)
 }
 
 #[tauri::command]
