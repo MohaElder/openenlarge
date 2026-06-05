@@ -15,6 +15,7 @@
   import GlassPanel from "../glass/GlassPanel.svelte";
   import CropView from "../crop/CropView.svelte";
   import CropPanel from "../crop/CropPanel.svelte";
+  import BaseView from "../develop/BaseView.svelte";
   import EraserPanel from "../develop/EraserPanel.svelte";
   import { addStroke, resetDust, emptyDust, setIrEnabled, setIrSensitivity, type DustStroke, type DustEdits } from "../develop/dust";
   import type { Rect, CropRect } from "../crop/types";
@@ -30,6 +31,9 @@
   // eslint-disable-next-line @typescript-eslint/no-unused-expressions
   $: { void $folderBaseByPath; effParams = withEffectiveBase($params, dir); }
   let effParams = withEffectiveBase($params, dir);
+
+  // ---- Base picker state ----
+  let sampledBase: [number, number, number] | null = null;
 
   // ---- Crop draft state (only while tool === "crop") ----
   let rect: Rect = { x: 0.1, y: 0.1, w: 0.8, h: 0.8 };
@@ -199,6 +203,9 @@
         <CropView id={$activeId} params={effParams} imgW={oW} imgH={oH}
                   bind:rect {lockRatio} {rot90} {flipH} {flipV} {angle}
                   on:custom={() => (aspect = "custom")} on:straighten={(e) => onStraighten(e.detail)} />
+      {:else if $tool === "base_picker"}
+        <BaseView id={$activeId} params={effParams} imgW={origW} imgH={origH}
+                  on:sampled={(e) => (sampledBase = e.detail)} />
       {:else}
         <Viewport id={$activeId} params={effParams} imgW={effW} imgH={effH} imageCrop={imageCrop}
                   rot90={cRot} flipH={committed?.flipH ?? false} flipV={committed?.flipV ?? false} angle={committed?.angle ?? 0}
