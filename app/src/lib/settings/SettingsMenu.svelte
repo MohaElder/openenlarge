@@ -15,6 +15,10 @@
       {/each}
     </div>
   </div>
+  <button class="shortcuts" on:click={() => dispatch("shortcuts")}>
+    <span class="kbd-icon" aria-hidden="true">⌨</span>
+    {$t("settings.shortcuts.button")}
+  </button>
 </div>
 
 <style>
@@ -28,4 +32,9 @@
   .seg button { flex: 1; padding: 7px; border-radius: 8px; font-size: 12px;
     border: 1px solid var(--glass-brd); background: transparent; color: var(--text-dim); }
   .seg button.on { color: #fff; background: rgba(244,157,78,0.18); border-color: rgba(244,157,78,0.5); }
+  .shortcuts { display: flex; align-items: center; gap: 8px; width: 100%; margin-top: 12px;
+    padding: 9px 10px; border-radius: 8px; font-size: 12px; text-align: left;
+    border: 1px solid var(--glass-brd); background: transparent; color: var(--text); }
+  .shortcuts:hover { background: var(--glass-hi); }
+  .kbd-icon { font-size: 14px; color: var(--text-dim); }
 </style>

@@ -83,6 +83,28 @@ pub fn pack_rgba16f(img: &Image, cap: u32) -> (u32, u32, Vec<u8>) {
     (capped.width as u32, capped.height as u32, bytes)
 }
 
+/// Build a linear-RGB Image from tightly-packed RGBA8 readback (alpha dropped, /255).
+pub fn image_from_rgba8(w: u32, h: u32, bytes: &[u8]) -> Image {
+    let n = (w * h) as usize;
+    let mut pixels = Vec::with_capacity(n);
+    for i in 0..n {
+        let o = i * 4;
+        pixels.push([bytes[o] as f32 / 255.0, bytes[o + 1] as f32 / 255.0, bytes[o + 2] as f32 / 255.0]);
+    }
+    Image { width: w as usize, height: h as usize, pixels, ir: None }
+}
+
+/// Build a linear-RGB Image from tightly-packed RGBA f32 readback (alpha dropped).
+pub fn image_from_rgba_f32(w: u32, h: u32, data: &[f32]) -> Image {
+    let n = (w * h) as usize;
+    let mut pixels = Vec::with_capacity(n);
+    for i in 0..n {
+        let o = i * 4;
+        pixels.push([data[o], data[o + 1], data[o + 2]]);
+    }
+    Image { width: w as usize, height: h as usize, pixels, ir: None }
+}
+
 use crate::commands::{build_params, mode_from, wb_from_params};
 use crate::session::InvertParams;
 use film_core::engine::Mode;
@@ -225,6 +247,27 @@ mod tests {
         let big = Image { width: 10, height: 4, pixels: vec![[0.0; 3]; 40], ir: None };
         let (bw, bh, _) = pack_rgba16f(&big, 5);
         assert_eq!(capped_dims(&big, 5), (bw, bh));
+    }
+
+    #[test]
+    fn image_from_rgba8_drops_alpha_and_normalizes() {
+        // 1x2 image, RGBA bytes; alpha ignored, channels /255 into f32.
+        let bytes = [255u8, 128, 0, 255,   0, 64, 255, 255];
+        let img = image_from_rgba8(1, 2, &bytes);
+        assert_eq!((img.width, img.height), (1, 2));
+        assert!((img.pixels[0][0] - 1.0).abs() < 1e-3);
+        assert!((img.pixels[0][1] - 128.0 / 255.0).abs() < 1e-3);
+        assert!((img.pixels[0][2] - 0.0).abs() < 1e-3);
+        assert!((img.pixels[1][1] - 64.0 / 255.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn image_from_rgba_f32_drops_alpha() {
+        let data = [0.25f32, 0.5, 0.75, 1.0,   0.1, 0.2, 0.3, 1.0];
+        let img = image_from_rgba_f32(2, 1, &data);
+        assert_eq!((img.width, img.height), (2, 1));
+        assert_eq!(img.pixels[0], [0.25, 0.5, 0.75]);
+        assert_eq!(img.pixels[1], [0.1, 0.2, 0.3]);
     }
 
     #[test]

@@ -12,6 +12,7 @@
   import ConfirmDevelop from "$lib/overlay/ConfirmDevelop.svelte";
   import ConfirmDelete from "$lib/overlay/ConfirmDelete.svelte";
   import SettingsMenu from "$lib/settings/SettingsMenu.svelte";
+  import KeymapModal from "$lib/keymap/KeymapModal.svelte";
   import AboutModal from "$lib/about/AboutModal.svelte";
   import Icon from "$lib/icons/Icon.svelte";
   import { hasDeveloped } from "$lib/export/eligible";
@@ -29,6 +30,7 @@
   let confirmCount = 0;
   let confirming = false;
   let settingsOpen = false;
+  let keymapOpen = false;
   let exporting = false;
   let aboutOpen = false;
 
@@ -110,7 +112,8 @@
   </main>
 </div>
 
-{#if settingsOpen}<SettingsMenu on:close={() => (settingsOpen = false)} />{/if}
+{#if settingsOpen}<SettingsMenu on:close={() => (settingsOpen = false)} on:shortcuts={() => { settingsOpen = false; keymapOpen = true; }} />{/if}
+{#if keymapOpen}<KeymapModal on:close={() => (keymapOpen = false)} />{/if}
 {#if aboutOpen}<AboutModal on:close={() => (aboutOpen = false)} />{/if}
 <ProgressOverlay />
 {#if exporting}

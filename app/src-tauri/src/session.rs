@@ -124,11 +124,21 @@ pub struct CachedImage {
     pub developed: Option<Developed>,
 }
 
+/// A full-res baked (geometry + pre-invert heal) raw-negative buffer awaiting GPU
+/// export, plus the dims the frontend uploads at. Held between export_begin and
+/// export_pixels so the file is decoded+baked exactly once per export.
+pub struct PreparedExport {
+    pub w: u32,
+    pub h: u32,
+    pub bytes: Vec<u8>, // half-float RGBA, full-res
+}
+
 #[derive(Default)]
 pub struct Session {
     pub images: Mutex<HashMap<String, CachedImage>>,
     pub quality: Mutex<Quality>,
     pub cache_dir: Mutex<std::path::PathBuf>,
+    pub pending_export: Mutex<Option<PreparedExport>>,
 }
 
 impl Session {
