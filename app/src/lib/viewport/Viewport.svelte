@@ -8,6 +8,7 @@
   import { toInversionUniforms } from "./gl/invert";
   import { toneLutBytes, colorGrade, colorMix } from "../develop/finish";
   import { screenRadius, type DustStroke } from "../develop/dust";
+  import { readCanvasPixel } from "../develop/colorPick";
   import { t } from "$lib/i18n";
 
   export let id: string | null;
@@ -22,6 +23,7 @@
   export let flipV = false;
   export let angle = 0;
   export let eraser = false;
+  export let pointPick = false;
   /** Brush radius normalized to image width. */
   export let brush = 0.03;
   /** Committed strokes for this image (rendered by the backend). */
@@ -30,7 +32,7 @@
   export let dustRev = 0;
   export let irRemoval: IrRemoval = { enabled: false, sensitivity: 50 };
 
-  const dispatch = createEventDispatcher<{ stroke: DustStroke; brush: number }>();
+  const dispatch = createEventDispatcher<{ stroke: DustStroke; brush: number; pointpick: { r: number; g: number; b: number } }>();
 
   const CAP = 5000;
   const PAD = 60;
@@ -346,6 +348,14 @@
   function onDown(e: PointerEvent) {
     if (!interactive) return;
     if (e.button !== 0) return; // ignore right/middle click — let the context menu open
+    if (pointPick) {
+      if (canvas) {
+        const rect = canvas.getBoundingClientRect();
+        const rgb = readCanvasPixel(canvas, e.clientX - rect.left, e.clientY - rect.top);
+        if (rgb) dispatch("pointpick", { r: rgb[0], g: rgb[1], b: rgb[2] });
+      }
+      return;
+    }
     if (eraser) {
       painting = true;
       pending = [normPoint(e)];
@@ -371,6 +381,7 @@
   }
   function onUp(e: PointerEvent) {
     if (e.button !== 0) return; // right/middle click never triggers tap-to-zoom
+    if (pointPick) return;
     if (eraser) {
       if (painting && pending.length > 0) dispatch("stroke", { points: pending, r: brush });
       painting = false; pending = [];
@@ -388,7 +399,7 @@
 </script>
 
 <div
-  class="vp" class:interactive class:zoomed class:erasing={eraser}
+  class="vp" class:interactive class:zoomed class:erasing={eraser} class:picking={pointPick}
   bind:this={el}
   on:wheel={onWheel}
   on:pointerdown={onDown} on:pointermove={onMove} on:pointerup={onUp} on:pointercancel={onCancel}
@@ -427,6 +438,7 @@
   .zoom { position: absolute; bottom: 8px; right: 10px; font-size: 11px; color: var(--text-dim);
     background: rgba(0,0,0,0.45); padding: 2px 8px; border-radius: 6px; z-index: 2; }
   .vp.erasing { cursor: none; }
+  .vp.picking { cursor: crosshair; }
   .brush { position: absolute; border-radius: 50%; pointer-events: none; z-index: 3;
     transform: translate(-50%, -50%); border: 1.5px solid rgba(255,255,255,0.9);
     box-shadow: 0 0 0 1px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(0,0,0,0.4); }

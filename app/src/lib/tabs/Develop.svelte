@@ -26,6 +26,7 @@
   import { presetNormAspect } from "../crop/presets";
   import { rotateRectCW, rotateRectCCW, flipRectH, flipRectV, orientDims } from "../crop/transforms";
   import { commitActive } from "../develop/historyStore";
+  import { rgbToHslSample } from "../develop/colorPick";
 
   $: active = $images.find((i) => i.id === $activeId);
   $: origW = active?.metadata.width ?? 0;
@@ -215,6 +216,19 @@
 
   let menu: { x: number; y: number } | null = null;
   function onContext(e: MouseEvent) { e.preventDefault(); menu = { x: e.clientX, y: e.clientY }; }
+
+  // ---- Point Color eyedropper state ----
+  let pointPicking = false;
+  function togglePointPick() { pointPicking = !pointPicking; }
+  function onPointPick(e: CustomEvent<{ r: number; g: number; b: number }>) {
+    params.update((p) => {
+      const arr = (p.pc_samples ?? []).slice();
+      if (arr.length >= 8) return p; // cap at 8
+      arr.push(rgbToHslSample(e.detail.r, e.detail.g, e.detail.b));
+      return { ...p, pc_samples: arr };
+    });
+    pointPicking = false;
+  }
 </script>
 
 <svelte:window on:keydown={onKey} />
@@ -233,7 +247,9 @@
         <Viewport id={$activeId} params={effParams} imgW={effW} imgH={effH} imageCrop={imageCrop}
                   rot90={cRot} flipH={committed?.flipH ?? false} flipV={committed?.flipV ?? false} angle={committed?.angle ?? 0}
                   eraser={$tool === "eraser"} {brush} dust={dust.strokes} irRemoval={dust.irRemoval} dustRev={$dustRev}
-                  on:stroke={(e) => commitStroke(e.detail)} on:brush={(e) => (brush = e.detail)} />
+                  pointPick={pointPicking}
+                  on:stroke={(e) => commitStroke(e.detail)} on:brush={(e) => (brush = e.detail)}
+                  on:pointpick={onPointPick} />
       {/if}
     {:else}<div class="hint">{$t('develop.notDevelopedYet')}</div>{/if}
   </section>
@@ -246,7 +262,7 @@
         <Basic />
         <TonalCurve />
         <ColorGrading />
-        <ColorMixer />
+        <ColorMixer onPick={togglePointPick} picking={pointPicking} />
       {:else if $tool === "crop"}
         <CropPanel bind:aspect bind:orientation bind:angle
                    on:preset={(e) => onPreset(e.detail)} on:swap={onSwap} on:reset={onReset}
