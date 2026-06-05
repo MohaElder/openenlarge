@@ -6,6 +6,10 @@ export interface CropRect {
   rect: Rect;
   aspect: string;
   orientation: "landscape" | "portrait";
+  rot90: 0 | 1 | 2 | 3;
+  flipH: boolean;
+  flipV: boolean;
+  angle: number;
 }
 
 export type Handle = "move" | "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w" | null;

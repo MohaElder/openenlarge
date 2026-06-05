@@ -29,14 +29,23 @@ export interface ViewSpec {
   raw: boolean;
   finish?: boolean; // omit/true = backend applies finishing; false = GPU does it
   image_crop?: [number, number, number, number] | null; // normalized persistent crop
+  rot90?: number; flip_h?: boolean; flip_v?: boolean; angle?: number;
 }
 
 export const api = {
   importImage: (path: string) => invoke<ImageEntry>("import_image", { path }),
   renderView: (id: string, params: InvertParams, view: ViewSpec) =>
     invoke<string>("render_view", { id, params, view }),
-  exportImage: (id: string, params: InvertParams, outPath: string, imageCrop: [number, number, number, number] | null = null) =>
-    invoke<void>("export_image", { id, params, outPath, imageCrop }),
+  exportImage: (
+    id: string, params: InvertParams, outPath: string,
+    imageCrop: [number, number, number, number] | null = null,
+    geom: { rot90?: number; flip_h?: boolean; flip_v?: boolean; angle?: number } = {},
+  ) =>
+    invoke<void>("export_image", {
+      id, params, outPath, imageCrop,
+      rot90: geom.rot90 ?? 0, flipH: geom.flip_h ?? false,
+      flipV: geom.flip_v ?? false, angle: geom.angle ?? 0,
+    }),
   developImage: (id: string) => invoke<ImageEntry>("develop_image", { id }),
   setQuality: (quality: Quality) => invoke<void>("set_quality", { quality }),
   thumbnail: (id: string, params: InvertParams) => invoke<string>("thumbnail", { id, params }),
