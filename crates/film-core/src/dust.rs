@@ -1,5 +1,8 @@
 //! Manual dust removal: rasterize brush stamps to a windowed mask, then Telea-inpaint.
 
+use crate::Image;
+use ndarray::{Array2, Array3};
+
 /// A brush dab in image PIXEL coordinates. `r` is the radius in pixels.
 #[derive(Debug, Clone, Copy)]
 pub struct Stamp {
@@ -71,6 +74,42 @@ pub fn rasterize(img_w: usize, img_h: usize, stamps: &[Stamp], grow: f32, pad: u
     Mask { x0, y0, w, h, bits }
 }
 
+/// Inpaint the masked pixels of `img` using Telea / Fast Marching, operating only
+/// on the mask's window. `radius` is the Telea neighborhood size (px). No-op on an
+/// empty mask.
+pub fn inpaint_masked(img: &mut Image, mask: &Mask, radius: u32) {
+    if mask.w == 0 || mask.h == 0 {
+        return;
+    }
+    let (w, h) = (mask.w, mask.h);
+    // Copy the window into (h, w, 3) and the mask into (h, w).
+    let mut region = Array3::<f32>::zeros((h, w, 3));
+    let mut m = Array2::<f32>::zeros((h, w));
+    for yy in 0..h {
+        for xx in 0..w {
+            let gi = (mask.y0 + yy) * img.width + (mask.x0 + xx);
+            let p = img.pixels[gi];
+            region[[yy, xx, 0]] = p[0];
+            region[[yy, xx, 1]] = p[1];
+            region[[yy, xx, 2]] = p[2];
+            if mask.bits[yy * w + xx] {
+                m[[yy, xx]] = 1.0;
+            }
+        }
+    }
+    // Isolated third-party call. Real signature: telea_inpaint(image, mask, radius: i32) -> Result<()>
+    let _ = inpaint::telea_inpaint(&mut region.view_mut(), &m.view(), radius as i32);
+    // Write back only the masked pixels.
+    for yy in 0..h {
+        for xx in 0..w {
+            if mask.bits[yy * w + xx] {
+                let gi = (mask.y0 + yy) * img.width + (mask.x0 + xx);
+                img.pixels[gi] = [region[[yy, xx, 0]], region[[yy, xx, 1]], region[[yy, xx, 2]]];
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -104,5 +143,26 @@ mod tests {
         assert_eq!(rasterize(100, 100, &[], 1.0, 4).w, 0);
         let off = rasterize(100, 100, &[Stamp { cx: -50.0, cy: -50.0, r: 2.0 }], 1.0, 1);
         assert_eq!(off.w, 0, "fully off-image dab → empty mask");
+    }
+
+    #[test]
+    fn inpaint_removes_a_speck_against_a_solid_field() {
+        // Solid gray 21x21 with one white "dust" pixel in the middle.
+        let n = 21usize;
+        let mut img = Image {
+            width: n,
+            height: n,
+            pixels: vec![[0.4, 0.4, 0.4]; n * n],
+            ir: None,
+        };
+        let mid = (n / 2) * n + (n / 2);
+        img.pixels[mid] = [1.0, 1.0, 1.0];
+        let mask = rasterize(n, n, &[Stamp { cx: 10.0, cy: 10.0, r: 1.0 }], 1.0, 4);
+        inpaint_masked(&mut img, &mask, 3);
+        // The speck is now close to the surrounding gray, not white.
+        let p = img.pixels[mid];
+        assert!(p[0] < 0.6, "speck should be filled toward gray, got {:?}", p);
+        // A far-away pixel is untouched.
+        assert_eq!(img.pixels[0], [0.4, 0.4, 0.4]);
     }
 }

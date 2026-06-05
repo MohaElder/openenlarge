@@ -8,3 +8,5 @@ nalgebra = { workspace = true }
 tiff = { workspace = true }
 rawler = { workspace = true }
 thiserror = { workspace = true }
+inpaint = "0.1"
+ndarray = "0.16"
