@@ -2,19 +2,27 @@
 export interface DustPoint { x: number; y: number }
 /** A brush stroke: a polyline + radius normalized to the displayed image WIDTH. */
 export interface DustStroke { points: DustPoint[]; r: number }
+/** IR-driven automatic dust removal settings. */
+export interface IrRemoval { enabled: boolean; sensitivity: number }
 /** Per-image dust edit state. */
-export interface DustEdits { strokes: DustStroke[] }
+export interface DustEdits { strokes: DustStroke[]; irRemoval: IrRemoval }
 
-export const emptyDust = (): DustEdits => ({ strokes: [] });
+export const emptyDust = (): DustEdits => ({ strokes: [], irRemoval: { enabled: false, sensitivity: 50 } });
 
 export function addStroke(d: DustEdits, s: DustStroke): DustEdits {
-  return { strokes: [...d.strokes, s] };
+  return { ...d, strokes: [...d.strokes, s] };
 }
 export function undoStroke(d: DustEdits): DustEdits {
-  return { strokes: d.strokes.slice(0, -1) };
+  return { ...d, strokes: d.strokes.slice(0, -1) };
 }
-export function resetDust(): DustEdits {
-  return { strokes: [] };
+export function resetDust(d: DustEdits): DustEdits {
+  return { ...d, strokes: [] };
+}
+export function setIrEnabled(d: DustEdits, enabled: boolean): DustEdits {
+  return { ...d, irRemoval: { ...d.irRemoval, enabled } };
+}
+export function setIrSensitivity(d: DustEdits, sensitivity: number): DustEdits {
+  return { ...d, irRemoval: { ...d.irRemoval, sensitivity } };
 }
 
 /** Normalized-to-width radius → on-screen pixels at the current zoom `eff`. */

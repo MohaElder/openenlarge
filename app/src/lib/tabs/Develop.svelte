@@ -135,7 +135,7 @@
   }
   const commitStroke = (s: DustStroke) => updateDust((d) => addStroke(d, s));
   const undoDust = () => updateDust((d) => undoStroke(d));
-  const resetDustEdits = () => updateDust(() => resetDust());
+  const resetDustEdits = () => updateDust((d) => resetDust(d));
 
   let menu: { x: number; y: number } | null = null;
   function onContext(e: MouseEvent) { e.preventDefault(); menu = { x: e.clientX, y: e.clientY }; }

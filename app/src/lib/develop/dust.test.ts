@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  emptyDust, addStroke, undoStroke, resetDust,
+  emptyDust, addStroke, undoStroke, resetDust, setIrEnabled, setIrSensitivity,
   screenRadius, normRadius, type DustEdits, type DustStroke,
 } from "./dust";
 
@@ -14,10 +14,26 @@ describe("dust edit-state", () => {
     expect(d0.strokes.length).toBe(0); // original untouched
     expect(d2.strokes.length).toBe(2);
     expect(undoStroke(d2).strokes.length).toBe(1);
-    expect(resetDust().strokes.length).toBe(0);
+    expect(resetDust(emptyDust()).strokes.length).toBe(0);
   });
   it("undo on empty is safe", () => {
     expect(undoStroke(emptyDust()).strokes.length).toBe(0);
+  });
+});
+
+describe("ir removal state", () => {
+  it("defaults disabled at sensitivity 50", () => {
+    const d = emptyDust();
+    expect(d.irRemoval.enabled).toBe(false);
+    expect(d.irRemoval.sensitivity).toBe(50);
+  });
+  it("toggles enabled and sets sensitivity immutably, preserving strokes", () => {
+    const d0 = addStroke(emptyDust(), { points: [{ x: 0.5, y: 0.5 }], r: 0.02 });
+    const d1 = setIrEnabled(d0, true);
+    const d2 = setIrSensitivity(d1, 70);
+    expect(d0.irRemoval.enabled).toBe(false);
+    expect(d2.irRemoval).toEqual({ enabled: true, sensitivity: 70 });
+    expect(d2.strokes.length).toBe(1);
   });
 });
 
