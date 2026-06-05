@@ -1,3 +1,4 @@
+import { get } from "svelte/store";
 import { api, type InvertParams, type CatalogSnapshot, type ImageEntry } from "./api";
 import type { CropRect } from "./crop/types";
 import type { DustEdits } from "./develop/dust";
@@ -77,6 +78,7 @@ export async function hydrate(): Promise<void> {
   try {
     const snap = await api.loadCatalog();
     applySnapshot(snap);
+    await api.setQuality(get(quality)).catch(() => {});
   } catch (e) {
     console.error("catalog hydrate failed", e);
   }

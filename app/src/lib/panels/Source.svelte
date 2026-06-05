@@ -16,7 +16,10 @@
     for (const path of paths) {
       try {
         const entry = await api.importImage(path as string);
-        images.update((xs) => [...xs, entry]);
+        images.update((xs) =>
+          xs.some((i) => i.id === entry.id)
+            ? xs.map((i) => (i.id === entry.id ? entry : i))
+            : [...xs, entry]);
         activeId.update((id) => id ?? entry.id);
       } catch (e) { error = String(e); }
     }
