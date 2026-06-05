@@ -4,7 +4,7 @@ import type { CropRect } from "./crop/types";
 import type { DustEdits } from "./develop/dust";
 import {
   images, editsById, cropById, dustById, metaById, quality,
-  selectedFolder, gridZoom, module as moduleStore, activeId,
+  selectedFolder, gridZoom, module as moduleStore, activeId, folderBaseByPath,
 } from "./store";
 import { locale } from "./i18n";
 
@@ -77,6 +77,16 @@ export function applySnapshot(snap: CatalogSnapshot): void {
   if (st.module === "library" || st.module === "develop") moduleStore.set(st.module);
   if (st.active_id && entries.some((e) => e.id === st.active_id)) activeId.set(st.active_id);
   else if (entries.length) activeId.set(entries[0].id);
+
+  const fb: Record<string, [number, number, number]> = {};
+  for (const [k, v] of Object.entries(st)) {
+    if (!k.startsWith("folder_base:")) continue;
+    try {
+      const arr = JSON.parse(v);
+      if (Array.isArray(arr) && arr.length === 3) fb[k.slice("folder_base:".length)] = arr as [number, number, number];
+    } catch { /* skip malformed */ }
+  }
+  folderBaseByPath.set(fb);
 }
 
 /** Load the catalog from the backend and populate the stores. Call once on mount. */

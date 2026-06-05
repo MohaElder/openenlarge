@@ -3,7 +3,7 @@ import { debounce, applySnapshot } from "./catalog";
 import { get } from "svelte/store";
 import {
   images, editsById, cropById, dustById, metaById, quality,
-  selectedFolder, gridZoom, module as moduleStore, activeId,
+  selectedFolder, gridZoom, module as moduleStore, activeId, folderBaseByPath,
 } from "./store";
 import type { CatalogSnapshot } from "./api";
 import { defaultParams } from "./api";
@@ -62,5 +62,15 @@ describe("applySnapshot", () => {
     expect(get(gridZoom)).toBe(70);
     expect(get(moduleStore)).toBe("develop");
     expect(get(activeId)).toBe("a");
+  });
+
+  it("hydrates folder bases from app_state folder_base: keys", () => {
+    const snap: CatalogSnapshot = {
+      images: [], edits: [],
+      prefs: {},
+      app_state: { "folder_base:/x/roll1": "[0.42,0.19,0.11]" },
+    };
+    applySnapshot(snap);
+    expect(get(folderBaseByPath)["/x/roll1"]).toEqual([0.42, 0.19, 0.11]);
   });
 });

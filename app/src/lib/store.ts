@@ -47,6 +47,10 @@ export const allDeveloped = derived(images, ($i) => $i.length > 0 && $i.every((x
 export const selectedFolder = writable<string | null>(null);
 export const gridZoom = writable<number>(55);
 
+/** Folder/roll-default film base, keyed by image directory path. Persisted via
+ * app_state as `folder_base:{dir}`. A per-image base_override wins over this. */
+export const folderBaseByPath = writable<Record<string, [number, number, number]>>({});
+
 /** The imported images that live in the selected folder (recursive on parents).
  * The grid, filmstrip, and Develop navigation/range all scope to this. */
 export const folderImages = derived(
@@ -67,7 +71,7 @@ export function selectFolder(path: string | null): void {
 /** Data-URL of the latest rendered develop preview; drives the histogram. */
 export const previewSrc = writable<string>("");
 
-export type Tool = "edit" | "crop" | "eraser";
+export type Tool = "edit" | "crop" | "eraser" | "base_picker";
 export const tool = writable<Tool>("edit");
 
 /** Id of the image awaiting a delete confirmation (null = no dialog). */
