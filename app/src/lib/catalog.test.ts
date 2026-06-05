@@ -6,6 +6,7 @@ import {
   selectedFolder, gridZoom, module as moduleStore, activeId,
 } from "./store";
 import type { CatalogSnapshot } from "./api";
+import { defaultParams } from "./api";
 
 describe("debounce", () => {
   it("coalesces rapid calls into one trailing invocation", async () => {
@@ -41,7 +42,7 @@ describe("applySnapshot", () => {
       }],
       edits: [{
         image_id: "a",
-        params: { ...({} as any), exposure: 1.5 } as any,
+        params: { ...defaultParams(), exposure: 1.5 },
         crop: null,
         dust: { strokes: [], irRemoval: { enabled: false, sensitivity: 50 } },
       }],

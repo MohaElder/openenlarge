@@ -68,7 +68,8 @@ export function applySnapshot(snap: CatalogSnapshot): void {
     if (Number.isFinite(z)) gridZoom.set(z);
   }
   if (st.module === "library" || st.module === "develop") moduleStore.set(st.module);
-  if (st.active_id) activeId.set(st.active_id);
+  if (st.active_id && entries.some((e) => e.id === st.active_id)) activeId.set(st.active_id);
+  else if (entries.length) activeId.set(entries[0].id);
 }
 
 /** Load the catalog from the backend and populate the stores. Call once on mount. */
@@ -83,9 +84,27 @@ export async function hydrate(): Promise<void> {
 
 // --- Write-through (debounced) ---------------------------------------------
 
-const saveEdits = debounce((id: string, json: string) => { void api.saveEdits(id, json); }, 400);
-const saveCrop = debounce((id: string, json: string) => { void api.saveCrop(id, json); }, 400);
-const saveDust = debounce((id: string, json: string) => { void api.saveDust(id, json); }, 400);
+// Each image id gets its own debounce instance per edit family, so a save for
+// image A is never dropped when image B is edited within the debounce window.
+function perIdSaver(
+  apiSave: (id: string, json: string) => Promise<void>,
+): { save: (id: string, json: string) => void; flushAll: () => void } {
+  const timers = new Map<string, Debounced<[string, string]>>();
+  const save = (id: string, json: string) => {
+    let d = timers.get(id);
+    if (!d) {
+      d = debounce((i: string, j: string) => { void apiSave(i, j); }, 400);
+      timers.set(id, d);
+    }
+    d(id, json);
+  };
+  const flushAll = () => timers.forEach((d) => d.flush());
+  return { save, flushAll };
+}
+
+const edits = perIdSaver(api.saveEdits);
+const crop = perIdSaver(api.saveCrop);
+const dust = perIdSaver(api.saveDust);
 const savePref = debounce((k: string, v: string) => { void api.savePref(k, v); }, 400);
 const saveState = debounce((k: string, v: string) => { void api.saveAppState(k, v); }, 400);
 
@@ -98,6 +117,8 @@ function wireRecord<T>(
   let first = true;
   return store.subscribe((map) => {
     if (first) { prev = map; first = false; return; } // skip hydration's initial set
+    // Deletions are not detected here; removing an image must go through
+    // api.deleteImage (the backend command), which deletes its catalog rows.
     for (const id in map) {
       if (map[id] !== prev[id]) save(id, JSON.stringify(map[id]));
     }
@@ -112,9 +133,9 @@ export function initPersistence(): () => void {
   if (started) return () => {};
   started = true;
 
-  wireRecord(editsById, saveEdits);
-  wireRecord(cropById, saveCrop);
-  wireRecord(dustById, saveDust);
+  wireRecord(editsById, edits.save);
+  wireRecord(cropById, crop.save);
+  wireRecord(dustById, dust.save);
 
   let first = { dm: true, q: true, sf: true, gz: true, mod: true, aid: true };
   developMode.subscribe((m) => { if (first.dm) { first.dm = false; return; } savePref("develop_mode", m); });
@@ -125,7 +146,7 @@ export function initPersistence(): () => void {
   activeId.subscribe((a) => { if (first.aid) { first.aid = false; return; } saveState("active_id", a ?? ""); });
 
   const flush = () => {
-    saveEdits.flush(); saveCrop.flush(); saveDust.flush();
+    edits.flushAll(); crop.flushAll(); dust.flushAll();
     savePref.flush(); saveState.flush();
   };
   if (typeof window !== "undefined")
