@@ -12,6 +12,7 @@
   import Basic from "../develop/Basic.svelte";
   import TonalCurve from "../develop/TonalCurve.svelte";
   import ColorGrading from "../develop/ColorGrading.svelte";
+  import ColorMixer from "../develop/ColorMixer.svelte";
   import GlassPanel from "../glass/GlassPanel.svelte";
   import CropView from "../crop/CropView.svelte";
   import CropPanel from "../crop/CropPanel.svelte";
@@ -245,6 +246,7 @@
         <Basic />
         <TonalCurve />
         <ColorGrading />
+        <ColorMixer />
       {:else if $tool === "crop"}
         <CropPanel bind:aspect bind:orientation bind:angle
                    on:preset={(e) => onPreset(e.detail)} on:swap={onSwap} on:reset={onReset}

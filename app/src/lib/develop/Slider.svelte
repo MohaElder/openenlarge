@@ -19,6 +19,7 @@
     class:grad={!!gradient}
     style={gradient ? `--track:${gradient}` : ""}
     on:dblclick={() => (value = def)}
+    on:input
   />
 </div>
 
