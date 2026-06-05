@@ -16,15 +16,16 @@ use std::path::Path;
 use tauri::State;
 
 fn default_bits() -> u8 { 16 }
+fn default_quality() -> u8 { 85 }
 
 /// Output format chosen in the Export modal. Mirrors the JS `ExportFormat` object.
-#[derive(serde::Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportFormat {
     pub kind: String, // "jpeg" | "tiff" | "png"
     #[serde(default = "default_bits")]
     pub bit_depth: u8, // 8 | 16 (tiff/png)
-    #[serde(default)]
+    #[serde(default = "default_quality")]
     pub quality: u8, // jpeg, 1–100
     #[serde(default)]
     pub max_bytes: Option<u64>, // jpeg
