@@ -64,6 +64,14 @@ export interface ViewSpec {
   ir_removal?: IrRemoval;
 }
 
+/** Geometry + dust/IR for baking a heal-ready working buffer (raw negative). */
+export interface BakeSpec {
+  rot90: number; flip_h: boolean; flip_v: boolean; angle: number;
+  image_crop: [number, number, number, number] | null;
+  dust: DustStroke[];
+  ir_removal: IrRemoval;
+}
+
 /** Persistent per-image edits that shape a thumbnail (no zoom/view crop). */
 export interface ThumbView {
   image_crop?: [number, number, number, number] | null;
@@ -130,7 +138,8 @@ export const api = {
   deleteImage: (id: string, deleteFile: boolean) => invoke<void>("delete_image", { id, deleteFile }),
   thumbnail: (id: string, params: InvertParams, view: ThumbView = {}) =>
     invoke<string>("thumbnail", { id, params, view: { ...view, dust: wireDust(view.dust) } }),
-  asShotWb: (id: string) => invoke<AsShotWb>("as_shot_wb", { id }),
+  asShotWb: (id: string, params: InvertParams) =>
+    invoke<AsShotWb>("as_shot_wb", { id, params }),
   loadCatalog: () => invoke<CatalogSnapshot>("load_catalog"),
   saveEdits: (id: string, paramsJson: string) =>
     invoke<void>("save_edits", { id, paramsJson }),
@@ -150,6 +159,12 @@ export const api = {
   // Tauri returns the command's `Response` bytes as an ArrayBuffer.
   workingPixels: (id: string) =>
     invoke<ArrayBuffer>("working_pixels", { id }),
+
+  workingBakedInfo: (id: string, spec: BakeSpec) =>
+    invoke<{ w: number; h: number }>("working_baked_info", { id, spec: { ...spec, dust: wireDust(spec.dust) } }),
+
+  workingBakedPixels: (id: string, spec: BakeSpec) =>
+    invoke<ArrayBuffer>("working_baked_pixels", { id, spec: { ...spec, dust: wireDust(spec.dust) } }),
 
   resolvedInversion: (id: string, params: InvertParams) =>
     invoke<import("./viewport/gl/invert").ResolvedInversion>("resolved_inversion", { id, params }),
