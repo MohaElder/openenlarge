@@ -42,6 +42,16 @@ fn default_invert_params() -> InvertParams {
         temp: 5500.0, tint: 0.0,
         contrast: 0.0, highlights: 0.0, shadows: 0.0, whites: 0.0, blacks: 0.0,
         texture: 0.0, vibrance: 0.0, saturation: 0.0,
+        tc_highlights: 0.0, tc_lights: 0.0, tc_darks: 0.0, tc_shadows: 0.0,
+        tc_curve: crate::session::identity_curve(),
+        tc_red: crate::session::identity_curve(),
+        tc_green: crate::session::identity_curve(),
+        tc_blue: crate::session::identity_curve(),
+        cg_sh_hue: 0.0, cg_sh_sat: 0.0, cg_sh_lum: 0.0,
+        cg_mid_hue: 0.0, cg_mid_sat: 0.0, cg_mid_lum: 0.0,
+        cg_hi_hue: 0.0, cg_hi_sat: 0.0, cg_hi_lum: 0.0,
+        cg_glob_hue: 0.0, cg_glob_sat: 0.0, cg_glob_lum: 0.0,
+        cg_blending: 50.0, cg_balance: 0.0,
     }
 }
 
@@ -213,6 +223,19 @@ pub fn develop_image(id: String, session: State<Session>) -> Result<ImageEntry, 
 #[tauri::command]
 pub fn set_quality(quality: Quality, session: State<Session>) -> Result<(), String> {
     *session.quality.lock().unwrap() = quality;
+    Ok(())
+}
+
+/// Drop an image from the session. With `delete_file`, also move the original
+/// file to the OS trash (recoverable). Removing from the session always happens
+/// first so the app forgets the image even if the trash step fails.
+#[tauri::command]
+pub fn delete_image(id: String, delete_file: bool, session: State<Session>) -> Result<(), String> {
+    let removed = session.images.lock().unwrap().remove(&id);
+    if delete_file {
+        let img = removed.ok_or_else(|| "unknown image".to_string())?;
+        trash::delete(&img.path).map_err(|e| format!("{e}"))?;
+    }
     Ok(())
 }
 

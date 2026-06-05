@@ -10,6 +10,10 @@ export interface ImageEntry {
   id: string; path: string; file_name: string; thumbnail: string; metadata: Metadata; developed: boolean; has_ir: boolean;
 }
 export type Quality = "performance" | "quality";
+/** A tone-curve control point in [0,1]×[0,1] (input → output). */
+export type CurvePoint = [number, number];
+/** Identity curve: a straight 0→0, 1→1 line. */
+export const IDENTITY_CURVE: CurvePoint[] = [[0, 0], [1, 1]];
 export interface InvertParams {
   mode: "b" | "c";
   stock: "none" | "portra400" | "fujic200";
@@ -22,6 +26,19 @@ export interface InvertParams {
   contrast: number; highlights: number; shadows: number;
   whites: number; blacks: number;
   texture: number; vibrance: number; saturation: number;
+
+  // --- Tone Curve (−100..100 region sliders; point curves are 0..1 control points) ---
+  tc_highlights: number; tc_lights: number; tc_darks: number; tc_shadows: number;
+  tc_curve: CurvePoint[]; // master (RGB) point curve
+  tc_red: CurvePoint[]; tc_green: CurvePoint[]; tc_blue: CurvePoint[];
+
+  // --- Color Grading (hue 0..360, sat 0..100, lum −100..100 per region) ---
+  cg_sh_hue: number; cg_sh_sat: number; cg_sh_lum: number;
+  cg_mid_hue: number; cg_mid_sat: number; cg_mid_lum: number;
+  cg_hi_hue: number; cg_hi_sat: number; cg_hi_lum: number;
+  cg_glob_hue: number; cg_glob_sat: number; cg_glob_lum: number;
+  cg_blending: number; // 0..100 (mask overlap width), default 50
+  cg_balance: number;  // −100..100 (shadow↔highlight crossover), default 0
 }
 export interface AsShotWb { temp: number; tint: number }
 export interface ViewSpec {
@@ -67,6 +84,8 @@ export const api = {
     }),
   developImage: (id: string) => invoke<ImageEntry>("develop_image", { id }),
   setQuality: (quality: Quality) => invoke<void>("set_quality", { quality }),
+  /** Forget an image; when deleteFile is true also move the file to the OS trash. */
+  deleteImage: (id: string, deleteFile: boolean) => invoke<void>("delete_image", { id, deleteFile }),
   thumbnail: (id: string, params: InvertParams) => invoke<string>("thumbnail", { id, params }),
   asShotWb: (id: string) => invoke<AsShotWb>("as_shot_wb", { id }),
 };
@@ -77,4 +96,16 @@ export const defaultParams = (): InvertParams => ({
   auto_wb: true, temp: 5500, tint: 0,
   contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0,
   texture: 0, vibrance: 0, saturation: 0,
+
+  tc_highlights: 0, tc_lights: 0, tc_darks: 0, tc_shadows: 0,
+  tc_curve: IDENTITY_CURVE.map((p) => [...p] as CurvePoint),
+  tc_red: IDENTITY_CURVE.map((p) => [...p] as CurvePoint),
+  tc_green: IDENTITY_CURVE.map((p) => [...p] as CurvePoint),
+  tc_blue: IDENTITY_CURVE.map((p) => [...p] as CurvePoint),
+
+  cg_sh_hue: 0, cg_sh_sat: 0, cg_sh_lum: 0,
+  cg_mid_hue: 0, cg_mid_sat: 0, cg_mid_lum: 0,
+  cg_hi_hue: 0, cg_hi_sat: 0, cg_hi_lum: 0,
+  cg_glob_hue: 0, cg_glob_sat: 0, cg_glob_lum: 0,
+  cg_blending: 50, cg_balance: 0,
 });

@@ -59,7 +59,39 @@ pub struct InvertParams {
     pub texture: f32,
     pub vibrance: f32,
     pub saturation: f32,
+
+    // Tone Curve: region sliders (−100..100) + point curves (0..1 control points).
+    #[serde(default)] pub tc_highlights: f32,
+    #[serde(default)] pub tc_lights: f32,
+    #[serde(default)] pub tc_darks: f32,
+    #[serde(default)] pub tc_shadows: f32,
+    #[serde(default = "identity_curve")] pub tc_curve: Vec<[f32; 2]>,
+    #[serde(default = "identity_curve")] pub tc_red: Vec<[f32; 2]>,
+    #[serde(default = "identity_curve")] pub tc_green: Vec<[f32; 2]>,
+    #[serde(default = "identity_curve")] pub tc_blue: Vec<[f32; 2]>,
+
+    // Color Grading: hue 0..360, sat 0..100, lum −100..100 per region.
+    #[serde(default)] pub cg_sh_hue: f32,
+    #[serde(default)] pub cg_sh_sat: f32,
+    #[serde(default)] pub cg_sh_lum: f32,
+    #[serde(default)] pub cg_mid_hue: f32,
+    #[serde(default)] pub cg_mid_sat: f32,
+    #[serde(default)] pub cg_mid_lum: f32,
+    #[serde(default)] pub cg_hi_hue: f32,
+    #[serde(default)] pub cg_hi_sat: f32,
+    #[serde(default)] pub cg_hi_lum: f32,
+    #[serde(default)] pub cg_glob_hue: f32,
+    #[serde(default)] pub cg_glob_sat: f32,
+    #[serde(default)] pub cg_glob_lum: f32,
+    #[serde(default = "default_blending")] pub cg_blending: f32,
+    #[serde(default)] pub cg_balance: f32,
 }
+
+/// Default identity tone curve: a straight 0→0, 1→1 line.
+pub fn identity_curve() -> Vec<[f32; 2]> {
+    vec![[0.0, 0.0], [1.0, 1.0]]
+}
+fn default_blending() -> f32 { 50.0 }
 
 /// What the frontend gets per image.
 #[derive(Debug, Clone, Serialize)]
