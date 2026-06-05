@@ -4,6 +4,7 @@ pub mod calibrate;
 pub mod decode;
 pub mod export;
 pub mod spectral;
+pub mod curve;
 pub mod finish;
 pub mod wb;
 pub mod dust;
