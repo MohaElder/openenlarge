@@ -94,6 +94,15 @@ pub(crate) fn default_invert_params() -> InvertParams {
         cg_hi_hue: 0.0, cg_hi_sat: 0.0, cg_hi_lum: 0.0,
         cg_glob_hue: 0.0, cg_glob_sat: 0.0, cg_glob_lum: 0.0,
         cg_blending: 50.0, cg_balance: 0.0,
+        cm_red_hue: 0.0, cm_red_sat: 0.0, cm_red_lum: 0.0,
+        cm_orange_hue: 0.0, cm_orange_sat: 0.0, cm_orange_lum: 0.0,
+        cm_yellow_hue: 0.0, cm_yellow_sat: 0.0, cm_yellow_lum: 0.0,
+        cm_green_hue: 0.0, cm_green_sat: 0.0, cm_green_lum: 0.0,
+        cm_aqua_hue: 0.0, cm_aqua_sat: 0.0, cm_aqua_lum: 0.0,
+        cm_blue_hue: 0.0, cm_blue_sat: 0.0, cm_blue_lum: 0.0,
+        cm_purple_hue: 0.0, cm_purple_sat: 0.0, cm_purple_lum: 0.0,
+        cm_magenta_hue: 0.0, cm_magenta_sat: 0.0, cm_magenta_lum: 0.0,
+        pc_samples: Vec::new(),
     }
 }
 
