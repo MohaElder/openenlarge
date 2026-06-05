@@ -53,13 +53,17 @@ pub fn crop(img: &Image, x: usize, y: usize, w: usize, h: usize) -> Image {
     let y2 = (y + h).min(img.height);
     let (cw, ch) = (x2 - x, y2 - y);
     let mut pixels = Vec::with_capacity(cw * ch);
+    let mut ir: Option<Vec<f32>> = img.ir.as_ref().map(|_| Vec::with_capacity(cw * ch));
     for yy in y..y2 {
         let row = yy * img.width;
         for xx in x..x2 {
             pixels.push(img.pixels[row + xx]);
+            if let (Some(dst), Some(src)) = (ir.as_mut(), img.ir.as_ref()) {
+                dst.push(src[row + xx]);
+            }
         }
     }
-    Image { width: cw, height: ch, pixels, ir: None }
+    Image { width: cw, height: ch, pixels, ir }
 }
 
 /// Oriented dimensions after `rot90` clockwise quarter-turns.
@@ -70,24 +74,37 @@ pub fn orient_dims(w: usize, h: usize, rot90: u8) -> (usize, usize) {
 fn flip_h(img: &Image) -> Image {
     let (w, h) = (img.width, img.height);
     let mut px = vec![[0.0_f32; 3]; w * h];
-    for y in 0..h { for x in 0..w { px[y * w + x] = img.pixels[y * w + (w - 1 - x)]; } }
-    Image { width: w, height: h, pixels: px, ir: None }
+    let mut ir = img.ir.as_ref().map(|_| vec![0.0_f32; w * h]);
+    for y in 0..h { for x in 0..w {
+        let (dst, src) = (y * w + x, y * w + (w - 1 - x));
+        px[dst] = img.pixels[src];
+        if let (Some(d), Some(s)) = (ir.as_mut(), img.ir.as_ref()) { d[dst] = s[src]; }
+    } }
+    Image { width: w, height: h, pixels: px, ir }
 }
 fn flip_v(img: &Image) -> Image {
     let (w, h) = (img.width, img.height);
     let mut px = vec![[0.0_f32; 3]; w * h];
-    for y in 0..h { for x in 0..w { px[y * w + x] = img.pixels[(h - 1 - y) * w + x]; } }
-    Image { width: w, height: h, pixels: px, ir: None }
+    let mut ir = img.ir.as_ref().map(|_| vec![0.0_f32; w * h]);
+    for y in 0..h { for x in 0..w {
+        let (dst, src) = (y * w + x, (h - 1 - y) * w + x);
+        px[dst] = img.pixels[src];
+        if let (Some(d), Some(s)) = (ir.as_mut(), img.ir.as_ref()) { d[dst] = s[src]; }
+    } }
+    Image { width: w, height: h, pixels: px, ir }
 }
 fn rotate_cw(img: &Image) -> Image {
     let (w, h) = (img.width, img.height);
     let (nw, nh) = (h, w);
     let mut px = vec![[0.0_f32; 3]; nw * nh];
+    let mut ir = img.ir.as_ref().map(|_| vec![0.0_f32; nw * nh]);
     for ny in 0..nh { for nx in 0..nw {
         let ox = ny; let oy = h - 1 - nx;
-        px[ny * nw + nx] = img.pixels[oy * w + ox];
+        let (dst, src) = (ny * nw + nx, oy * w + ox);
+        px[dst] = img.pixels[src];
+        if let (Some(d), Some(s)) = (ir.as_mut(), img.ir.as_ref()) { d[dst] = s[src]; }
     } }
-    Image { width: nw, height: nh, pixels: px, ir: None }
+    Image { width: nw, height: nh, pixels: px, ir }
 }
 
 /// Lossless orientation: flip-H, flip-V, then `rot90` clockwise quarter-turns.
@@ -297,5 +314,49 @@ mod tests {
         let p = pattern();
         let r = rotate(&p, 30.0);
         assert_eq!(r.pixels[0], [0.0, 0.0, 0.0]);
+    }
+
+    fn ramp_ir(w: usize, h: usize) -> Image {
+        // pixels and ir both encode a per-pixel index so remaps are checkable.
+        let mut img = Image { width: w, height: h, pixels: vec![[0.0; 3]; w * h], ir: Some(vec![0.0; w * h]) };
+        for i in 0..w * h {
+            img.pixels[i] = [i as f32, 0.0, 0.0];
+            if let Some(ir) = img.ir.as_mut() { ir[i] = i as f32; }
+        }
+        img
+    }
+
+    #[test]
+    fn crop_carries_ir_subrectangle() {
+        let img = ramp_ir(4, 4);
+        let c = crop(&img, 1, 2, 2, 1); // row 2, cols 1..3 → indices 9,10
+        let ir = c.ir.expect("crop carries ir");
+        assert_eq!(ir, vec![9.0, 10.0]);
+    }
+
+    #[test]
+    fn crop_none_ir_stays_none() {
+        let img = solid(4, 4, [0.5, 0.5, 0.5]);
+        assert!(crop(&img, 0, 0, 2, 2).ir.is_none());
+    }
+
+    #[test]
+    fn orient_flip_h_remaps_ir_like_pixels() {
+        let img = ramp_ir(2, 3);
+        let f = orient(&img, 0, true, false);
+        let ir = f.ir.expect("orient carries ir");
+        assert_eq!(f.pixels[0][0], ir[0]);
+        assert_eq!(f.pixels[1][0], ir[1]);
+    }
+
+    #[test]
+    fn orient_rot90_remaps_ir_like_pixels() {
+        let img = ramp_ir(2, 3);
+        let r = orient(&img, 1, false, false);
+        let ir = r.ir.expect("orient carries ir through rot90");
+        assert_eq!((r.width, r.height), (3, 2));
+        for i in 0..r.pixels.len() {
+            assert_eq!(r.pixels[i][0], ir[i]);
+        }
     }
 }
