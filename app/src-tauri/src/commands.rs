@@ -79,9 +79,11 @@ fn crop_px(norm: [f64; 4], w: usize, h: usize) -> (usize, usize, usize, usize) {
     (x, y, cw, ch)
 }
 
-/// Map normalized strokes → `Stamp`s in OUTPUT pixel space. `base_w/base_h` are the
-/// displayed (oriented+cropped) image dims at working res; `(cx,cy,cw,ch)` is the
-/// view crop taken from it; `out_w/out_h` is the rendered size of that crop.
+/// Map normalized strokes → `Stamp`s in OUTPUT pixel space.
+/// `base_w/base_h` are the WORKING image dims BEFORE the view crop is applied
+/// (oriented + straightened + persistent image_crop, but NOT the per-render view
+/// crop) — this is the image the UI normalizes stroke coords against. `(cx,cy,cw,ch)`
+/// is the view-crop window within that base; `out_w/out_h` is the rendered output size.
 #[allow(clippy::too_many_arguments)]
 fn view_stamps(
     dust: &[DustStroke], base_w: usize, base_h: usize,
@@ -94,6 +96,7 @@ fn view_stamps(
     let sy = out_h as f64 / ch as f64;
     let mut out = Vec::new();
     for stroke in dust {
+        // r is normalized to base WIDTH (matching the UI brush); scale by the x-axis factor.
         let r = (stroke.r * base_w as f64 * sx).max(0.5);
         for pt in &stroke.points {
             let bx = pt[0] * base_w as f64;
