@@ -24,7 +24,7 @@ OpenEnlarge is an open-source desktop darkroom for color film negatives. It inve
 
 Most tools treat a negative scan as a generic image and fit per-channel tone curves to flip it. OpenEnlarge instead works in the **density domain**, using a Beer-Lambert model of how dye layers absorb light. Density is *linear* in dye concentration; transmittance is not — which is exactly why a naive invert-and-flip looks wrong. Working in density first, then applying creative finishing on top, yields cleaner, more faithful color.
 
-> Engine **B** (density-domain matrix inversion) is the default. A naive per-channel engine (**C**) ships as a built-in comparison mode so you can see the difference for yourself.
+> Every image is developed with a density-domain matrix inversion grounded in the Beer-Lambert model — a physically-based engine, not a per-channel tone curve.
 
 ## Negative → Positive
 
@@ -41,14 +41,14 @@ Most tools treat a negative scan as a generic image and fit per-channel tone cur
 - **Full develop controls** — tonal curve, color grading, color wheels, exposure/black/gamma
 - **Crop, rotate, straighten, flip** with a live viewport and histogram
 - **Batch export** to 16-bit TIFF / PNG / JPEG
-- **Headless CLI** (`film-cli`) for scripting and B-vs-C comparison
+- **Headless CLI** (`film-cli`) for scripting and batch inversion
 - **Cross-platform** — macOS, Windows, Linux, built on Tauri
 
 ## Architecture
 
 | Component | Path | Responsibility |
 |---|---|---|
-| `film-core` | `crates/film-core` | Pure Rust engine — decode, inversion (B & C), calibration, export. No UI deps. |
+| `film-core` | `crates/film-core` | Pure Rust engine — decode, density-domain inversion, calibration, export. No UI deps. |
 | `film-cli` | `crates/film-cli` | Headless CLI over `film-core` for batch/scripted inversion. |
 | App shell | `app/` | Tauri 2 + SvelteKit UI wrapping `film-core`. |
 
@@ -79,14 +79,11 @@ npm run tauri build
 The engine also runs headless. From the repo root:
 
 ```bash
-# Invert a scan with the default density engine (mode B) → 16-bit TIFF
-cargo run -p film-cli -- input.tiff -o output.tiff --mode b
-
-# Emit B, C, and naive side by side for comparison
-cargo run -p film-cli -- input.tiff -o out.tiff --compare
+# Invert a scan with the density-domain engine → 16-bit TIFF
+cargo run -p film-cli -- input.tiff -o output.tiff
 
 # Sample the film base from a rect (x,y,w,h) and pick a stock profile
-cargo run -p film-cli -- input.tiff -o out.tiff --mode b --stock portra400 --base-rect 0,0,128,128
+cargo run -p film-cli -- input.tiff -o out.tiff --stock portra400 --base-rect 0,0,128,128
 ```
 
 Run `cargo run -p film-cli -- --help` for all options.
