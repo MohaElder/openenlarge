@@ -248,40 +248,51 @@ export class FinishRenderer {
     this.srcW = g.outW; this.srcH = g.outH; // finishing pass uses these for u_texel/viewport
   }
 
-  draw() {
-    const gl = this.gl; if (!gl || !this.hasSource) return;
-    if (this.useFloat && this.invProg && this.inv) {
-      // PASS 1: INVERT raw negative → intermediate FBO (output-sized).
-      gl.useProgram(this.invProg);
-      gl.bindVertexArray(this.vao);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.interTex, 0);
-      gl.viewport(0, 0, this.srcW, this.srcH);
-      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.srcTexF);
-      const L = this.invLoc, u = this.inv;
-      gl.uniform3fv(L.u_base, u.base); gl.uniform3fv(L.u_wb, u.wb);
-      gl.uniformMatrix3fv(L.u_m_pre, false, u.m_pre);
-      gl.uniformMatrix3fv(L.u_m_post, false, u.m_post);
-      gl.uniform1f(L.u_exposure, u.exposure); gl.uniform1f(L.u_black, u.black);
-      gl.uniform1f(L.u_gamma, u.gamma); gl.uniform1i(L.u_mode, u.mode);
-      gl.uniform1i(L.u_raw, this.geom.raw ? 1 : 0);
-      gl.uniform2fv(L.u_crop_off, this.geom.crop_off);
-      gl.uniform2fv(L.u_crop_scale, this.geom.crop_scale);
-      gl.uniform1f(L.u_angle, this.geom.angle);
-      gl.uniformMatrix2fv(L.u_orient, false, this.geom.orient);
-      gl.drawArrays(gl.TRIANGLES, 0, 3);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    }
-    // PASS 2: FINISH (existing program) reads the intermediate, draws to canvas.
+  /** Max texture dimension this GL context supports (0 if no context). */
+  maxTextureSize(): number {
+    return this.gl ? this.gl.getParameter(this.gl.MAX_TEXTURE_SIZE) : 0;
+  }
+
+  /** PASS 1: INVERT raw negative → intermediate FBO (output-sized). */
+  private drawInvertPass() {
+    const gl = this.gl; if (!gl) return;
+    gl.useProgram(this.invProg);
+    gl.bindVertexArray(this.vao);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.interTex, 0);
+    gl.viewport(0, 0, this.srcW, this.srcH);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.srcTexF);
+    const L = this.invLoc, u = this.inv!;
+    gl.uniform3fv(L.u_base, u.base); gl.uniform3fv(L.u_wb, u.wb);
+    gl.uniformMatrix3fv(L.u_m_pre, false, u.m_pre);
+    gl.uniformMatrix3fv(L.u_m_post, false, u.m_post);
+    gl.uniform1f(L.u_exposure, u.exposure); gl.uniform1f(L.u_black, u.black);
+    gl.uniform1f(L.u_gamma, u.gamma); gl.uniform1i(L.u_mode, u.mode);
+    gl.uniform1i(L.u_raw, this.geom.raw ? 1 : 0);
+    gl.uniform2fv(L.u_crop_off, this.geom.crop_off);
+    gl.uniform2fv(L.u_crop_scale, this.geom.crop_scale);
+    gl.uniform1f(L.u_angle, this.geom.angle);
+    gl.uniformMatrix2fv(L.u_orient, false, this.geom.orient);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+
+  /**
+   * PASS 2: FINISH (existing program) reads the intermediate, draws into
+   * WHATEVER framebuffer is currently bound (canvas for live, export FBO for
+   * export) at viewport (vw, vh).
+   */
+  private drawFinishPass(vw: number, vh: number) {
+    const gl = this.gl; if (!gl) return;
     const p = this.prog, fu = this.uniforms;
     if (!p || !fu) return;
     gl.useProgram(p);
     gl.bindVertexArray(this.vao);
-    gl.viewport(0, 0, this.srcW, this.srcH);
+    gl.viewport(0, 0, vw, vh);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.useFloat ? this.interTex : this.tex);
     gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.lutTex);
-    gl.uniform2f(this.loc.u_texel, 1 / this.srcW, 1 / this.srcH);
+    gl.uniform2f(this.loc.u_texel, 1 / vw, 1 / vh);
     for (const n of UNIFORM_NAMES) gl.uniform1f(this.loc[`u_${n}`], (fu as unknown as Record<string, number>)[n]);
     const cg = this.cg;
     if (cg) {
@@ -289,6 +300,62 @@ export class FinishRenderer {
       for (const [uu, k] of CG_FLOAT) gl.uniform1f(this.loc[uu], cg[k] as number);
     }
     gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  draw() {
+    const gl = this.gl; if (!gl || !this.hasSource) return;
+    if (this.useFloat && this.invProg && this.inv) this.drawInvertPass();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    this.drawFinishPass(this.srcW, this.srcH);
+  }
+
+  /**
+   * Render invert+finish for EXPORT into an offscreen FBO at (w,h) and read back.
+   * bit16=false → returns RGBA8 (Uint8Array); bit16=true → RGBA f32 (Float32Array).
+   * Geometry is identity (Rust already baked orient/crop/heal into `src`).
+   * Returns null if WebGL is unavailable or (w,h) exceeds MAX_TEXTURE_SIZE.
+   */
+  renderExport(
+    src: Uint16Array, w: number, h: number,
+    inv: InversionUniforms,
+    fu: FinishUniforms, lut: Uint8Array, cg: ColorGradeUniforms,
+    bit16: boolean,
+  ): { data: Uint8Array | Float32Array; w: number; h: number } | null {
+    const gl = this.gl; if (!gl || !this.invProg || !this.prog) return null;
+    const max = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+    if (w > max || h > max) return null;
+
+    // Upload the full-res source, set inversion + IDENTITY geometry + finishing.
+    this.setSourceFloat(src, w, h);
+    this.setInversion(inv);
+    this.setGeometry({ crop_off: [0, 0], crop_scale: [1, 1], angle: 0, orient: [1, 0, 0, 1], raw: false, outW: w, outH: h });
+    this.setUniforms(fu); this.setLut(lut); this.setColorGrade(cg);
+
+    // Offscreen output texture + FBO (RGBA8 for 8-bit, RGBA16F for 16-bit).
+    const outInternal = bit16 ? gl.RGBA16F : gl.RGBA8;
+    const outType = bit16 ? gl.HALF_FLOAT : gl.UNSIGNED_BYTE;
+    const outTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, outTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texImage2D(gl.TEXTURE_2D, 0, outInternal, w, h, 0, gl.RGBA, outType, null);
+    const outFbo = gl.createFramebuffer();
+
+    // PASS 1: invert → interTex.
+    this.drawInvertPass();
+    // PASS 2: finish interTex → outTex.
+    gl.bindFramebuffer(gl.FRAMEBUFFER, outFbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, outTex, 0);
+    this.drawFinishPass(w, h);
+
+    // Read back.
+    let data: Uint8Array | Float32Array;
+    if (bit16) { data = new Float32Array(w * h * 4); gl.readPixels(0, 0, w, h, gl.RGBA, gl.FLOAT, data); }
+    else { data = new Uint8Array(w * h * 4); gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, data); }
+
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.deleteFramebuffer(outFbo); gl.deleteTexture(outTex);
+    return { data, w, h };
   }
 }
 
