@@ -117,7 +117,12 @@
         src = data;
         if (interactive && !raw) previewSrc.set(src);
       }
-    } catch { /* keep previous frame */ }
+    } catch (e) {
+      // "not developed" is expected for thumbnails of not-yet-developed images;
+      // anything else is a real error worth surfacing (don't swallow silently).
+      if (!(typeof e === "string" && e === "not developed")) console.error("renderView failed", e);
+      /* keep previous frame */
+    }
   }
 
   function drawGL() {

@@ -19,10 +19,17 @@ const UNIFORM_NAMES = [
   "vibrance", "saturation", "texture",
 ] as const;
 
-// Color-grading uniforms: vec3 offsets, float lums, mask edges.
-const CG_VEC3 = ["cg_sh_off", "cg_mid_off", "cg_hi_off", "cg_glob_off"] as const;
-const CG_FLOAT = ["cg_sh_lum", "cg_mid_lum", "cg_hi_lum", "cg_glob_lum",
-  "cg_sh_edge", "cg_hi_edge", "cg_soft"] as const;
+// Color-grading uniforms: [shader uniform name, ColorGradeUniforms key]. The
+// shader names are cg-prefixed; the JS object keys are not — keep them paired.
+const CG_VEC3: [string, keyof ColorGradeUniforms][] = [
+  ["u_cg_sh_off", "sh_off"], ["u_cg_mid_off", "mid_off"],
+  ["u_cg_hi_off", "hi_off"], ["u_cg_glob_off", "glob_off"],
+];
+const CG_FLOAT: [string, keyof ColorGradeUniforms][] = [
+  ["u_cg_sh_lum", "sh_lum"], ["u_cg_mid_lum", "mid_lum"],
+  ["u_cg_hi_lum", "hi_lum"], ["u_cg_glob_lum", "glob_lum"],
+  ["u_cg_sh_edge", "sh_edge"], ["u_cg_hi_edge", "hi_edge"], ["u_cg_soft", "softness"],
+];
 
 /** Applies the finishing layer to a source preview texture via a fragment shader. */
 export class FinishRenderer {
@@ -66,8 +73,8 @@ export class FinishRenderer {
     this.loc.u_lut = gl.getUniformLocation(prog, "u_lut");
     this.loc.u_texel = gl.getUniformLocation(prog, "u_texel");
     for (const n of UNIFORM_NAMES) this.loc[`u_${n}`] = gl.getUniformLocation(prog, `u_${n}`);
-    for (const n of CG_VEC3) this.loc[`u_${n}`] = gl.getUniformLocation(prog, `u_${n}`);
-    for (const n of CG_FLOAT) this.loc[`u_${n}`] = gl.getUniformLocation(prog, `u_${n}`);
+    for (const [u] of CG_VEC3) this.loc[u] = gl.getUniformLocation(prog, u);
+    for (const [u] of CG_FLOAT) this.loc[u] = gl.getUniformLocation(prog, u);
     gl.uniform1i(this.loc.u_src, 0);
     gl.uniform1i(this.loc.u_lut, 1);
     this.available = true;
@@ -130,8 +137,8 @@ export class FinishRenderer {
     for (const n of UNIFORM_NAMES) gl.uniform1f(this.loc[`u_${n}`], (u as unknown as Record<string, number>)[n]);
     const cg = this.cg;
     if (cg) {
-      for (const n of CG_VEC3) gl.uniform3fv(this.loc[`u_${n}`], (cg as unknown as Record<string, [number, number, number]>)[n]);
-      for (const n of CG_FLOAT) gl.uniform1f(this.loc[`u_${n}`], (cg as unknown as Record<string, number>)[n]);
+      for (const [u, k] of CG_VEC3) gl.uniform3fv(this.loc[u], cg[k] as [number, number, number]);
+      for (const [u, k] of CG_FLOAT) gl.uniform1f(this.loc[u], cg[k] as number);
     }
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
