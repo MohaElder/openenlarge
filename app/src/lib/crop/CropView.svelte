@@ -55,7 +55,7 @@
     } catch { /* keep last */ }
   }
   // Re-fetch the oriented image only on discrete changes (NOT the live angle).
-  $: key = `${id}|${vpW}|${vpH}|${imgW}|${imgH}|${rot90}|${flipH}|${flipV}|${params.mode}|${params.stock}|${params.exposure}|${params.temp}|${params.tint}|${params.contrast}|${params.highlights}|${params.shadows}|${params.whites}|${params.blacks}|${params.texture}|${params.vibrance}|${params.saturation}`;
+  $: key = `${id}|${vpW}|${vpH}|${imgW}|${imgH}|${rot90}|${flipH}|${flipV}|${params.mode}|${params.stock}|${params.exposure}|${params.temp}|${params.tint}|${params.contrast}|${params.highlights}|${params.shadows}|${params.whites}|${params.blacks}|${params.texture}|${params.vibrance}|${params.saturation}|${JSON.stringify(params.base_override)}`;
   $: if (key !== lastKey) { lastKey = key; render(); }
 
   // Animate a single 90° turn: snapshot the current (old) frame and spin it.

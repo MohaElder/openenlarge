@@ -1,6 +1,8 @@
 <script lang="ts">
   import { t } from "$lib/i18n";
-  import { activeId, params, images, folderImages, tool, cropById, activeCrop, dustById, activeDust, deleteTarget, dustRev } from "../store";
+  import { activeId, params, images, folderImages, tool, cropById, activeCrop, dustById, activeDust, deleteTarget, dustRev, folderBaseByPath } from "../store";
+  import { imageDir } from "../library/folderScope";
+  import { withEffectiveBase } from "../develop/base";
   import { api } from "../api";
   import Filmstrip from "../panels/Filmstrip.svelte";
   import Viewport from "../viewport/Viewport.svelte";
@@ -24,6 +26,10 @@
   $: active = $images.find((i) => i.id === $activeId);
   $: origW = active?.metadata.width ?? 0;
   $: origH = active?.metadata.height ?? 0;
+  $: dir = active ? imageDir(active) : "";
+  // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+  $: { void $folderBaseByPath; effParams = withEffectiveBase($params, dir); }
+  let effParams = withEffectiveBase($params, dir);
 
   // ---- Crop draft state (only while tool === "crop") ----
   let rect: Rect = { x: 0.1, y: 0.1, w: 0.8, h: 0.8 };
@@ -157,12 +163,12 @@
     };
     thumbTimer = setTimeout(async () => {
       try {
-        const t = await api.thumbnail(id, $params, view);
+        const t = await api.thumbnail(id, effParams, view);
         images.update((xs) => xs.map((i) => (i.id === id ? { ...i, thumbnail: t } : i)));
       } catch { /* ignore */ }
     }, 400);
   }
-  $: $params, $activeId, $activeCrop, $activeDust, refreshThumb();
+  $: $params, $activeId, $activeCrop, $activeDust, $folderBaseByPath, refreshThumb();
 
   let brush = 0.03;            // normalized-to-width brush radius
   $: dust = $activeDust;
@@ -190,11 +196,11 @@
   <section class="center">
     {#if active?.developed}
       {#if $tool === "crop"}
-        <CropView id={$activeId} params={$params} imgW={oW} imgH={oH}
+        <CropView id={$activeId} params={effParams} imgW={oW} imgH={oH}
                   bind:rect {lockRatio} {rot90} {flipH} {flipV} {angle}
                   on:custom={() => (aspect = "custom")} on:straighten={(e) => onStraighten(e.detail)} />
       {:else}
-        <Viewport id={$activeId} params={$params} imgW={effW} imgH={effH} imageCrop={imageCrop}
+        <Viewport id={$activeId} params={effParams} imgW={effW} imgH={effH} imageCrop={imageCrop}
                   rot90={cRot} flipH={committed?.flipH ?? false} flipV={committed?.flipV ?? false} angle={committed?.angle ?? 0}
                   eraser={$tool === "eraser"} {brush} dust={dust.strokes} irRemoval={dust.irRemoval} dustRev={$dustRev}
                   on:stroke={(e) => commitStroke(e.detail)} on:brush={(e) => (brush = e.detail)} />

@@ -248,7 +248,7 @@
   $: if (!gpuEligible) uploadKey = "";
 
   // Inversion params now drive GPU uniforms (no backend pixel fetch) when eligible.
-  $: invKey = `${params.mode}|${params.stock}|${params.exposure}|${params.temp}|${params.tint}|${params.black}|${params.gamma}`;
+  $: invKey = `${params.mode}|${params.stock}|${params.exposure}|${params.temp}|${params.tint}|${params.black}|${params.gamma}|${JSON.stringify(params.base_override)}`;
   $: if (gpuEligible) { invKey; refreshInversion().then(applyGeometryAndDraw); }
 
   // Geometry also drives GPU uniforms (no fetch) when eligible.
@@ -260,7 +260,7 @@
   // CPU fallback path: re-fetch the SOURCE from the backend only when NOT eligible
   // (dust/IR active, raw view, or no WebGL2). Reuses the existing render()/schedule.
   $: cpuKey = gpuEligible ? '' :
-    `${id}|${raw}|${eff}|${vpW}|${vpH}|${params.mode}|${params.stock}|${params.exposure}|${params.temp}|${params.tint}|${imageCrop ? imageCrop.join(',') : 'full'}|${rot90}|${flipH}|${flipV}|${angle}|${dustRev}|${irRemoval.enabled}|${irRemoval.sensitivity}`;
+    `${id}|${raw}|${eff}|${vpW}|${vpH}|${params.mode}|${params.stock}|${params.exposure}|${params.temp}|${params.tint}|${imageCrop ? imageCrop.join(',') : 'full'}|${rot90}|${flipH}|${flipV}|${angle}|${dustRev}|${irRemoval.enabled}|${irRemoval.sensitivity}|${JSON.stringify(params.base_override)}`;
   $: cpuKey, imgW, imgH, scheduleIfReady();
 
   // Finishing-only change → GPU redraw, no backend fetch. Tone curve + color
