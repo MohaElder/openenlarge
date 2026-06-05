@@ -1,7 +1,7 @@
 //! Tauri commands orchestrating film-core for the RedRoom UI.
 
 use crate::convert::{crop, orient, orient_dims, proxy, resize_to, rotate};
-use crate::encode::{to_jpeg_b64, to_png_b64};
+use crate::encode::{to_jpeg_b64, to_png_b64, write_jpeg, write_png, write_tiff8};
 use crate::metadata::extract;
 use crate::session::{CachedImage, Developed, ImageEntry, InvertParams, Quality, Session};
 use film_core::calibrate::{auto_wb_gains, sample_base};
@@ -14,6 +14,21 @@ use film_core::spectral::Stock;
 use serde::Deserialize;
 use std::path::Path;
 use tauri::State;
+
+fn default_bits() -> u8 { 16 }
+
+/// Output format chosen in the Export modal. Mirrors the JS `ExportFormat` object.
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExportFormat {
+    pub kind: String, // "jpeg" | "tiff" | "png"
+    #[serde(default = "default_bits")]
+    pub bit_depth: u8, // 8 | 16 (tiff/png)
+    #[serde(default)]
+    pub quality: u8, // jpeg, 1–100
+    #[serde(default)]
+    pub max_bytes: Option<u64>, // jpeg
+}
 
 const THUMB_EDGE: u32 = 320;
 const AUTOWB_EDGE: u32 = 256;
@@ -303,7 +318,7 @@ pub fn thumbnail(id: String, params: InvertParams, session: State<Session>) -> R
     to_jpeg_b64(&fin, false, 82)
 }
 
-/// Re-decode the file at full resolution and export a 16-bit TIFF.
+/// Re-decode the file at full resolution and export it in the chosen format.
 #[allow(clippy::too_many_arguments)] // Tauri command: flat args mirror the JS invoke contract
 #[tauri::command]
 pub fn export_image(
@@ -312,6 +327,7 @@ pub fn export_image(
     rot90: u8, flip_h: bool, flip_v: bool, angle: f32,
     dust: Vec<DustStroke>,
     ir_removal: IrRemoval,
+    format: ExportFormat,
     session: State<Session>,
 ) -> Result<(), String> {
     let (path, base, thumb) = {
@@ -340,7 +356,19 @@ pub fn export_image(
         }
     }
     let fin = finish_image(&inv, &finish_from(&params));
-    film_core::export::write_tiff16(&fin, Path::new(&out_path)).map_err(|e| format!("{e}"))
+    let out = Path::new(&out_path);
+    match format.kind.as_str() {
+        "tiff" => {
+            if format.bit_depth == 16 {
+                film_core::export::write_tiff16(&fin, out).map_err(|e| format!("{e}"))
+            } else {
+                write_tiff8(&fin, out)
+            }
+        }
+        "png" => write_png(&fin, out, format.bit_depth),
+        "jpeg" => write_jpeg(&fin, out, format.quality, format.max_bytes),
+        other => Err(format!("unknown export format: {other}")),
+    }
 }
 
 /// Estimated as-shot white point for the developed image, as (Kelvin, tint).
