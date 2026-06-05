@@ -25,6 +25,20 @@ export type Quality = "performance" | "quality";
 export type CurvePoint = [number, number];
 /** Identity curve: a straight 0→0, 1→1 line. */
 export const IDENTITY_CURVE: CurvePoint[] = [[0, 0], [1, 1]];
+/** One Point Color sample: a picked target color + its per-sample adjustments. */
+export interface PointColorSample {
+  hue: number;   // target hue, 0..360 (fixed at pick time)
+  sat: number;   // target saturation, 0..1
+  lum: number;   // target lightness, 0..1
+  hue_shift: number;  // −100..100
+  sat_shift: number;  // −100..100
+  lum_shift: number;  // −100..100
+  variance: number;   // −100..100 (widens sat/lum tolerance)
+  range: number;      // 0..100 (hue-window half-width), default 50
+}
+/** Lightroom Color Mixer band order (fixed). */
+export const CM_BANDS = ["red","orange","yellow","green","aqua","blue","purple","magenta"] as const;
+export type CmBand = (typeof CM_BANDS)[number];
 export interface InvertParams {
   mode: "b" | "c";
   stock: "none" | "portra400" | "fujic200";
@@ -50,6 +64,18 @@ export interface InvertParams {
   cg_glob_hue: number; cg_glob_sat: number; cg_glob_lum: number;
   cg_blending: number; // 0..100 (mask overlap width), default 50
   cg_balance: number;  // −100..100 (shadow↔highlight crossover), default 0
+
+  // --- Color Mixer (HSL): 8 bands × hue/sat/lum, each −100..100, 0 = identity ---
+  cm_red_hue: number; cm_red_sat: number; cm_red_lum: number;
+  cm_orange_hue: number; cm_orange_sat: number; cm_orange_lum: number;
+  cm_yellow_hue: number; cm_yellow_sat: number; cm_yellow_lum: number;
+  cm_green_hue: number; cm_green_sat: number; cm_green_lum: number;
+  cm_aqua_hue: number; cm_aqua_sat: number; cm_aqua_lum: number;
+  cm_blue_hue: number; cm_blue_sat: number; cm_blue_lum: number;
+  cm_purple_hue: number; cm_purple_sat: number; cm_purple_lum: number;
+  cm_magenta_hue: number; cm_magenta_sat: number; cm_magenta_lum: number;
+  // --- Point Color: up to 8 sampled swatches ---
+  pc_samples: PointColorSample[];
 }
 export interface AsShotWb { temp: number; tint: number }
 export interface ViewSpec {
@@ -205,4 +231,14 @@ export const defaultParams = (): InvertParams => ({
   cg_hi_hue: 0, cg_hi_sat: 0, cg_hi_lum: 0,
   cg_glob_hue: 0, cg_glob_sat: 0, cg_glob_lum: 0,
   cg_blending: 50, cg_balance: 0,
+
+  cm_red_hue: 0, cm_red_sat: 0, cm_red_lum: 0,
+  cm_orange_hue: 0, cm_orange_sat: 0, cm_orange_lum: 0,
+  cm_yellow_hue: 0, cm_yellow_sat: 0, cm_yellow_lum: 0,
+  cm_green_hue: 0, cm_green_sat: 0, cm_green_lum: 0,
+  cm_aqua_hue: 0, cm_aqua_sat: 0, cm_aqua_lum: 0,
+  cm_blue_hue: 0, cm_blue_sat: 0, cm_blue_lum: 0,
+  cm_purple_hue: 0, cm_purple_sat: 0, cm_purple_lum: 0,
+  cm_magenta_hue: 0, cm_magenta_sat: 0, cm_magenta_lum: 0,
+  pc_samples: [],
 });
