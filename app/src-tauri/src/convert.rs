@@ -52,6 +52,43 @@ pub fn crop(img: &Image, x: usize, y: usize, w: usize, h: usize) -> Image {
     Image { width: cw, height: ch, pixels, ir: None }
 }
 
+/// Oriented dimensions after `rot90` clockwise quarter-turns.
+pub fn orient_dims(w: usize, h: usize, rot90: u8) -> (usize, usize) {
+    if rot90 % 2 == 1 { (h, w) } else { (w, h) }
+}
+
+fn flip_h(img: &Image) -> Image {
+    let (w, h) = (img.width, img.height);
+    let mut px = vec![[0.0_f32; 3]; w * h];
+    for y in 0..h { for x in 0..w { px[y * w + x] = img.pixels[y * w + (w - 1 - x)]; } }
+    Image { width: w, height: h, pixels: px, ir: None }
+}
+fn flip_v(img: &Image) -> Image {
+    let (w, h) = (img.width, img.height);
+    let mut px = vec![[0.0_f32; 3]; w * h];
+    for y in 0..h { for x in 0..w { px[y * w + x] = img.pixels[(h - 1 - y) * w + x]; } }
+    Image { width: w, height: h, pixels: px, ir: None }
+}
+fn rotate_cw(img: &Image) -> Image {
+    let (w, h) = (img.width, img.height);
+    let (nw, nh) = (h, w);
+    let mut px = vec![[0.0_f32; 3]; nw * nh];
+    for ny in 0..nh { for nx in 0..nw {
+        let ox = ny; let oy = h - 1 - nx;
+        px[ny * nw + nx] = img.pixels[oy * w + ox];
+    } }
+    Image { width: nw, height: nh, pixels: px, ir: None }
+}
+
+/// Lossless orientation: flip-H, flip-V, then `rot90` clockwise quarter-turns.
+pub fn orient(img: &Image, rot90: u8, flip_horizontal: bool, flip_vertical: bool) -> Image {
+    let mut o = img.clone();
+    if flip_horizontal { o = flip_h(&o); }
+    if flip_vertical { o = flip_v(&o); }
+    for _ in 0..(rot90 % 4) { o = rotate_cw(&o); }
+    o
+}
+
 /// Resize to exactly `w x h` (Triangle filter). No-op if already that size.
 pub fn resize_to(img: &Image, w: u32, h: u32) -> Image {
     if img.width as u32 == w && img.height as u32 == h {
@@ -121,5 +158,37 @@ mod tests {
         for c in 0..3 {
             assert!((r.pixels[0][c] - img.pixels[0][c]).abs() < 1e-3);
         }
+    }
+
+    fn pattern() -> Image {
+        let mut img = Image { width: 2, height: 3, pixels: vec![[0.0; 3]; 6], ir: None };
+        for y in 0..3 { for x in 0..2 { img.pixels[y * 2 + x] = [x as f32 / 10.0, y as f32 / 10.0, 0.0]; } }
+        img
+    }
+    #[test]
+    fn orient_identity() {
+        let p = pattern();
+        assert_eq!(orient(&p, 0, false, false).pixels, p.pixels);
+    }
+    #[test]
+    fn orient_dims_swaps_on_quarter_turns() {
+        assert_eq!(orient_dims(2, 3, 0), (2, 3));
+        assert_eq!(orient_dims(2, 3, 1), (3, 2));
+        assert_eq!(orient_dims(2, 3, 2), (2, 3));
+        assert_eq!(orient_dims(2, 3, 3), (3, 2));
+    }
+    #[test]
+    fn orient_flip_h_mirrors_x() {
+        let p = pattern();
+        let f = orient(&p, 0, true, false);
+        assert_eq!(f.pixels[0], p.pixels[1]);
+        assert_eq!(f.pixels[1], p.pixels[0]);
+    }
+    #[test]
+    fn orient_rot90_cw_maps_topleft_to_topright() {
+        let p = pattern();
+        let r = orient(&p, 1, false, false);
+        assert_eq!((r.width, r.height), (3, 2));
+        assert_eq!(r.pixels[0 * 3 + 2], p.pixels[0]);
     }
 }
