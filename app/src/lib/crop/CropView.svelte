@@ -11,6 +11,10 @@
   export let imgH = 0;
   export let rect: Rect;          // bound draft rect
   export let lockRatio: number;
+  export let rot90 = 0;
+  export let flipH = false;
+  export let flipV = false;
+  export let angle = 0;
 
   const PAD = 60;
   const CAP = 5000;
@@ -41,19 +45,21 @@
     const out_h = Math.max(1, Math.round(imgH * rscale));
     try {
       src = await api.renderView(id, params, {
-        crop: [0, 0, imgW, imgH], out_w, out_h, raw: false, finish: true, image_crop: null,
+        crop: [0, 0, imgW, imgH], out_w, out_h, raw: false, finish: true,
+        image_crop: null, rot90, flip_h: flipH, flip_v: flipV, angle: 0,
       });
     } catch { /* keep last */ }
   }
-  $: key = `${id}|${vpW}|${vpH}|${imgW}|${imgH}|${params.mode}|${params.stock}|${params.exposure}|${params.temp}|${params.tint}|${params.contrast}|${params.highlights}|${params.shadows}|${params.whites}|${params.blacks}|${params.texture}|${params.vibrance}|${params.saturation}`;
+  // Re-fetch the oriented image only on discrete changes (NOT the live angle).
+  $: key = `${id}|${vpW}|${vpH}|${imgW}|${imgH}|${rot90}|${flipH}|${flipV}|${params.mode}|${params.stock}|${params.exposure}|${params.temp}|${params.tint}|${params.contrast}|${params.highlights}|${params.shadows}|${params.whites}|${params.blacks}|${params.texture}|${params.vibrance}|${params.saturation}`;
   $: if (key !== lastKey) { lastKey = key; render(); }
 </script>
 
 <div class="cropvp" bind:this={el}>
   {#if src}
     <img {src} alt="crop" draggable="false"
-      style="position:absolute; left:{imgScreen.left}px; top:{imgScreen.top}px; width:{dispW}px; height:{dispH}px;" />
-    <CropOverlay bind:rect img={imgScreen} {lockRatio} on:custom />
+      style="position:absolute; left:{imgScreen.left}px; top:{imgScreen.top}px; width:{dispW}px; height:{dispH}px; transform:rotate({angle}deg);" />
+    <CropOverlay bind:rect img={imgScreen} {lockRatio} {angle} on:custom on:straighten />
   {:else}<div class="hint">…</div>{/if}
 </div>
 
