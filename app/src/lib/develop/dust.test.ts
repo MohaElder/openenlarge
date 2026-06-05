@@ -35,6 +35,12 @@ describe("ir removal state", () => {
     expect(d2.irRemoval).toEqual({ enabled: true, sensitivity: 70 });
     expect(d2.strokes.length).toBe(1);
   });
+  it("reset clears strokes but preserves irRemoval", () => {
+    const d = setIrEnabled(addStroke(emptyDust(), { points: [{ x: 0.1, y: 0.1 }], r: 0.02 }), true);
+    const r = resetDust(d);
+    expect(r.strokes.length).toBe(0);
+    expect(r.irRemoval.enabled).toBe(true);
+  });
 });
 
 describe("brush radius mapping", () => {

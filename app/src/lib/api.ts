@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { DustStroke } from "./develop/dust";
-export type { DustStroke };
+import type { DustStroke, IrRemoval } from "./develop/dust";
+export type { DustStroke, IrRemoval };
 
 export interface Metadata {
   camera?: string; lens?: string; iso?: string; shutter?: string;
@@ -24,7 +24,6 @@ export interface InvertParams {
   texture: number; vibrance: number; saturation: number;
 }
 export interface AsShotWb { temp: number; tint: number }
-export interface IrRemoval { enabled: boolean; sensitivity: number }
 export interface ViewSpec {
   crop: [number, number, number, number];
   out_w: number;
