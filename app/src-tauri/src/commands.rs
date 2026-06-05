@@ -881,6 +881,21 @@ pub fn resolved_inversion(
     Ok(resolve_to_uniforms(&params, effective_base(&params, dev.base)))
 }
 
+/// Sample the orange-mask base from a normalized rect [x,y,w,h] (0..1) over the
+/// resident working image. Used by the base-picker tool; cheap, no re-decode.
+#[tauri::command]
+pub fn sample_base_at(
+    id: String, rect: [f64; 4], session: State<Session>,
+) -> Result<[f32; 3], String> {
+    use film_core::calibrate::Rect;
+    ensure_resident(&session, &id)?;
+    let images = session.images.lock().unwrap();
+    let img = images.get(&id).ok_or("unknown image id")?;
+    let dev = img.developed.as_ref().ok_or("not developed")?;
+    let (x, y, w, h) = crop_px(rect, dev.working.width, dev.working.height);
+    Ok(sample_base(&dev.working, Some(Rect { x, y, w, h })))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -956,6 +971,19 @@ mod tests {
         assert!((s[0].cx - 100.0).abs() < 0.5, "0.25*400");
         assert!((s[0].cy - 100.0).abs() < 0.5, "0.5*200");
         assert!((s[0].r - 4.0).abs() < 0.5, "0.01*400");
+    }
+
+    #[test]
+    fn sample_base_at_maps_normalized_rect_to_region() {
+        use film_core::calibrate::{sample_base, Rect};
+        // 4x4 image: left half bright [0.9,...], right half dark [0.1,...].
+        let mut pixels = vec![[0.1f32; 3]; 16];
+        for y in 0..4 { for x in 0..2 { pixels[y * 4 + x] = [0.9, 0.9, 0.9]; } }
+        let img = film_core::Image { width: 4, height: 4, pixels, ir: None };
+        // Normalized rect over the left half -> bright base.
+        let (x, y, w, h) = crop_px([0.0, 0.0, 0.5, 1.0], img.width, img.height);
+        let base = sample_base(&img, Some(Rect { x, y, w, h }));
+        assert!(base[0] >= 0.85, "left-half base should be bright, got {base:?}");
     }
 
     #[test]

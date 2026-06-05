@@ -70,6 +70,7 @@ pub fn run() {
             commands::working_baked_info,
             commands::working_baked_pixels,
             commands::resolved_inversion,
+            commands::sample_base_at,
         ])
         .run(tauri::generate_context!())
         .expect("error while running OpenEnlarge");
