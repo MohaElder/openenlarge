@@ -27,10 +27,9 @@ Most tools treat a negative scan as a generic image and fit per-channel tone cur
 
 ## Negative → Positive
 
-<!-- TODO: replace placeholders once docs/screenshots/{before,after}.png exist -->
 | Negative (scan) | Developed (OpenEnlarge) |
 |---|---|
-| ![before](docs/screenshots/before.png) | ![after](docs/screenshots/after.png) |
+| ![before](docs/screenshots/before.jpg) | ![after](docs/screenshots/after.jpg) |
 
 ## Features
 
