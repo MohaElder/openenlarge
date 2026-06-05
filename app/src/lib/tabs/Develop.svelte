@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { save } from "@tauri-apps/plugin-dialog";
   import { activeId, params, images, tool, cropById, activeCrop, dustById, activeDust } from "../store";
   import { api } from "../api";
   import Filmstrip from "../panels/Filmstrip.svelte";
@@ -84,6 +83,32 @@
     const nrot = ((base.rot90 + (dir > 0 ? 1 : 3)) % 4) as 0 | 1 | 2 | 3;
     cropById.update((m) => ({ ...m, [id]: { ...base, rect: nr, rot90: nrot } }));
   }
+  // True while a form control has focus, so its own arrow-key behaviour wins
+  // (e.g. nudging a slider) instead of stepping the image.
+  function formFocused(): boolean {
+    const a = document.activeElement;
+    const tag = a?.tagName;
+    return tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA";
+  }
+
+  // Arrow keys step through images from anywhere in Develop (not just the filmstrip).
+  function navImages(e: KeyboardEvent): boolean {
+    if (e.metaKey || e.ctrlKey || e.altKey) return false;
+    const arrows = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"];
+    if (!arrows.includes(e.key) || formFocused()) return false;
+    const list = $images;
+    if (list.length === 0) return false;
+    let idx = list.findIndex((i) => i.id === $activeId);
+    if (idx < 0) idx = 0;
+    if (e.key === "ArrowLeft") idx = Math.max(0, idx - 1);
+    else if (e.key === "ArrowRight") idx = Math.min(list.length - 1, idx + 1);
+    else if (e.key === "ArrowUp") idx = 0;
+    else idx = list.length - 1;
+    e.preventDefault();
+    activeId.set(list[idx].id);
+    return true;
+  }
+
   function onKey(e: KeyboardEvent) {
     const meta = e.metaKey || e.ctrlKey;
     if ($tool === "eraser" && meta && (e.key === "z" || e.key === "Z")) {
@@ -95,6 +120,7 @@
       if ($tool === "crop") onRotate(dir); else rotateCommitted(dir);
       return;
     }
+    if (navImages(e)) return;
     if ($tool !== "crop") return;
     if (e.key === "Enter") { commitCrop(); tool.set("edit"); }
     else if (e.key === "Escape") { discardCrop(); }
@@ -143,22 +169,6 @@
 
   let menu: { x: number; y: number } | null = null;
   function onContext(e: MouseEvent) { e.preventDefault(); menu = { x: e.clientX, y: e.clientY }; }
-
-  let exporting = false, msg = "";
-  async function exportTiff() {
-    if (!$activeId) return;
-    const out = await save({ defaultPath: "redroom-export.tiff", filters: [{ name: "TIFF", extensions: ["tiff"] }] });
-    if (!out) return;
-    exporting = true; msg = "";
-    try {
-      await api.exportImage($activeId, $params, out, imageCrop, {
-        rot90: committed?.rot90 ?? 0, flip_h: committed?.flipH ?? false,
-        flip_v: committed?.flipV ?? false, angle: committed?.angle ?? 0,
-      }, dust.strokes, dust.irRemoval);
-      msg = "Exported ✓";
-    } catch (e) { msg = "Error: " + e; }
-    exporting = false;
-  }
 </script>
 
 <svelte:window on:keydown={onKey} />
@@ -196,10 +206,6 @@
                      on:irEnabled={(e) => setIrOn(e.detail)}
                      on:irSensitivity={(e) => setIrSens(e.detail)} />
       {/if}
-      <button class="export" on:click={exportTiff} disabled={exporting || !$activeId}>
-        {exporting ? "Exporting…" : "Export 16-bit TIFF"}
-      </button>
-      {#if msg}<div class="msg">{msg}</div>{/if}
     </GlassPanel>
   </aside>
 
@@ -215,8 +221,4 @@
   .center { grid-area: center; min-height: 0; display: grid; place-items: center; }
   .hint { color: var(--text-dim); }
   .bottom { grid-area: bottom; }
-  .export { width: 100%; margin-top: 12px; padding: 10px; border: 0; border-radius: 10px;
-    background: var(--accent); color: white; font-weight: 600; cursor: pointer; }
-  .export:disabled { opacity: 0.5; }
-  .msg { margin-top: 8px; color: var(--text-dim); font-size: 12px; }
 </style>
