@@ -15,6 +15,11 @@ pub struct Metadata {
     pub height: u32,
     pub file_size: u64,
     pub date: Option<String>,
+    /// Free-form note (EXIF ImageDescription). Not read from RAW EXIF — populated
+    /// only by user edits via the metadata override. `#[serde(default)]` so catalog
+    /// rows written before this field deserialize cleanly.
+    #[serde(default)]
+    pub note: Option<String>,
 }
 
 /// `width`/`height` come from the already-decoded image (authoritative); the rest

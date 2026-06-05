@@ -6,7 +6,7 @@
   import { join } from "@tauri-apps/api/path";
   import { revealItemInDir } from "@tauri-apps/plugin-opener";
   import { developedImages } from "./eligible";
-  import { editsById, cropById, dustById } from "../store";
+  import { editsById, cropById, dustById, metaById } from "../store";
   import { defaultParams, type ExportFormat } from "../api";
   import { api } from "../api";
   import { emptyDust } from "../develop/dust";
@@ -92,8 +92,9 @@
           ? { rot90: crop.rot90, flip_h: crop.flipH, flip_v: crop.flipV, angle: crop.angle }
           : {};
         const d = $dustById[img.id] ?? emptyDust();
+        const metaOverride = $metaById[img.id] ?? null;
         const outPath = await join(folder, outName(img.file_name, kind));
-        await api.exportImage(img.id, p, outPath, imageCrop, geom, d.strokes, d.irRemoval, format);
+        await api.exportImage(img.id, p, outPath, imageCrop, geom, d.strokes, d.irRemoval, format, metaOverride);
         written.push(outPath);
         done++;
       } catch (e) {

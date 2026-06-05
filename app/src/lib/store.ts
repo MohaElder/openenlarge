@@ -1,5 +1,5 @@
 import { writable, derived, get } from "svelte/store";
-import type { ImageEntry, Quality, InvertParams } from "./api";
+import type { ImageEntry, Quality, InvertParams, MetaOverride } from "./api";
 import { defaultParams } from "./api";
 import type { CropRect } from "./crop/types";
 import { createPerImageParams } from "./perImage";
@@ -44,6 +44,12 @@ export const dustById = writable<Record<string, DustEdits>>({});
 /** The active image's dust edits. */
 export const activeDust = derived([dustById, activeId], ([m, id]) =>
   id ? m[id] ?? emptyDust() : emptyDust());
+
+/** Per-image editable metadata overrides (camera/lens/iso/…/note). */
+export const metaById = writable<Record<string, MetaOverride>>({});
+/** The active image's metadata override (empty object when none). */
+export const activeMeta = derived([metaById, activeId], ([m, id]) =>
+  id ? m[id] ?? {} : {});
 
 /** Develop-all progress. active=true shows the overlay. */
 export const developProgress = writable<{ active: boolean; done: number; total: number }>({
