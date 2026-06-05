@@ -1,4 +1,5 @@
-//! Encode a film_core::Image to a base64 PNG/JPEG (8-bit) for the webview.
+//! Encode a film_core::Image — base64 PNG/JPEG for the webview, and PNG/TIFF/JPEG
+//! files (8 or 16-bit) for export.
 
 use base64::Engine;
 use film_core::Image;
@@ -34,7 +35,8 @@ fn to_rgb16(img: &Image) -> ImageBuffer<Rgb<u16>, Vec<u16>> {
     buf
 }
 
-/// Write a PNG file at 8 or 16 bits. Format is inferred from the `.png` path.
+/// Write a PNG file. bits == 16 → 16-bit PNG; any other value → 8-bit PNG.
+/// (Callers only pass 8 or 16; the format is inferred from the .png path.)
 pub fn write_png(img: &Image, path: &Path, bits: u8) -> Result<(), String> {
     if bits == 16 {
         to_rgb16(img).save(path).map_err(|e| format!("png16 write: {e}"))
