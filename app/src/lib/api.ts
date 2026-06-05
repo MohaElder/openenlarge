@@ -36,6 +36,13 @@ export interface ViewSpec {
   ir_removal?: IrRemoval;
 }
 
+export interface ExportFormat {
+  kind: "jpeg" | "tiff" | "png";
+  bitDepth?: 8 | 16;        // tiff/png only
+  quality?: number;         // jpeg only, 1–100
+  maxBytes?: number | null; // jpeg only
+}
+
 /** Convert app-internal {x,y} points to the [x,y] tuple format the Rust side expects. */
 const wireDust = (dust?: DustStroke[]) =>
   (dust ?? []).map((s) => ({ points: s.points.map((p) => [p.x, p.y]), r: s.r }));
@@ -50,12 +57,13 @@ export const api = {
     geom: { rot90?: number; flip_h?: boolean; flip_v?: boolean; angle?: number } = {},
     dust: DustStroke[] = [],
     irRemoval: IrRemoval = { enabled: false, sensitivity: 50 },
+    format: ExportFormat = { kind: "tiff", bitDepth: 16 },
   ) =>
     invoke<void>("export_image", {
       id, params, outPath, imageCrop,
       rot90: geom.rot90 ?? 0, flipH: geom.flip_h ?? false,
       flipV: geom.flip_v ?? false, angle: geom.angle ?? 0,
-      dust: wireDust(dust), irRemoval,
+      dust: wireDust(dust), irRemoval, format,
     }),
   developImage: (id: string) => invoke<ImageEntry>("develop_image", { id }),
   setQuality: (quality: Quality) => invoke<void>("set_quality", { quality }),
