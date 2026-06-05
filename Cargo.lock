@@ -349,6 +349,7 @@ dependencies = [
  "nalgebra",
  "ndarray",
  "rawler",
+ "rayon",
  "thiserror 1.0.69",
  "tiff",
 ]

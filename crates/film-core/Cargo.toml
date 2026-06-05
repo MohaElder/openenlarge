@@ -10,3 +10,4 @@ rawler = { workspace = true }
 thiserror = { workspace = true }
 inpaint = "0.1"
 ndarray = "0.16"
+rayon = "1"
