@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, createEventDispatcher } from "svelte";
+  import { onMount, onDestroy, createEventDispatcher } from "svelte";
   import { api, type InvertParams } from "../api";
   import type { Rect } from "../crop/types";
   import type { ScreenRect } from "../crop/cropMath";
@@ -53,6 +53,7 @@
   }
   function onChange() { if (timer) clearTimeout(timer); timer = setTimeout(sample, 120); }
   onMount(() => { sample(); });
+  onDestroy(() => { if (timer) clearTimeout(timer); });
 </script>
 
 <div class="basevp" bind:this={el}>
