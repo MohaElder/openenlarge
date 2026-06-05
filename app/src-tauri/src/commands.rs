@@ -9,7 +9,7 @@ use film_core::calibrate::{auto_wb_gains, sample_base};
 use film_core::decode::{decode_raw, decode_tiff};
 use film_core::dust::{self, Stamp};
 use film_core::engine::{invert_image, params_for_stock, InversionParams, Mode};
-use film_core::finish::{finish_image, tone_luts, ColorGrade, FinishParams};
+use film_core::finish::{finish_image, tone_luts, ColorGrade, ColorMix, FinishParams, PcSample};
 use film_core::wb::{gains_to_cct, wb_from_kelvin};
 use film_core::spectral::Stock;
 use serde::Deserialize;
@@ -222,6 +222,32 @@ pub(crate) fn export_stamps(dust: &[DustStroke], w: usize, h: usize) -> Vec<Stam
     out
 }
 
+fn color_mix_from(p: &crate::session::InvertParams) -> ColorMix {
+    let cm_hue = [
+        p.cm_red_hue, p.cm_orange_hue, p.cm_yellow_hue, p.cm_green_hue,
+        p.cm_aqua_hue, p.cm_blue_hue, p.cm_purple_hue, p.cm_magenta_hue,
+    ];
+    let cm_sat = [
+        p.cm_red_sat, p.cm_orange_sat, p.cm_yellow_sat, p.cm_green_sat,
+        p.cm_aqua_sat, p.cm_blue_sat, p.cm_purple_sat, p.cm_magenta_sat,
+    ];
+    let cm_lum = [
+        p.cm_red_lum, p.cm_orange_lum, p.cm_yellow_lum, p.cm_green_lum,
+        p.cm_aqua_lum, p.cm_blue_lum, p.cm_purple_lum, p.cm_magenta_lum,
+    ];
+    let samples = p.pc_samples.iter().map(|s| PcSample {
+        hue: s.hue, sat: s.sat, lum: s.lum,
+        hue_shift: s.hue_shift / 100.0, sat_shift: s.sat_shift / 100.0, lum_shift: s.lum_shift / 100.0,
+        variance: s.variance, range: s.range,
+    }).collect();
+    ColorMix {
+        cm_hue: cm_hue.map(|v| v / 100.0),
+        cm_sat: cm_sat.map(|v| v / 100.0),
+        cm_lum: cm_lum.map(|v| v / 100.0),
+        samples,
+    }
+}
+
 fn finish_from(p: &InvertParams) -> FinishParams {
     // Region sliders ordered [shadows, darks, lights, highlights] to match the engine.
     let regions = [
@@ -247,6 +273,7 @@ fn finish_from(p: &InvertParams) -> FinishParams {
         vibrance: p.vibrance / 100.0,
         saturation: p.saturation / 100.0,
         lut_r, lut_g, lut_b, cg,
+        cm: color_mix_from(p),
     }
 }
 

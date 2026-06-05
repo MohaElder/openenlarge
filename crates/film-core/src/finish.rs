@@ -324,7 +324,7 @@ fn color_grade(rgb: [f32; 3], cg: &ColorGrade) -> [f32; 3] {
 
 /// Creative controls. UI sends −100..100 (and EV for exposure, handled upstream);
 /// these are pre-scaled to −1..1 by the caller. 0.0 everywhere = identity.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct FinishParams {
     pub contrast: f32,
     pub highlights: f32,
@@ -339,6 +339,7 @@ pub struct FinishParams {
     pub lut_g: [f32; LUT_SIZE],
     pub lut_b: [f32; LUT_SIZE],
     pub cg: ColorGrade,
+    pub cm: ColorMix,
 }
 
 impl Default for FinishParams {
@@ -348,6 +349,7 @@ impl Default for FinishParams {
             texture: 0.0, vibrance: 0.0, saturation: 0.0,
             lut_r: identity_lut(), lut_g: identity_lut(), lut_b: identity_lut(),
             cg: ColorGrade::default(),
+            cm: ColorMix::default(),
         }
     }
 }
@@ -389,7 +391,9 @@ pub fn finish_pixel(rgb: [f32; 3], p: &FinishParams) -> [f32; 3] {
         sample_lut(&p.lut_g, sat[1]),
         sample_lut(&p.lut_b, sat[2]),
     ];
-    color_grade(curved, &p.cg)
+    let graded = color_grade(curved, &p.cg);
+    let mixed = color_mix(graded, &p.cm);
+    point_color(mixed, &p.cm.samples)
 }
 
 /// Separable 3-tap Gaussian (radius 1, weights 1/4,1/2,1/4). Edges clamp. Small
@@ -724,6 +728,17 @@ mod tests {
         let ab = point_color(c, &vec![a, b]);
         let ba = point_color(c, &vec![b, a]);
         for k in 0..3 { assert!((ab[k] - ba[k]).abs() < 1e-5, "order matters {ab:?} {ba:?}"); }
+    }
+
+    #[test]
+    fn finish_pixel_color_mixer_default_is_identity() {
+        // Default FinishParams (no mixer, no samples) must leave pixels unchanged.
+        let p = FinishParams::default();
+        for v in [0.1_f32, 0.35, 0.7, 0.95] {
+            let px = [v, v * 0.6, v * 0.3];
+            let out = finish_pixel(px, &p);
+            for c in 0..3 { assert!((out[c] - px[c]).abs() < 1e-4, "v={v} c={c} {out:?}"); }
+        }
     }
 
     #[test]
