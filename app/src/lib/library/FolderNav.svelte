@@ -50,8 +50,7 @@
   .tree { flex: 1; overflow: auto; }
   .empty { color: var(--text-faint); padding: 8px; }
   .import { margin-top: 10px; width: 100%; padding: 11px; border: 0; border-radius: 11px;
-    background: var(--accent); color: #fff; font: inherit; font-weight: 700; cursor: pointer;
-    display: flex; align-items: center; justify-content: center; gap: 7px;
-    box-shadow: 0 6px 18px rgba(224,52,52,0.35); }
+    background: var(--accent-grad); color: #fff; font: inherit; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 7px; }
   .import:disabled { opacity: 0.6; }
 </style>

@@ -33,5 +33,5 @@
   .head { font-size: 11px; color: var(--text-dim); padding: 4px 8px; }
   button { display: block; width: 100%; text-align: left; padding: 7px 8px; border: 0;
     background: transparent; border-radius: 7px; color: var(--text-dim); }
-  button.on { color: var(--text); background: rgba(224,52,52,0.16); }
+  button.on { color: var(--text); background: rgba(244,157,78,0.16); }
 </style>

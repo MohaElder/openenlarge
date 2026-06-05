@@ -1,11 +1,12 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
+  import { fade, scale } from "svelte/transition";
   export let count = 0;
   const dispatch = createEventDispatcher();
 </script>
 
-<div class="scrim" on:click|self={() => dispatch("cancel")}>
-  <div class="card">
+<div class="scrim" on:click|self={() => dispatch("cancel")} transition:fade={{ duration: 150 }}>
+  <div class="card" transition:scale={{ duration: 160, start: 0.96, opacity: 0 }}>
     <div class="title">Develop all {count} image{count === 1 ? "" : "s"}?</div>
     <div class="sub">They'll be decoded and inverted, then opened in Develop.</div>
     <div class="row">
@@ -24,5 +25,5 @@
   .sub { color: var(--text-dim); margin-bottom: 18px; font-size: 12px; }
   .row { display: flex; gap: 10px; justify-content: flex-end; }
   button { padding: 8px 14px; border-radius: 9px; border: 1px solid var(--glass-brd); background: transparent; }
-  .go { background: var(--accent); color: white; border: 0; font-weight: 600; }
+  .go { background: var(--accent-grad); color: white; border: 0; font-weight: 600; }
 </style>

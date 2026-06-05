@@ -216,9 +216,11 @@
 <style>
   .layout { display: grid; height: 100%; gap: 12px;
     grid-template-columns: 1fr 300px; grid-template-rows: 1fr 88px;
-    grid-template-areas: "center right" "bottom bottom"; }
-  .right { grid-area: right; min-height: 0; overflow-y: auto; }
+    grid-template-areas: "center right" "bottom right"; }
+  .right { grid-area: right; min-height: 0; overflow-y: auto;
+    scrollbar-width: none; -ms-overflow-style: none; }
+  .right::-webkit-scrollbar { width: 0; height: 0; }
   .center { grid-area: center; min-height: 0; display: grid; place-items: center; }
   .hint { color: var(--text-dim); }
-  .bottom { grid-area: bottom; }
+  .bottom { grid-area: bottom; min-width: 0; overflow: hidden; }
 </style>

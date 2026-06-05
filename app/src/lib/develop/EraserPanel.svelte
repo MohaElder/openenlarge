@@ -57,7 +57,7 @@
     padding: 7px 10px; border-radius: 8px; border: 1px solid var(--glass-brd);
     background: transparent; color: var(--text); cursor: default; opacity: 0.5; }
   .ir.on { cursor: pointer; opacity: 1; }
-  .ir.on.active { background: rgba(224,52,52,0.18); border-color: rgba(224,52,52,0.5); }
+  .ir.on.active { background: rgba(244,157,78,0.18); border-color: rgba(244,157,78,0.5); }
   .soon, .state { font-size: 10px; border: 1px solid var(--glass-brd); border-radius: 4px;
     padding: 0 5px; color: var(--text-dim); }
   .slrow { display: flex; align-items: center; gap: 8px; }

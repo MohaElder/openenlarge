@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
-  import { PRESETS, labelFor } from "./presets";
+  import { PRESETS } from "./presets";
   import Icon from "../icons/Icon.svelte";
 
   export let aspect: string;
@@ -17,10 +17,11 @@
     {#if aspect === "custom"}<option value="custom">Custom</option>{/if}
     {#each PRESETS as p}<option value={p.id}>{p.label}</option>{/each}
   </select>
-  <div class="current">{labelFor(aspect)}</div>
 
-  <button class="row" on:click={() => dispatch("swap")}>
-    Orientation: {orientation === "landscape" ? "Landscape" : "Portrait"} <span class="key">X</span>
+  <div class="sub">Orientation</div>
+  <button class="orient" title="Toggle orientation (X)" aria-label="Orientation"
+          on:click={() => dispatch("swap")}>
+    <Icon name={orientation === "landscape" ? "landscape" : "portrait"} size={20} />
   </button>
 
   <div class="sub">Transform</div>
@@ -46,13 +47,15 @@
   .head { color: var(--text); font-weight: 600; padding: 4px 0; }
   .sub { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
     color: var(--text-dim); margin: 12px 0 4px; }
-  select { width: 100%; padding: 6px; border-radius: 8px; background: var(--bg-1);
-    color: var(--text); border: 1px solid var(--glass-brd); }
-  .current { font-size: 12px; color: var(--text-dim); margin: 4px 0 8px; }
+  select { width: 100%; padding: 10px 12px; border-radius: 9px; background: var(--bg-1);
+    color: var(--text); border: 1px solid var(--glass-brd); font-size: 13px; }
+  .orient { display: grid; place-items: center; width: 44px; height: 38px; padding: 0;
+    border-radius: 9px; border: 1px solid var(--glass-brd); background: transparent;
+    color: var(--text); cursor: pointer; transition: background 0.12s, border-color 0.12s; }
+  .orient:hover { background: var(--glass-hi); border-color: rgba(255,255,255,0.18); }
   .row { width: 100%; display: flex; justify-content: space-between; align-items: center;
     padding: 7px 10px; margin: 6px 0; border-radius: 8px; border: 1px solid var(--glass-brd);
     background: transparent; color: var(--text); cursor: pointer; }
-  .key { font-size: 10px; border: 1px solid var(--glass-brd); border-radius: 4px; padding: 0 5px; color: var(--text-dim); }
   .btns { display: flex; gap: 6px; }
   .btns button { flex: 1; display: grid; place-items: center; padding: 8px 0; border-radius: 8px;
     border: 1px solid var(--glass-brd); background: transparent; color: var(--text); cursor: pointer; }

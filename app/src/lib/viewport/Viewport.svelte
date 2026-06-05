@@ -5,8 +5,6 @@
   import { previewSrc } from "../store";
   import { FinishRenderer, webgl2Available } from "./gl/renderer";
   import { finishUniforms } from "./gl/uniforms";
-  import SpinOverlay from "./SpinOverlay.svelte";
-  import { spinGeometry } from "./spin";
   import { screenRadius, type DustStroke } from "../develop/dust";
 
   export let id: string | null;
@@ -40,9 +38,6 @@
   // GPU path: only the interactive, non-raw develop canvas, when WebGL2 exists.
   const useGL = interactive && !raw && webgl2Available();
 
-  let spinOverlay: SpinOverlay;
-  let prevRot90 = rot90;
-
   let src = "";
   let vpW = 0, vpH = 0;
   let scale = 0;
@@ -61,15 +56,6 @@
   $: eff = interactive ? (scale > 0 ? scale : fit) : fit;
   $: zoomed = interactive && eff > fit + 1e-6;
   $: label = eff <= fit + 1e-6 ? "Fit" : Math.round(eff * 100) + "%";
-
-  // Animate a single 90° turn at Fit (skip while zoomed). Snapshot = GL canvas or img src.
-  $: if (rot90 !== prevRot90) {
-    const atFit = eff <= fit + 1e-6;
-    const snap = useGL && canvas ? canvas.toDataURL("image/jpeg", 0.9) : src;
-    const g = atFit && snap ? spinGeometry(prevRot90, rot90, imgW, imgH, vpW, vpH, PAD) : null;
-    if (g && spinOverlay) spinOverlay.spin(snap, g.rect, g.dir, g.k);
-    prevRot90 = rot90;
-  }
 
   function clampCenter() {
     const halfW = avW / 2 / eff, halfH = avH / 2 / eff;
@@ -213,6 +199,7 @@
 
   function onDown(e: PointerEvent) {
     if (!interactive) return;
+    if (e.button !== 0) return; // ignore right/middle click — let the context menu open
     if (eraser) {
       painting = true;
       pending = [normPoint(e)];
@@ -237,6 +224,7 @@
     lastX = e.clientX; lastY = e.clientY;
   }
   function onUp(e: PointerEvent) {
+    if (e.button !== 0) return; // right/middle click never triggers tap-to-zoom
     if (eraser) {
       if (painting && pending.length > 0) dispatch("stroke", { points: pending, r: brush });
       painting = false; pending = [];
@@ -272,7 +260,6 @@
       style="position:absolute; width:{dispW}px; height:{dispH}px; left:{left}px; top:{top}px;"
     />
   {:else}<div class="hint">…</div>{/if}
-  <SpinOverlay bind:this={spinOverlay} />
   {#if eraser && hovering}
     <div class="brush" style="left:{curX}px; top:{curY}px; width:{cursorR * 2}px; height:{cursorR * 2}px;"></div>
   {/if}

@@ -7,17 +7,15 @@
   --text: #e8e8ea;
   --text-dim: #9a9aa2;
   --text-faint: #5f5f68;
-  --accent: #e03434;
-  --accent-dim: #7a1e1e;
+  --accent: #f49d4e;
+  --accent-dim: #df7136;
+  --accent-grad: linear-gradient(90deg, #f49d4e, #df7136);
   --radius: 14px;
 }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
 body {
-  background:
-    radial-gradient(1200px 800px at 70% -10%, #1a1320 0%, transparent 60%),
-    radial-gradient(900px 600px at -10% 110%, #101820 0%, transparent 55%),
-    var(--bg-0);
+  background: #181818;
   color: var(--text);
   font: 13px/1.4 -apple-system, system-ui, sans-serif;
   overflow: hidden;

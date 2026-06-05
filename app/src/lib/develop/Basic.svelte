@@ -30,17 +30,16 @@
 
   {#if open}
     <div class="body">
-      <!-- White Balance -->
-      <div class="sub">White Balance</div>
-      <div class="seg">
-        <button class:on={$params.mode === "b"} on:click={() => params.update((p) => ({ ...p, mode: "b" }))}>B · density</button>
-        <button class:on={$params.mode === "c"} on:click={() => params.update((p) => ({ ...p, mode: "c" }))}>C · per-chan</button>
-      </div>
+      <!-- Film Profile -->
+      <div class="sub">Film Profile</div>
       <select bind:value={$params.stock}>
         <option value="none">No film profile</option>
         <option value="portra400">Kodak Portra 400</option>
         <option value="fujic200">Fuji C200</option>
       </select>
+
+      <!-- White Balance -->
+      <div class="sub">White Balance</div>
       <div class="wbhead">
         <span>Temp / Tint</span>
         <button class="auto" on:click={autoWb}>Auto</button>
@@ -75,12 +74,8 @@
     padding: 4px 0; cursor: pointer; }
   .sub { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
     color: var(--text-dim); margin: 12px 0 4px; }
-  .seg { display: flex; gap: 6px; margin-bottom: 8px; }
-  .seg button { flex: 1; padding: 6px; border-radius: 8px; font-size: 12px;
-    border: 1px solid var(--glass-brd); background: transparent; color: var(--text-dim); }
-  .seg button.on { color: #fff; background: rgba(224,52,52,0.18); border-color: rgba(224,52,52,0.5); }
-  select { width: 100%; padding: 6px; border-radius: 8px; background: var(--bg-1);
-    color: var(--text); border: 1px solid var(--glass-brd); margin-bottom: 8px; }
+  select { width: 100%; padding: 10px 12px; border-radius: 9px; background: var(--bg-1);
+    color: var(--text); border: 1px solid var(--glass-brd); margin-bottom: 8px; font-size: 13px; }
   .wbhead { display: flex; justify-content: space-between; align-items: center;
     font-size: 11px; color: var(--text-dim); margin: 4px 0; }
   .auto { background: transparent; border: 1px solid var(--glass-brd); color: var(--text-dim);

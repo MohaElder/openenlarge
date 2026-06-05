@@ -1,4 +1,4 @@
-//! Tauri commands orchestrating film-core for the RedRoom UI.
+//! Tauri commands orchestrating film-core for the OpenEnlarge UI.
 
 use crate::convert::{crop, orient, orient_dims, proxy, resize_to, rotate};
 use crate::encode::{to_jpeg_b64, to_png_b64, write_jpeg, write_png, write_tiff8};

@@ -1,12 +1,13 @@
 <script lang="ts">
+  import { fade, scale } from "svelte/transition";
   import { developProgress } from "../store";
   $: p = $developProgress;
   $: pct = p.total ? Math.round((p.done / p.total) * 100) : 0;
 </script>
 
 {#if p.active}
-  <div class="scrim">
-    <div class="card">
+  <div class="scrim" transition:fade={{ duration: 150 }}>
+    <div class="card" transition:scale={{ duration: 160, start: 0.96, opacity: 0 }}>
       <div class="title">Developing {p.done + 1 > p.total ? p.total : p.done + 1} of {p.total}…</div>
       <div class="bar"><div class="fill" style="width:{pct}%"></div></div>
     </div>

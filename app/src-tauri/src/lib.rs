@@ -35,5 +35,5 @@ pub fn run() {
             commands::as_shot_wb,
         ])
         .run(tauri::generate_context!())
-        .expect("error while running RedRoom");
+        .expect("error while running OpenEnlarge");
 }

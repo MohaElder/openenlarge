@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- macOS 26 (Tahoe) Liquid Glass icon: selects the "app-logo" asset inside
+	     Resources/Assets.car. Older macOS ignores this key and falls back to the
+	     legacy icon.icns via CFBundleIconFile (set by Tauri). -->
+	<key>CFBundleIconName</key>
+	<string>app-logo</string>
+</dict>
+</plist>

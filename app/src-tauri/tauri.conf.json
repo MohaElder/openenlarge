@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "RedRoom",
+  "productName": "OpenEnlarge",
   "version": "0.1.0",
   "identifier": "com.mohaelder.app",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "RedRoom",
+        "title": "OpenEnlarge",
         "width": 800,
         "height": 600,
         "visible": false
@@ -31,6 +31,11 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "macOS": {
+      "files": {
+        "Resources/Assets.car": "icons/Assets.car"
+      }
+    }
   }
 }

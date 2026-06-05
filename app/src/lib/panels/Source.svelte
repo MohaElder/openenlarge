@@ -57,5 +57,5 @@
   .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
   .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); flex: 0 0 auto; }
   .develop { width: 100%; padding: 10px; border: 0; border-radius: 10px; margin-top: auto;
-    background: var(--accent); color: white; font-weight: 700; }
+    background: var(--accent-grad); color: white; font-weight: 700; }
 </style>

@@ -26,7 +26,7 @@
   button { flex: 1; display: grid; place-items: center; padding: 7px 0;
     border-radius: 8px; border: 1px solid transparent; background: transparent;
     color: var(--text-dim); cursor: pointer; }
-  button.on { color: #fff; background: rgba(224,52,52,0.18);
-    border-color: rgba(224,52,52,0.5); }
+  button.on { color: #fff; background: rgba(244,157,78,0.18);
+    border-color: rgba(244,157,78,0.5); }
   button:disabled { opacity: 0.35; cursor: default; }
 </style>

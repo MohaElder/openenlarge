@@ -27,7 +27,11 @@
     move: "move", n: "ns-resize", s: "ns-resize", e: "ew-resize", w: "ew-resize",
     nw: "nwse-resize", se: "nwse-resize", ne: "nesw-resize", sw: "nesw-resize",
   };
-  $: cursor = active ? CURSOR[active] : rotating ? "grabbing" : hoverRotate ? "grab" : (hover ? CURSOR[hover] : "default");
+  // A circular-arrow "rotate" cursor (white glyph with a black outline for contrast).
+  const ROT_PATHS = "<path d='M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8'/><path d='M21 3v5h-5'/>";
+  const ROT_SVG = `<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28' viewBox='0 0 24 24' fill='none' stroke-linecap='round' stroke-linejoin='round'><g stroke='black' stroke-width='4.5'>${ROT_PATHS}</g><g stroke='white' stroke-width='2'>${ROT_PATHS}</g></svg>`;
+  const ROT_CURSOR = `url("data:image/svg+xml,${encodeURIComponent(ROT_SVG)}") 14 14, grab`;
+  $: cursor = active ? CURSOR[active] : (rotating || hoverRotate) ? ROT_CURSOR : (hover ? CURSOR[hover] : "default");
 
   function localXY(e: PointerEvent): [number, number] {
     const r = host.getBoundingClientRect();
@@ -35,18 +39,11 @@
   }
   const center = () => ({ cx: img.left + img.width / 2, cy: img.top + img.height / 2 });
 
-  // True when the point is just OUTSIDE a corner (rotate zone).
+  // True anywhere OUTSIDE the crop box — that whole region rotates (straightens).
+  // Edge/corner resize handles are matched first by handleAt(), so they win there.
   function inRotateZone(px: number, py: number): boolean {
     const insideBox = px > box.left && px < box.left + box.width && py > box.top && py < box.top + box.height;
-    if (insideBox) return false;
-    const corners = [
-      [box.left, box.top], [box.left + box.width, box.top],
-      [box.left, box.top + box.height], [box.left + box.width, box.top + box.height],
-    ];
-    for (const [cxp, cyp] of corners) {
-      if (Math.hypot(px - cxp, py - cyp) <= 30) return true;
-    }
-    return false;
+    return !insideBox;
   }
 
   function onMove(e: PointerEvent) {
@@ -71,6 +68,7 @@
     if (active !== "move" && lock == null) dispatch("custom");
   }
   function onDown(e: PointerEvent) {
+    if (e.button !== 0) return; // ignore right/middle click — let the context menu open
     const [px, py] = localXY(e);
     const h = handleAt(px, py, box, 12);
     if (!h && inRotateZone(px, py)) {

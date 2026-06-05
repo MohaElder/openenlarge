@@ -61,18 +61,18 @@
   .topbar { display: flex; align-items: center; gap: 18px; padding: 10px 16px;
     border-bottom: 1px solid var(--glass-brd); }
   .brand { font-weight: 600; letter-spacing: 0.3px; display: flex; align-items: center; gap: 8px; }
-  .logo { width: 20px; height: 20px; border-radius: 5px; display: block; flex: none; }
+  .logo { width: 33px; height: 33px; border-radius: 8px; display: block; flex: none; }
   .tabs button { background: transparent; border: 0; padding: 6px 14px; border-radius: 8px; color: var(--text-dim); position: relative; }
-  .tabs button.active { color: var(--text); background: rgba(224,52,52,0.14); box-shadow: inset 0 0 0 1px rgba(224,52,52,0.4); }
+  .tabs button.active { color: var(--text); background: rgba(244,157,78,0.14); box-shadow: inset 0 0 0 1px rgba(244,157,78,0.4); }
   .tabs button:disabled { opacity: 0.35; cursor: not-allowed; }
   .badge { position: absolute; top: -7px; right: -8px; min-width: 18px; height: 18px; padding: 0 5px;
     border-radius: 9px; background: var(--accent); color: #fff; font-size: 11px; font-weight: 700;
-    display: grid; place-items: center; box-shadow: 0 2px 8px rgba(224,52,52,0.6); }
+    display: grid; place-items: center; box-shadow: 0 2px 8px rgba(244,157,78,0.6); }
   .spacer { flex: 1; }
   .gear { display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
     background: transparent; border: 0; border-radius: 8px; color: var(--text-dim);
     transition: color 0.12s, background 0.12s; }
   .gear:hover { color: var(--text); background: var(--glass-hi); }
-  .gear.on { color: var(--text); background: rgba(224,52,52,0.14); box-shadow: inset 0 0 0 1px rgba(224,52,52,0.4); }
+  .gear.on { color: var(--text); background: rgba(244,157,78,0.14); box-shadow: inset 0 0 0 1px rgba(244,157,78,0.4); }
   main { flex: 1; min-height: 0; padding: 12px; }
 </style>
