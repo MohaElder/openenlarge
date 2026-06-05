@@ -14,7 +14,7 @@
 
   const dispatch = createEventDispatcher<{ change: CurvePoint[] }>();
   const S = 256; // viewBox size (square)
-  const HIT = 0.045; // hit radius in normalized units
+  const HIT_PX = 9; // grab radius in screen pixels (size-independent; ~dot radius)
 
   let svgEl: SVGSVGElement;
   let dragIdx = -1;
@@ -65,10 +65,11 @@
     const r = svgEl.getBoundingClientRect();
     return [clamp01((e.clientX - r.left) / r.width), clamp01(1 - (e.clientY - r.top) / r.height)];
   }
-  function hitIndex(p: CurvePoint): number {
-    let best = -1, bd = HIT;
+  /** Nearest control point within HIT_PX screen pixels, or -1 to add a new one. */
+  function hitIndex(p: CurvePoint, rect: DOMRect): number {
+    let best = -1, bd = HIT_PX;
     for (let i = 0; i < pts.length; i++) {
-      const d = Math.hypot(pts[i][0] - p[0], pts[i][1] - p[1]);
+      const d = Math.hypot((pts[i][0] - p[0]) * rect.width, (pts[i][1] - p[1]) * rect.height);
       if (d < bd) { bd = d; best = i; }
     }
     return best;
@@ -78,7 +79,7 @@
 
   function onDown(e: PointerEvent) {
     const p = toLocal(e);
-    let idx = hitIndex(p);
+    let idx = hitIndex(p, svgEl.getBoundingClientRect());
     if (idx < 0) {
       // Insert a new interior point, keep sorted by x.
       pts = [...pts, p].sort((a, b) => a[0] - b[0]);
