@@ -1,3 +1,4 @@
+mod catalog;
 mod commands;
 mod convert;
 mod encode;
