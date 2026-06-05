@@ -204,3 +204,16 @@ final integration review, which also caught + fixed two bugs (double-render on e
 **Still to confirm before Plan 3** (low risk, isolated sign tweaks if off): rotate-90 / flip-V /
 straighten directions (this fix moved geometry into the image-space convention those matrices
 assume, so it likely corrected them too).
+
+## GPU Develop — Plan 3a results (2026-06-05)
+
+Phase 5 landed on `main`: dust-eraser / IR-removal images now stay on the fast GPU path. When
+dust/IR is active the frontend requests a *baked* working texture — Rust applies geometry
+(orient/rotate/crop) and runs the Telea inpaint (`dust::apply`/`apply_ir`) on the **raw negative**
+(pre-invert), returns half-float RGBA; the GPU inverts+finishes with identity geometry. Re-bake
+fires only on stroke-commit / IR-toggle / geometry change (off the session lock; `info` skips the
+inpaint so it runs once per upload).
+
+**User-verified (E2E):** dust heals correctly and exposure stays instant with dust on; the
+post→pre-invert heal-domain change looks equivalent to the prior CPU-fallback heal. CPU
+`render_view` is now used only for raw view and no-WebGL2.
