@@ -1,6 +1,7 @@
 <script lang="ts">
   import { params, activeId } from "../store";
   import { api, defaultParams } from "../api";
+  import { reseedActive } from "./historyStore";
   import Icon from "../icons/Icon.svelte";
   import Slider from "./Slider.svelte";
   import { TEMP_GRADIENT, TINT_GRADIENT, SAT_GRADIENT, signed, ev, kelvin } from "./gradients";
@@ -17,6 +18,7 @@
     try {
       const wb = await api.asShotWb(id);
       params.update((p) => ({ ...p, temp: wb.temp, tint: wb.tint }));
+      reseedActive();
     } catch { /* not developed yet */ }
   }
   $: seed($activeId);

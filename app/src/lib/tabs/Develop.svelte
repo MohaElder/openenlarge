@@ -18,6 +18,7 @@
   import { default80, conform, constrainToRotated } from "../crop/cropMath";
   import { presetNormAspect } from "../crop/presets";
   import { rotateRectCW, rotateRectCCW, flipRectH, flipRectV, orientDims } from "../crop/transforms";
+  import { commitActive } from "../develop/historyStore";
 
   $: active = $images.find((i) => i.id === $activeId);
   $: origW = active?.metadata.width ?? 0;
@@ -48,6 +49,7 @@
   function commitCrop() {
     const id = $activeId; if (!id || !cropInit) return;
     cropById.update((m) => ({ ...m, [id]: draftCrop() }));
+    commitActive();
   }
   function discardCrop() {
     const c = $activeCrop;
@@ -84,6 +86,7 @@
     const nr = dir > 0 ? rotateRectCW(base.rect) : rotateRectCCW(base.rect);
     const nrot = ((base.rot90 + (dir > 0 ? 1 : 3)) % 4) as 0 | 1 | 2 | 3;
     cropById.update((m) => ({ ...m, [id]: { ...base, rect: nr, rot90: nrot } }));
+    commitActive();
   }
   // True while a form control has focus, so its own arrow-key behaviour wins
   // (e.g. nudging a slider) instead of stepping the image.
