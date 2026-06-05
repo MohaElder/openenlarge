@@ -105,7 +105,6 @@ uniform vec2 u_crop_off;      // source-UV offset of the crop origin
 uniform vec2 u_crop_scale;    // source-UV size of the crop
 uniform float u_angle;        // straighten radians (clockwise)
 uniform mat2 u_orient;        // rot90/flip as a 2x2 on centred UV
-uniform vec2 u_orient_flip;   // post-orient sign fix kept in JS; identity by default
 
 const float EPS = 1e-5;
 const float LOG10 = 0.30102999566; // 1/log2(10): log10(x) = log2(x)*LOG10
@@ -121,7 +120,8 @@ vec3 invert(vec3 rgbIn) {
     rgbIn.r / max(u_base.r, EPS),
     rgbIn.g / max(u_base.g, EPS),
     rgbIn.b / max(u_base.b, EPS)), EPS, 1.0);
-  if (u_mode == 2) {           // Naive: 1 - clamp(I/base,0,1)
+  if (u_mode == 2) {           // Naive: 1 - clamp(I/base,0,1). Intentionally uses
+    // its own [0,1] clamp (engine.rs invert_naive), not the [EPS,1] `r` above.
     vec3 n = clamp(vec3(rgbIn.r/max(u_base.r,EPS), rgbIn.g/max(u_base.g,EPS), rgbIn.b/max(u_base.b,EPS)), 0.0, 1.0);
     return 1.0 - n;
   }
