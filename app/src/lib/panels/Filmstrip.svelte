@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick } from "svelte";
   import { folderImages, activeId } from "../store";
+  import { t } from "$lib/i18n";
   let stripEl: HTMLDivElement;
 
   // Arrow-key navigation lives in Develop.svelte (window-level) so it works from
@@ -17,7 +18,7 @@
   $: $activeId, revealActive();
 </script>
 
-<div class="strip" bind:this={stripEl} role="listbox" aria-label="Imported images">
+<div class="strip" bind:this={stripEl} role="listbox" aria-label={$t('filmstrip.importedImagesAria')}>
   {#each $folderImages as img}
     <button data-id={img.id} class:active={$activeId === img.id} on:click={() => activeId.set(img.id)}>
       <img src={img.thumbnail} alt={img.file_name} />

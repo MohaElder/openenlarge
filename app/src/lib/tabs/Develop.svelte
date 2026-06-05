@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from "$lib/i18n";
   import { activeId, params, images, folderImages, tool, cropById, activeCrop, dustById, activeDust, deleteTarget } from "../store";
   import { api } from "../api";
   import Filmstrip from "../panels/Filmstrip.svelte";
@@ -200,7 +201,7 @@
                   eraser={$tool === "eraser"} {brush} dust={dust.strokes} irRemoval={dust.irRemoval} {dustRev}
                   on:stroke={(e) => commitStroke(e.detail)} on:brush={(e) => (brush = e.detail)} />
       {/if}
-    {:else}<div class="hint">Not developed yet</div>{/if}
+    {:else}<div class="hint">{$t('develop.notDevelopedYet')}</div>{/if}
   </section>
 
   <aside class="right">

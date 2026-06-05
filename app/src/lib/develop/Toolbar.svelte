@@ -1,21 +1,22 @@
 <script lang="ts">
   import Icon from "../icons/Icon.svelte";
+  import { t } from "$lib/i18n";
   import { tool, type Tool } from "../store";
 
-  const tools: { id: Tool; icon: string; label: string; enabled: boolean }[] = [
-    { id: "edit", icon: "sliders", label: "Edit", enabled: true },
-    { id: "crop", icon: "crop", label: "Crop", enabled: true },
-    { id: "eraser", icon: "eraser", label: "Eraser", enabled: true },
+  const tools: { id: Tool; icon: string; labelKey: string; enabled: boolean }[] = [
+    { id: "edit", icon: "sliders", labelKey: "toolbar.edit", enabled: true },
+    { id: "crop", icon: "crop", labelKey: "toolbar.crop", enabled: true },
+    { id: "eraser", icon: "eraser", labelKey: "toolbar.eraser", enabled: true },
   ];
 </script>
 
 <div class="toolbar">
-  {#each tools as t}
+  {#each tools as tl}
     <button
-      class:on={$tool === t.id} disabled={!t.enabled} title={t.label}
-      on:click={() => t.enabled && tool.set(t.id)}
+      class:on={$tool === tl.id} disabled={!tl.enabled} title={$t(tl.labelKey)}
+      on:click={() => tl.enabled && tool.set(tl.id)}
     >
-      <Icon name={t.icon} size={17} />
+      <Icon name={tl.icon} size={17} />
     </button>
   {/each}
 </div>

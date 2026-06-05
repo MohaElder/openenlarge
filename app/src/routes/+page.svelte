@@ -14,6 +14,7 @@
   import Icon from "$lib/icons/Icon.svelte";
   import { hasDeveloped } from "$lib/export/eligible";
   import ExportModal from "$lib/export/ExportModal.svelte";
+  import { t } from "$lib/i18n";
 
   onMount(() => {
     let flush: (() => void) | undefined;
@@ -47,19 +48,19 @@
 
 <div class="app">
   <header class="topbar">
-    <button class="brand" on:click={() => (aboutOpen = true)} aria-label="About OpenEnlarge">
-      <img class="logo" src="/favicon.png" alt="" /> OpenEnlarge
+    <button class="brand" on:click={() => (aboutOpen = true)} aria-label={$t('app.about.ariaLabel')}>
+      <img class="logo" src="/favicon.png" alt="" /> {$t('app.brand')}
     </button>
     <nav class="tabs">
-      <button class:active={$module === "library"} on:click={() => module.set("library")}>Library</button>
+      <button class:active={$module === "library"} on:click={() => module.set("library")}>{$t('app.tab.library')}</button>
       <button class:active={$module === "develop"} disabled={!$hasImages} on:click={gotoDevelop}>
-        Develop
+        {$t('app.tab.develop')}
         {#if $undevelopedCount > 0}<span class="badge">{$undevelopedCount}</span>{/if}
       </button>
-      <button disabled={!$hasDeveloped} on:click={() => (exporting = true)}>Export</button>
+      <button disabled={!$hasDeveloped} on:click={() => (exporting = true)}>{$t('app.tab.export')}</button>
     </nav>
     <div class="spacer"></div>
-    <button class="gear" class:on={settingsOpen} on:click={() => (settingsOpen = !settingsOpen)} aria-label="Settings">
+    <button class="gear" class:on={settingsOpen} on:click={() => (settingsOpen = !settingsOpen)} aria-label={$t('app.settings.ariaLabel')}>
       <Icon name="settings" size={18} />
     </button>
   </header>

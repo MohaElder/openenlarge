@@ -4,12 +4,14 @@
   import { images, activeId, allDeveloped } from "../store";
   import { developAll } from "../workflow";
   import GlassPanel from "../glass/GlassPanel.svelte";
+  import { t } from "$lib/i18n";
 
   let importing = false;
   let error = "";
+  $: filterFilmScans = $t("source.filterFilmScans");
 
   async function pickAndImport() {
-    const sel = await open({ multiple: true, filters: [{ name: "Film scans", extensions: ["dng", "tif", "tiff", "raf"] }] });
+    const sel = await open({ multiple: true, filters: [{ name: filterFilmScans, extensions: ["dng", "tif", "tiff", "raf"] }] });
     if (!sel) return;
     const paths = Array.isArray(sel) ? sel : [sel];
     importing = true; error = "";
@@ -30,19 +32,19 @@
 <GlassPanel>
   <div class="wrap">
     <button class="import" on:click={pickAndImport} disabled={importing}>
-      {importing ? "Importing…" : "Import"}
+      {importing ? $t('source.importing') : $t('source.import')}
     </button>
     {#if error}<div class="err">{error}</div>{/if}
     <ul>
       {#each $images as img}
         <li class:active={$activeId === img.id} on:click={() => activeId.set(img.id)}>
           <span class="name">{img.file_name}</span>
-          {#if img.developed}<span class="dot" title="developed"></span>{/if}
+          {#if img.developed}<span class="dot" title={$t('source.developed')}></span>{/if}
         </li>
       {/each}
     </ul>
     {#if $images.length > 0 && !$allDeveloped}
-      <button class="develop" on:click={() => developAll()}>Develop all</button>
+      <button class="develop" on:click={() => developAll()}>{$t('source.developAll')}</button>
     {/if}
   </div>
 </GlassPanel>

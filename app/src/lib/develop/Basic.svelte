@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from "$lib/i18n";
   import { params, activeId } from "../store";
   import { api, defaultParams } from "../api";
   import Icon from "../icons/Icon.svelte";
@@ -45,46 +46,46 @@
   <div class="head">
     <button class="toggle" on:click={() => (open = !open)}>
       <Icon name={open ? "chevron-down" : "chevron-right"} size={14} />
-      <span>Basic</span>
+      <span>{$t('basic.title')}</span>
     </button>
-    <button class="reset" on:click={resetBasic}>Reset</button>
+    <button class="reset" on:click={resetBasic}>{$t('basic.reset')}</button>
   </div>
 
   {#if open}
     <div class="body" transition:slide={{ duration: 280, easing: cubicInOut }}>
       <!-- Film Profile -->
-      <div class="sub">Film Profile</div>
+      <div class="sub">{$t('basic.filmProfile')}</div>
       <select bind:value={$params.stock}>
-        <option value="none">No film profile</option>
-        <option value="portra400">Kodak Portra 400</option>
-        <option value="fujic200">Fuji C200</option>
+        <option value="none">{$t('basic.noFilmProfile')}</option>
+        <option value="portra400">{$t('basic.stock.portra400')}</option>
+        <option value="fujic200">{$t('basic.stock.fujic200')}</option>
       </select>
 
       <!-- White Balance -->
-      <div class="sub">White Balance</div>
+      <div class="sub">{$t('basic.whiteBalance')}</div>
       <div class="wbhead">
-        <span>Temp / Tint</span>
-        <button class="auto" on:click={autoWb}>Auto</button>
+        <span>{$t('basic.tempTint')}</span>
+        <button class="auto" on:click={autoWb}>{$t('basic.auto')}</button>
       </div>
-      <Slider label="Temp" min={2000} max={50000} step={50}
+      <Slider label={$t('basic.temp')} min={2000} max={50000} step={50}
         bind:value={$params.temp} def={5500} gradient={TEMP_GRADIENT} format={kelvin} />
-      <Slider label="Tint" min={-150} max={150} step={1}
+      <Slider label={$t('basic.tint')} min={-150} max={150} step={1}
         bind:value={$params.tint} def={0} gradient={TINT_GRADIENT} format={signed} />
 
       <!-- Tone -->
-      <div class="sub">Tone</div>
-      <Slider label="Exposure" min={-5} max={5} step={0.05} bind:value={$params.exposure} def={0} format={ev} />
-      <Slider label="Contrast" min={-100} max={100} bind:value={$params.contrast} def={0} format={signed} />
-      <Slider label="Highlights" min={-100} max={100} bind:value={$params.highlights} def={0} format={signed} />
-      <Slider label="Shadows" min={-100} max={100} bind:value={$params.shadows} def={0} format={signed} />
-      <Slider label="Whites" min={-100} max={100} bind:value={$params.whites} def={0} format={signed} />
-      <Slider label="Blacks" min={-100} max={100} bind:value={$params.blacks} def={0} format={signed} />
+      <div class="sub">{$t('basic.tone')}</div>
+      <Slider label={$t('basic.exposure')} min={-5} max={5} step={0.05} bind:value={$params.exposure} def={0} format={ev} />
+      <Slider label={$t('basic.contrast')} min={-100} max={100} bind:value={$params.contrast} def={0} format={signed} />
+      <Slider label={$t('basic.highlights')} min={-100} max={100} bind:value={$params.highlights} def={0} format={signed} />
+      <Slider label={$t('basic.shadows')} min={-100} max={100} bind:value={$params.shadows} def={0} format={signed} />
+      <Slider label={$t('basic.whites')} min={-100} max={100} bind:value={$params.whites} def={0} format={signed} />
+      <Slider label={$t('basic.blacks')} min={-100} max={100} bind:value={$params.blacks} def={0} format={signed} />
 
       <!-- Presence -->
-      <div class="sub">Presence</div>
-      <Slider label="Texture" min={-100} max={100} bind:value={$params.texture} def={0} format={signed} />
-      <Slider label="Vibrance" min={-100} max={100} bind:value={$params.vibrance} def={0} gradient={SAT_GRADIENT} format={signed} />
-      <Slider label="Saturation" min={-100} max={100} bind:value={$params.saturation} def={0} gradient={SAT_GRADIENT} format={signed} />
+      <div class="sub">{$t('basic.presence')}</div>
+      <Slider label={$t('basic.texture')} min={-100} max={100} bind:value={$params.texture} def={0} format={signed} />
+      <Slider label={$t('basic.vibrance')} min={-100} max={100} bind:value={$params.vibrance} def={0} gradient={SAT_GRADIENT} format={signed} />
+      <Slider label={$t('basic.saturation')} min={-100} max={100} bind:value={$params.saturation} def={0} gradient={SAT_GRADIENT} format={signed} />
     </div>
   {/if}
 </div>

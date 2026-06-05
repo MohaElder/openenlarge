@@ -2,18 +2,19 @@
   import { images, activeId, metaById, activeMeta } from "../store";
   import type { MetaField } from "../api";
   import GlassPanel from "../glass/GlassPanel.svelte";
+  import { t } from "$lib/i18n";
 
   $: active = $images.find((i) => i.id === $activeId);
   const fmtSize = (b: number) => (b > 1e6 ? (b / 1e6).toFixed(1) + " MB" : (b / 1e3).toFixed(0) + " KB");
 
   // Free-text EXIF fields. Each input shows the user override if set, otherwise the
   // source EXIF value as a placeholder — an empty field means "keep the original".
-  const TEXT_FIELDS: { key: Exclude<MetaField, "date" | "note">; label: string }[] = [
-    { key: "camera", label: "Camera" },
-    { key: "lens", label: "Lens" },
-    { key: "iso", label: "ISO" },
-    { key: "shutter", label: "Shutter" },
-    { key: "aperture", label: "Aperture" },
+  const TEXT_FIELDS: { key: Exclude<MetaField, "date" | "note"> }[] = [
+    { key: "camera" },
+    { key: "lens" },
+    { key: "iso" },
+    { key: "shutter" },
+    { key: "aperture" },
   ];
 
   /** Write (or clear, when blank) one override field on the active image. */
@@ -63,14 +64,14 @@
     <header>
       <h3>{active.file_name}</h3>
       {#if hasOverride}
-        <button class="reset" on:click={resetAll} title="Revert all metadata to the original EXIF">Reset</button>
+        <button class="reset" on:click={resetAll} title={$t('metadata.resetTitle')}>{$t('metadata.reset')}</button>
       {/if}
     </header>
 
     <div class="fields">
       {#each TEXT_FIELDS as f (f.key)}
         <label>
-          <span>{f.label}</span>
+          <span>{$t('metadata.' + f.key)}</span>
           <input
             type="text"
             value={$activeMeta[f.key] ?? ""}
@@ -81,7 +82,7 @@
       {/each}
 
       <label>
-        <span>Date</span>
+        <span>{$t('metadata.date')}</span>
         <input
           type="datetime-local"
           value={dateValue}
@@ -90,22 +91,22 @@
       </label>
 
       <label class="note">
-        <span>Note</span>
+        <span>{$t('metadata.note')}</span>
         <textarea
           rows="3"
           value={$activeMeta.note ?? ""}
-          placeholder="Add a note…"
+          placeholder={$t('metadata.notePlaceholder')}
           on:input={(e) => setField("note", e.currentTarget.value)}
         ></textarea>
       </label>
     </div>
 
     <dl class="ro">
-      <dt>Dimensions</dt><dd>{m.width} × {m.height}</dd>
-      <dt>Size</dt><dd>{fmtSize(m.file_size)}</dd>
+      <dt>{$t('metadata.dimensions')}</dt><dd>{m.width} × {m.height}</dd>
+      <dt>{$t('metadata.size')}</dt><dd>{fmtSize(m.file_size)}</dd>
     </dl>
   {:else}
-    <div class="empty">No image selected</div>
+    <div class="empty">{$t('metadata.noImageSelected')}</div>
   {/if}
 </GlassPanel>
 

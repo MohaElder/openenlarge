@@ -11,7 +11,7 @@ export const GITHUB_URL = "https://github.com/openenlarge/openenlarge";
 
 export const credits: { group: string; items: Credit[] }[] = [
   {
-    group: "Application & UI",
+    group: "about.credits.group.applicationUi",
     items: [
       { name: "Svelte", license: "MIT", url: "https://svelte.dev" },
       { name: "SvelteKit", license: "MIT", url: "https://kit.svelte.dev" },
@@ -21,7 +21,7 @@ export const credits: { group: string; items: Credit[] }[] = [
     ],
   },
   {
-    group: "Image pipeline",
+    group: "about.credits.group.imagePipeline",
     items: [
       { name: "image", license: "MIT", url: "https://github.com/image-rs/image" },
       { name: "rawler", license: "LGPL-2.1", url: "https://github.com/dnglab/dnglab" },
@@ -34,7 +34,7 @@ export const credits: { group: string; items: Credit[] }[] = [
     ],
   },
   {
-    group: "Storage & system",
+    group: "about.credits.group.storageSystem",
     items: [
       { name: "SQLite (via rusqlite)", license: "Public Domain / MIT", url: "https://www.sqlite.org" },
       { name: "Zstandard (via zstd)", license: "BSD-3-Clause", url: "https://github.com/facebook/zstd" },

@@ -3,6 +3,7 @@
   import { fade, scale } from "svelte/transition";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { credits, GITHUB_URL } from "./credits";
+  import { t } from "$lib/i18n";
 
   const dispatch = createEventDispatcher<{ close: void }>();
   let view: "about" | "licenses" = "about";
@@ -19,32 +20,30 @@
       <div class="head">
         <img class="logo" src="/favicon.png" alt="" />
         <div>
-          <div class="title">OpenEnlarge</div>
-          <div class="sub">Open-source film scanning &amp; darkroom.</div>
+          <div class="title">{$t('about.title')}</div>
+          <div class="sub">{$t('about.subtitle')}</div>
         </div>
       </div>
       <p class="body">
-        OpenEnlarge is free, open-source software for inverting, developing, and
-        enlarging film scans. It's built in the open and stands on the shoulders of
-        many other open-source projects.
+        {$t('about.body')}
       </p>
       <div class="row">
-        <button class="link" on:click={() => (view = "licenses")}>Licenses</button>
-        <button class="link" on:click={() => open(GITHUB_URL)}>GitHub ↗</button>
+        <button class="link" on:click={() => (view = "licenses")}>{$t('about.licenses')}</button>
+        <button class="link" on:click={() => open(GITHUB_URL)}>{$t('about.github')}</button>
         <div class="spacer"></div>
-        <button class="go" on:click={() => dispatch("close")}>Close</button>
+        <button class="go" on:click={() => dispatch("close")}>{$t('about.close')}</button>
       </div>
     {:else}
       <div class="head">
-        <button class="back" on:click={() => (view = "about")} aria-label="Back">←</button>
+        <button class="back" on:click={() => (view = "about")} aria-label={$t('about.back')}>←</button>
         <div>
-          <div class="title">Open-source licenses</div>
-          <div class="sub">OpenEnlarge is built with these projects.</div>
+          <div class="title">{$t('about.licensesTitle')}</div>
+          <div class="sub">{$t('about.licensesSubtitle')}</div>
         </div>
       </div>
       <div class="licenses">
         {#each credits as section}
-          <div class="grp">{section.group}</div>
+          <div class="grp">{$t(section.group)}</div>
           {#each section.items as c}
             <button class="dep" on:click={() => open(c.url)}>
               <span class="dep-name">{c.name}</span>
@@ -55,7 +54,7 @@
       </div>
       <div class="row">
         <div class="spacer"></div>
-        <button class="go" on:click={() => dispatch("close")}>Close</button>
+        <button class="go" on:click={() => dispatch("close")}>{$t('about.close')}</button>
       </div>
     {/if}
   </div>

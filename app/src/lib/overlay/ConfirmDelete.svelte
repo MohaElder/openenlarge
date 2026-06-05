@@ -1,18 +1,19 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
   import { fade, scale } from "svelte/transition";
+  import { t } from "$lib/i18n";
   export let name = "";
   const dispatch = createEventDispatcher<{ remove: void; trash: void; cancel: void }>();
 </script>
 
 <div class="scrim" on:click|self={() => dispatch("cancel")} transition:fade={{ duration: 150 }}>
   <div class="card" transition:scale={{ duration: 160, start: 0.96, opacity: 0 }}>
-    <div class="title">Delete {name || "this image"}?</div>
-    <div class="sub">Remove it from OpenEnlarge, or also move the original file to the Trash.</div>
+    <div class="title">{$t('confirmDelete.title', { name: name || $t('confirmDelete.fallbackName') })}</div>
+    <div class="sub">{$t('confirmDelete.sub')}</div>
     <div class="row">
-      <button class="ghost" on:click={() => dispatch("cancel")}>Cancel</button>
-      <button class="ghost" on:click={() => dispatch("remove")}>Remove from OpenEnlarge</button>
-      <button class="go" on:click={() => dispatch("trash")}>Move file to Trash</button>
+      <button class="ghost" on:click={() => dispatch("cancel")}>{$t('confirmDelete.cancel')}</button>
+      <button class="ghost" on:click={() => dispatch("remove")}>{$t('confirmDelete.remove')}</button>
+      <button class="go" on:click={() => dispatch("trash")}>{$t('confirmDelete.trash')}</button>
     </div>
   </div>
 </div>

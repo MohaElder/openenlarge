@@ -6,6 +6,7 @@ import {
   images, editsById, cropById, dustById, metaById, developMode, quality,
   selectedFolder, gridZoom, module as moduleStore, activeId,
 } from "./store";
+import { locale } from "./i18n";
 
 /** A debounced function with a `flush()` that fires any pending call now. */
 export interface Debounced<A extends unknown[]> {
@@ -65,6 +66,8 @@ export function applySnapshot(snap: CatalogSnapshot): void {
     developMode.set(snap.prefs.develop_mode);
   if (snap.prefs.quality === "performance" || snap.prefs.quality === "quality")
     quality.set(snap.prefs.quality);
+  if (snap.prefs.locale === "en" || snap.prefs.locale === "zh")
+    locale.set(snap.prefs.locale);
 
   const st = snap.app_state;
   if (st.selected_folder !== undefined)
@@ -146,9 +149,10 @@ export function initPersistence(): () => void {
   wireRecord(dustById, dust.save);
   wireRecord(metaById, meta.save);
 
-  let first = { dm: true, q: true, sf: true, gz: true, mod: true, aid: true };
+  let first = { dm: true, q: true, loc: true, sf: true, gz: true, mod: true, aid: true };
   developMode.subscribe((m) => { if (first.dm) { first.dm = false; return; } savePref("develop_mode", m); });
   quality.subscribe((q) => { if (first.q) { first.q = false; return; } savePref("quality", q); });
+  locale.subscribe((l) => { if (first.loc) { first.loc = false; return; } savePref("locale", l); });
   selectedFolder.subscribe((p) => { if (first.sf) { first.sf = false; return; } saveState("selected_folder", p ?? ""); });
   gridZoom.subscribe((z) => { if (first.gz) { first.gz = false; return; } saveState("grid_zoom", String(z)); });
   moduleStore.subscribe((m) => { if (first.mod) { first.mod = false; return; } saveState("module", m); });
