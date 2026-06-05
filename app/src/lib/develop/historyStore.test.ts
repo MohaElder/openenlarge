@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { get } from "svelte/store";
 import { activeId, editsById, cropById, dustById, metaById, dustRev } from "../store";
 import { defaultParams } from "../api";
+import type { CropRect } from "../crop/types";
 import {
   historyById, seedActive, reseedActive, commitActive, undoActive, redoActive, dropHistory,
 } from "./historyStore";
@@ -20,6 +21,16 @@ beforeEach(() => {
 
 const setExposure = (v: number) =>
   editsById.update((m) => ({ ...m, img1: { ...defaultParams(), exposure: v } }));
+
+const sampleCrop = (): CropRect => ({
+  rect: { x: 0.1, y: 0.1, w: 0.8, h: 0.8 },
+  aspect: "custom",
+  orientation: "landscape",
+  rot90: 0,
+  flipH: false,
+  flipV: false,
+  angle: 0,
+});
 
 describe("historyStore", () => {
   it("seedActive creates a pristine entry from the current state", () => {
@@ -94,5 +105,32 @@ describe("historyStore", () => {
     seedActive();
     dropHistory("img1");
     expect(get(historyById)["img1"]).toBeUndefined();
+  });
+
+  it("round-trips a null crop through commit/undo (null is the no-crop sentinel)", () => {
+    seedActive();                                  // crop starts null
+    cropById.update((m) => ({ ...m, img1: sampleCrop() }));
+    commitActive();                                // present has a crop
+    undoActive();
+    expect(get(cropById)["img1"]).toBeNull();      // restored to null
+  });
+
+  it("restores a non-null crop on redo", () => {
+    seedActive();
+    cropById.update((m) => ({ ...m, img1: sampleCrop() }));
+    commitActive();
+    undoActive();                                  // crop → null
+    redoActive();                                  // crop → sampleCrop()
+    expect(get(cropById)["img1"]).toEqual(sampleCrop());
+  });
+
+  it("commitActive with no prior history entry seeds instead of crashing", () => {
+    // No seedActive() first — exercises the defensive path in commitActive.
+    setExposure(2);
+    commitActive();
+    const h = get(historyById)["img1"];
+    expect(h).toBeDefined();
+    expect(h.past).toEqual([]);                    // seeded, not pushed
+    expect(h.present.params.exposure).toBe(2);
   });
 });

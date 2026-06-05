@@ -26,6 +26,8 @@ export function currentSnapshot(): EditSnapshot {
 /** Write a snapshot back into every per-image store for `id`. */
 function applySnapshot(id: string, snap: EditSnapshot): void {
   editsById.update((m) => ({ ...m, [id]: clone(snap.params) }));
+  // crop is written as CropRect | null — `null` is the "no crop" sentinel, not absence.
+  // dust/meta written here turn an absent entry into an explicit (equivalent) empty one.
   cropById.update((m) => ({ ...m, [id]: clone(snap.crop) }));
   dustById.update((m) => ({ ...m, [id]: clone(snap.dust) }));
   metaById.update((m) => ({ ...m, [id]: clone(snap.meta) }));
