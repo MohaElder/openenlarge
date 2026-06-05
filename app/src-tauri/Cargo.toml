@@ -32,6 +32,7 @@ trash = "5"
 rusqlite = { version = "0.31", features = ["bundled"] }
 uuid = { version = "1", features = ["v4"] }
 zstd = "0.13"
+half = "2"
 
 
 # Fast `tauri dev`: optimize dependencies (RAW decode, resize, inversion live in

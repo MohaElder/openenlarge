@@ -3,6 +3,7 @@
   import { quality } from "../store";
   import { api, type Quality } from "../api";
   import { developAll, markAllUndeveloped } from "../workflow";
+  import { t } from "$lib/i18n";
   export let x = 0;
   export let y = 0;
   const dispatch = createEventDispatcher();
@@ -21,11 +22,11 @@
 </script>
 
 <div class="menu" style="left:{x}px; top:{y}px" on:pointerleave={() => dispatch("close")}>
-  <div class="head">Preview quality</div>
-  <button class:on={$quality === "performance"} on:click={() => pick("performance")}>Performance · 4K</button>
-  <button class:on={$quality === "quality"} on:click={() => pick("quality")}>Quality · full res</button>
+  <div class="head">{$t('quality.menuHeading')}</div>
+  <button class:on={$quality === "performance"} on:click={() => pick("performance")}>{$t('quality.performance')}</button>
+  <button class:on={$quality === "quality"} on:click={() => pick("quality")}>{$t('quality.quality')}</button>
   <div class="divider"></div>
-  <button on:click={() => dispatch("delete")}>Delete image…</button>
+  <button on:click={() => dispatch("delete")}>{$t('quality.deleteImage')}</button>
 </div>
 
 <style>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
+  import { t } from "$lib/i18n";
   import { sampleCurve } from "./curve";
   import type { CurvePoint } from "../api";
   import { previewSrc } from "../store";
@@ -177,7 +178,7 @@
 <svg
   bind:this={svgEl} class="curve" viewBox="0 0 {S} {S}" preserveAspectRatio="none"
   on:pointerdown={onDown} on:pointermove={onMove} on:pointerup={onUp} on:pointercancel={onUp}
-  role="application" aria-label="Tone curve editor"
+  role="application" aria-label={$t('curve.editorAriaLabel')}
 >
   <!-- grid -->
   {#each [0.25, 0.5, 0.75] as g}
@@ -193,7 +194,7 @@
   <path d={curveD} class="line" style="stroke:{color}" />
   {#each pts as p, i}
     <circle cx={sx(p[0])} cy={sy(p[1])} r="5" class="pt" style="fill:{color}"
-      on:dblclick={() => onDblPoint(i)} role="button" tabindex="-1" aria-label="curve point" />
+      on:dblclick={() => onDblPoint(i)} role="button" tabindex="-1" aria-label={$t('curve.pointAriaLabel')} />
   {/each}
 </svg>
 

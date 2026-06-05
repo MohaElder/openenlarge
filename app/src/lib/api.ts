@@ -64,6 +64,22 @@ export interface ViewSpec {
   ir_removal?: IrRemoval;
 }
 
+/** Geometry + dust/IR for baking a heal-ready working buffer (raw negative). */
+export interface BakeSpec {
+  rot90: number; flip_h: boolean; flip_v: boolean; angle: number;
+  image_crop: [number, number, number, number] | null;
+  dust: DustStroke[];
+  ir_removal: IrRemoval;
+}
+
+/** Persistent per-image edits that shape a thumbnail (no zoom/view crop). */
+export interface ThumbView {
+  image_crop?: [number, number, number, number] | null;
+  rot90?: number; flip_h?: boolean; flip_v?: boolean; angle?: number;
+  dust?: DustStroke[];
+  ir_removal?: IrRemoval;
+}
+
 export interface ExportFormat {
   kind: "jpeg" | "tiff" | "png";
   bitDepth?: 8 | 16;        // tiff/png only
@@ -120,8 +136,10 @@ export const api = {
   setQuality: (quality: Quality) => invoke<void>("set_quality", { quality }),
   /** Forget an image; when deleteFile is true also move the file to the OS trash. */
   deleteImage: (id: string, deleteFile: boolean) => invoke<void>("delete_image", { id, deleteFile }),
-  thumbnail: (id: string, params: InvertParams) => invoke<string>("thumbnail", { id, params }),
-  asShotWb: (id: string) => invoke<AsShotWb>("as_shot_wb", { id }),
+  thumbnail: (id: string, params: InvertParams, view: ThumbView = {}) =>
+    invoke<string>("thumbnail", { id, params, view: { ...view, dust: wireDust(view.dust) } }),
+  asShotWb: (id: string, params: InvertParams) =>
+    invoke<AsShotWb>("as_shot_wb", { id, params }),
   loadCatalog: () => invoke<CatalogSnapshot>("load_catalog"),
   saveEdits: (id: string, paramsJson: string) =>
     invoke<void>("save_edits", { id, paramsJson }),
@@ -135,6 +153,21 @@ export const api = {
     invoke<void>("save_pref", { key, value }),
   saveAppState: (key: string, value: string) =>
     invoke<void>("save_app_state", { key, value }),
+  workingInfo: (id: string) =>
+    invoke<{ w: number; h: number }>("working_info", { id }),
+
+  // Tauri returns the command's `Response` bytes as an ArrayBuffer.
+  workingPixels: (id: string) =>
+    invoke<ArrayBuffer>("working_pixels", { id }),
+
+  workingBakedInfo: (id: string, spec: BakeSpec) =>
+    invoke<{ w: number; h: number }>("working_baked_info", { id, spec: { ...spec, dust: wireDust(spec.dust) } }),
+
+  workingBakedPixels: (id: string, spec: BakeSpec) =>
+    invoke<ArrayBuffer>("working_baked_pixels", { id, spec: { ...spec, dust: wireDust(spec.dust) } }),
+
+  resolvedInversion: (id: string, params: InvertParams) =>
+    invoke<import("./viewport/gl/invert").ResolvedInversion>("resolved_inversion", { id, params }),
 };
 
 export const defaultParams = (): InvertParams => ({

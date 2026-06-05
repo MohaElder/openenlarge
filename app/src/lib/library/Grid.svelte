@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick, onMount } from "svelte";
   import { activeId, selectedFolder, gridZoom, folderImages } from "../store";
+  import { t } from "$lib/i18n";
   let scrollEl: HTMLDivElement;
   let containerW = 800;
   $: shown = $folderImages;
@@ -39,10 +40,10 @@
 
 <div class="center">
   <div class="head">
-    <div class="where"><b>{$selectedFolder?.split("/").pop() ?? "—"}</b> · {shown.length} image{shown.length === 1 ? "" : "s"}</div>
-    <div class="right">Thumb size <input class="zoom" type="range" min="0" max="100" bind:value={$gridZoom} /></div>
+    <div class="where"><b>{$selectedFolder?.split("/").pop() ?? "—"}</b> · {$t('grid.imageCount', { count: shown.length, plural: shown.length === 1 ? '' : 's' })}</div>
+    <div class="right">{$t('grid.thumbSize')} <input class="zoom" type="range" min="0" max="100" bind:value={$gridZoom} /></div>
   </div>
-  <div class="scroll" bind:this={scrollEl} role="listbox" aria-label="Folder images" on:wheel={onWheel}>
+  <div class="scroll" bind:this={scrollEl} role="listbox" aria-label={$t('grid.folderImagesAria')} on:wheel={onWheel}>
     <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax({minCol}px,1fr))">
       {#each shown as img (img.id)}
         <button data-id={img.id} class="cell" class:sel={$activeId === img.id} on:click={() => activeId.set(img.id)}>
@@ -50,7 +51,7 @@
         </button>
       {/each}
     </div>
-    {#if shown.length === 0}<div class="empty">Select a folder with images</div>{/if}
+    {#if shown.length === 0}<div class="empty">{$t('grid.selectFolder')}</div>{/if}
   </div>
 </div>
 

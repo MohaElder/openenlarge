@@ -1,5 +1,5 @@
 import { writable, derived, get } from "svelte/store";
-import type { ImageEntry, Quality, InvertParams, MetaOverride } from "./api";
+import type { ImageEntry, Quality, MetaOverride } from "./api";
 import { defaultParams } from "./api";
 import type { CropRect } from "./crop/types";
 import { createPerImageParams } from "./perImage";
@@ -10,28 +10,13 @@ export const images = writable<ImageEntry[]>([]);
 export const activeId = writable<string | null>(null);
 export const module = writable<"library" | "develop">("library");
 
-/** Global develop mode (B·density / C·per-chan). Set once in Settings; applies to
- * every image. Persisted via the catalog (see catalog.ts). */
-export const developMode = writable<"b" | "c">("b");
-
 // Per-image edits: $params is the ACTIVE image's params; writes go to the active
-// image only. New images inherit the current global develop mode.
-const _perImage = createPerImageParams(activeId, () => ({ ...defaultParams(), mode: get(developMode) }));
+// image only. Every image uses the density inversion (Mode B); the per-channel
+// mode was removed as a confusing, lower-quality alternative.
+const _perImage = createPerImageParams(activeId, () => defaultParams());
 export const params = _perImage.params;
 export const editsById = _perImage.editsById;
 
-// Develop mode is global: when it changes, re-apply it to every image's params.
-developMode.subscribe((m) =>
-  editsById.update((map) => {
-    let changed = false;
-    const out: Record<string, InvertParams> = {};
-    for (const k in map) {
-      out[k] = map[k].mode === m ? map[k] : { ...map[k], mode: m };
-      if (out[k] !== map[k]) changed = true;
-    }
-    return changed ? out : map;
-  })
-);
 export const quality = writable<Quality>("performance");
 
 /** Per-image committed crop (null = full image). */

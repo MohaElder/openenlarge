@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from "$lib/i18n";
   import { params } from "../store";
   import Icon from "../icons/Icon.svelte";
   import Slider from "./Slider.svelte";
@@ -39,30 +40,30 @@
   <div class="head">
     <button class="toggle" on:click={() => (open = !open)}>
       <Icon name={open ? "chevron-down" : "chevron-right"} size={14} />
-      <span>Tone Curve</span>
+      <span>{$t('curve.title')}</span>
     </button>
-    <button class="reset" on:click={resetTone}>Reset</button>
+    <button class="reset" on:click={resetTone}>{$t('curve.reset')}</button>
   </div>
 
   {#if open}
     <div class="body" transition:slide={{ duration: 280, easing: cubicInOut }}>
       <div class="adjust">
-        <span class="adjlabel">Adjust</span>
+        <span class="adjlabel">{$t('curve.adjust')}</span>
         <div class="dots">
-          <button class="dot m" class:on={mode === "master"} on:click={() => (mode = "master")} title="Master" aria-label="Master curve"></button>
-          <button class="dot r" class:on={mode === "r"} on:click={() => (mode = "r")} title="Red" aria-label="Red curve"></button>
-          <button class="dot g" class:on={mode === "g"} on:click={() => (mode = "g")} title="Green" aria-label="Green curve"></button>
-          <button class="dot b" class:on={mode === "b"} on:click={() => (mode = "b")} title="Blue" aria-label="Blue curve"></button>
+          <button class="dot m" class:on={mode === "master"} on:click={() => (mode = "master")} title={$t('curve.master.title')} aria-label={$t('curve.master.ariaLabel')}></button>
+          <button class="dot r" class:on={mode === "r"} on:click={() => (mode = "r")} title={$t('curve.red.title')} aria-label={$t('curve.red.ariaLabel')}></button>
+          <button class="dot g" class:on={mode === "g"} on:click={() => (mode = "g")} title={$t('curve.green.title')} aria-label={$t('curve.green.ariaLabel')}></button>
+          <button class="dot b" class:on={mode === "b"} on:click={() => (mode = "b")} title={$t('curve.blue.title')} aria-label={$t('curve.blue.ariaLabel')}></button>
         </div>
       </div>
 
       <CurveEditor {points} color={COLOR[mode]} hist={[...HIST[mode]]} on:change={onCurve} />
 
-      <div class="sub">Region</div>
-      <Slider label="Highlights" min={-100} max={100} bind:value={$params.tc_highlights} def={0} format={signed} />
-      <Slider label="Lights" min={-100} max={100} bind:value={$params.tc_lights} def={0} format={signed} />
-      <Slider label="Darks" min={-100} max={100} bind:value={$params.tc_darks} def={0} format={signed} />
-      <Slider label="Shadows" min={-100} max={100} bind:value={$params.tc_shadows} def={0} format={signed} />
+      <div class="sub">{$t('curve.region')}</div>
+      <Slider label={$t('curve.highlights')} min={-100} max={100} bind:value={$params.tc_highlights} def={0} format={signed} />
+      <Slider label={$t('curve.lights')} min={-100} max={100} bind:value={$params.tc_lights} def={0} format={signed} />
+      <Slider label={$t('curve.darks')} min={-100} max={100} bind:value={$params.tc_darks} def={0} format={signed} />
+      <Slider label={$t('curve.shadows')} min={-100} max={100} bind:value={$params.tc_shadows} def={0} format={signed} />
     </div>
   {/if}
 </div>

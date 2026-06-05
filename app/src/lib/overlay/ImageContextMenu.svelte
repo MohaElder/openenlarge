@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
+  import { t } from "$lib/i18n";
   export let x = 0;
   export let y = 0;
   const dispatch = createEventDispatcher<{ delete: void; close: void }>();
@@ -9,7 +10,7 @@
      on:pointerdown={() => dispatch("close")}
      on:contextmenu|preventDefault={() => dispatch("close")}></div>
 <div class="menu" style="left:{x}px; top:{y}px" role="menu">
-  <button class="del" on:click={() => dispatch("delete")}>Delete…</button>
+  <button class="del" on:click={() => dispatch("delete")}>{$t('contextMenu.delete')}</button>
 </div>
 
 <style>

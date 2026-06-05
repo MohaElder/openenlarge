@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from "$lib/i18n";
   import { params } from "../store";
   import { defaultParams } from "../api";
   import Icon from "../icons/Icon.svelte";
@@ -13,12 +14,12 @@
   type Mode = "3way" | "sh" | "mid" | "hi" | "glob";
   let mode: Mode = "3way";
 
-  const MODES: { id: Mode; label: string }[] = [
-    { id: "3way", label: "3-way" },
-    { id: "sh", label: "Shadows" },
-    { id: "mid", label: "Midtones" },
-    { id: "hi", label: "Highlights" },
-    { id: "glob", label: "Global" },
+  const MODES: { id: Mode; labelKey: string }[] = [
+    { id: "3way", labelKey: "colorGrading.mode.threeWay" },
+    { id: "sh", labelKey: "colorGrading.mode.shadows" },
+    { id: "mid", labelKey: "colorGrading.mode.midtones" },
+    { id: "hi", labelKey: "colorGrading.mode.highlights" },
+    { id: "glob", labelKey: "colorGrading.mode.global" },
   ];
 
   const KEYS = {
@@ -54,43 +55,43 @@
   <div class="head">
     <button class="toggle" on:click={() => (open = !open)}>
       <Icon name={open ? "chevron-down" : "chevron-right"} size={14} />
-      <span>Color Grading</span>
+      <span>{$t('colorGrading.title')}</span>
     </button>
-    <button class="reset" on:click={resetColorGrading}>Reset</button>
+    <button class="reset" on:click={resetColorGrading}>{$t('colorGrading.reset')}</button>
   </div>
 
   {#if open}
     <div class="body" transition:slide={{ duration: 280, easing: cubicInOut }}>
       <div class="modes">
         {#each MODES as m}
-          <button class:on={mode === m.id} on:click={() => (mode = m.id)}>{m.label}</button>
+          <button class:on={mode === m.id} on:click={() => (mode = m.id)}>{$t(m.labelKey)}</button>
         {/each}
       </div>
 
       {#if mode === "3way"}
         <div class="mid-row">
-          <ColorWheel label="Midtones" hue={$params.cg_mid_hue} sat={$params.cg_mid_sat} lum={$params.cg_mid_lum}
+          <ColorWheel label={$t('colorGrading.wheel.midtones')} hue={$params.cg_mid_hue} sat={$params.cg_mid_sat} lum={$params.cg_mid_lum}
             on:change={(e) => setWheel("mid", e.detail)} />
         </div>
         <div class="pair">
-          <ColorWheel label="Shadows" hue={$params.cg_sh_hue} sat={$params.cg_sh_sat} lum={$params.cg_sh_lum}
+          <ColorWheel label={$t('colorGrading.wheel.shadows')} hue={$params.cg_sh_hue} sat={$params.cg_sh_sat} lum={$params.cg_sh_lum}
             on:change={(e) => setWheel("sh", e.detail)} />
-          <ColorWheel label="Highlights" hue={$params.cg_hi_hue} sat={$params.cg_hi_sat} lum={$params.cg_hi_lum}
+          <ColorWheel label={$t('colorGrading.wheel.highlights')} hue={$params.cg_hi_hue} sat={$params.cg_hi_sat} lum={$params.cg_hi_lum}
             on:change={(e) => setWheel("hi", e.detail)} />
         </div>
       {:else if mode === "sh"}
-        <div class="single"><ColorWheel label="Shadows" hue={$params.cg_sh_hue} sat={$params.cg_sh_sat} lum={$params.cg_sh_lum} on:change={(e) => setWheel("sh", e.detail)} /></div>
+        <div class="single"><ColorWheel label={$t('colorGrading.wheel.shadows')} hue={$params.cg_sh_hue} sat={$params.cg_sh_sat} lum={$params.cg_sh_lum} on:change={(e) => setWheel("sh", e.detail)} /></div>
       {:else if mode === "mid"}
-        <div class="single"><ColorWheel label="Midtones" hue={$params.cg_mid_hue} sat={$params.cg_mid_sat} lum={$params.cg_mid_lum} on:change={(e) => setWheel("mid", e.detail)} /></div>
+        <div class="single"><ColorWheel label={$t('colorGrading.wheel.midtones')} hue={$params.cg_mid_hue} sat={$params.cg_mid_sat} lum={$params.cg_mid_lum} on:change={(e) => setWheel("mid", e.detail)} /></div>
       {:else if mode === "hi"}
-        <div class="single"><ColorWheel label="Highlights" hue={$params.cg_hi_hue} sat={$params.cg_hi_sat} lum={$params.cg_hi_lum} on:change={(e) => setWheel("hi", e.detail)} /></div>
+        <div class="single"><ColorWheel label={$t('colorGrading.wheel.highlights')} hue={$params.cg_hi_hue} sat={$params.cg_hi_sat} lum={$params.cg_hi_lum} on:change={(e) => setWheel("hi", e.detail)} /></div>
       {:else}
-        <div class="single"><ColorWheel label="Global" hue={$params.cg_glob_hue} sat={$params.cg_glob_sat} lum={$params.cg_glob_lum} on:change={(e) => setWheel("glob", e.detail)} /></div>
+        <div class="single"><ColorWheel label={$t('colorGrading.wheel.global')} hue={$params.cg_glob_hue} sat={$params.cg_glob_sat} lum={$params.cg_glob_lum} on:change={(e) => setWheel("glob", e.detail)} /></div>
       {/if}
 
       <div class="sliders">
-        <Slider label="Blending" min={0} max={100} bind:value={$params.cg_blending} def={50} />
-        <Slider label="Balance" min={-100} max={100} bind:value={$params.cg_balance} def={0} format={signed} />
+        <Slider label={$t('colorGrading.blending')} min={0} max={100} bind:value={$params.cg_blending} def={50} />
+        <Slider label={$t('colorGrading.balance')} min={-100} max={100} bind:value={$params.cg_balance} def={0} format={signed} />
       </div>
     </div>
   {/if}

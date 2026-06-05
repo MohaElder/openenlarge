@@ -181,3 +181,39 @@ WebGL2 supports `EXT_color_buffer_float` and an `RGBA16F` render target is frame
 → **Green light.** Plans 2–3 (float-texture upload, GPU inversion, offscreen tiled export) proceed
 as designed; no RGBA8 encoded-range fallback or WebGPU detour needed. Probe added in
 `app/src/lib/viewport/gl/renderer.ts::float16RenderTargetSupported()`.
+
+## GPU Develop — Plan 2 results (2026-06-05)
+
+Phases 2–4 landed on `main`: working image uploaded once as `RGBA16F` (half-float, ≤8192 cap),
+GPU two-pass invert→finish, inversion + geometry driven by uniforms. The per-frame base64-JPEG
+path is gone for the common (no-dust) case; exposure/temp/tint/mode/stock/zoom update with no
+backend round-trip. Dust/IR active, raw view, or no-WebGL2 → unchanged CPU `render_view` path
+(no parity gap). Export still CPU (Plan 3 moves it to offscreen GPU).
+
+**User-verified (E2E):** inverted preview renders correctly; one bug found + fixed —
+**vertical flip in crop mode** (root cause: float source uploaded `UNPACK_FLIP_Y=false` while
+the display convention expected the 8-bit path's `true`; `sourceUV` mapped clip-space y-up
+straight into top-down image space). Fixed in `INVERT_FRAG` by converting `v_uv` to image space
+(`uv.y = 1.0 - uv.y`) before crop/orient/straighten — full frame and crop both correct after.
+
+**Automated:** frontend build clean; 88 vitest; 5 `gpu_upload` Rust tests. Every Rust↔TS↔GLSL
+contract (byte layout, JSON keys, uniform names, column-major matrices) traced consistent in a
+final integration review, which also caught + fixed two bugs (double-render on eligible loads;
+`useFloat` never reset → dust/IR fallback drew the un-healed invert).
+
+**Still to confirm before Plan 3** (low risk, isolated sign tweaks if off): rotate-90 / flip-V /
+straighten directions (this fix moved geometry into the image-space convention those matrices
+assume, so it likely corrected them too).
+
+## GPU Develop — Plan 3a results (2026-06-05)
+
+Phase 5 landed on `main`: dust-eraser / IR-removal images now stay on the fast GPU path. When
+dust/IR is active the frontend requests a *baked* working texture — Rust applies geometry
+(orient/rotate/crop) and runs the Telea inpaint (`dust::apply`/`apply_ir`) on the **raw negative**
+(pre-invert), returns half-float RGBA; the GPU inverts+finishes with identity geometry. Re-bake
+fires only on stroke-commit / IR-toggle / geometry change (off the session lock; `info` skips the
+inpaint so it runs once per upload).
+
+**User-verified (E2E):** dust heals correctly and exposure stays instant with dust on; the
+post→pre-invert heal-domain change looks equivalent to the prior CPU-fallback heal. CPU
+`render_view` is now used only for raw view and no-WebGL2.

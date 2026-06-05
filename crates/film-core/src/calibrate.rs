@@ -117,6 +117,31 @@ pub fn fit_m_post(data: &SpectralData) -> Matrix3<f32> {
     )
 }
 
+/// Von-Kries neutral balance for a fitted `M_post`. The raw concentration-recovery
+/// fit maps an equal-density (neutral) input to UNequal RGB — dye concentration is
+/// not display colour, so e.g. Portra's fit injects a strong red bias that reads as
+/// magenta. Scaling each row so the row sums are equal makes a neutral input map to
+/// a neutral output, while preserving the row's internal off-diagonal structure (the
+/// actual crosstalk correction). The common scale is the mean of the original row
+/// sums, so overall exposure is unchanged. White balance then only has to handle the
+/// residual scene/scanner cast — which the (temp,tint) model CAN express.
+pub fn balance_neutral(m: Matrix3<f32>) -> Matrix3<f32> {
+    let rowsum = [
+        m[(0, 0)] + m[(0, 1)] + m[(0, 2)],
+        m[(1, 0)] + m[(1, 1)] + m[(1, 2)],
+        m[(2, 0)] + m[(2, 1)] + m[(2, 2)],
+    ];
+    let mean = (rowsum[0] + rowsum[1] + rowsum[2]) / 3.0;
+    let mut out = m;
+    for r in 0..3 {
+        let s = mean / rowsum[r].abs().max(1e-6);
+        for c in 0..3 {
+            out[(r, c)] *= s;
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -201,6 +226,27 @@ mod tests {
         let rms_fit = (sse_fit / count as f32).sqrt();
         let rms_id = (sse_id / count as f32).sqrt();
         assert!(rms_fit < rms_id * 0.8, "fit RMS ΔC {rms_fit} not < 0.8 × identity {rms_id}");
+    }
+
+    #[test]
+    fn balance_neutral_preserves_neutral_and_keeps_crosstalk() {
+        use crate::spectral::{load_stock, Stock};
+        // Raw Portra fit injects a strong red bias on a neutral input (the magenta).
+        let raw = fit_m_post(&load_stock(Stock::Portra400));
+        let raw_n = raw * Vector3::new(0.5, 0.5, 0.5);
+        let raw_spread = raw_n.max() - raw_n.min();
+        assert!(raw_spread > 0.1, "expected the raw fit to cast a neutral; got {raw_spread}");
+
+        // After balancing, an equal-density (neutral) input maps to equal RGB.
+        let m = balance_neutral(raw);
+        for d in [0.2f32, 0.5, 1.0, 1.5] {
+            let out = m * Vector3::new(d, d, d);
+            assert!(out.max() - out.min() < 1e-3, "neutral not preserved at d={d}: {:?}", out.as_slice());
+        }
+        // Crosstalk correction is retained (off-diagonals survive the row scaling).
+        let off = [m[(0, 1)], m[(0, 2)], m[(1, 0)], m[(1, 2)], m[(2, 0)], m[(2, 1)]];
+        let max_off = off.iter().fold(0.0f32, |a, &b| a.max(b.abs()));
+        assert!(max_off > 0.1, "row scaling should preserve crosstalk; max off-diagonal = {max_off}");
     }
 
     #[test]

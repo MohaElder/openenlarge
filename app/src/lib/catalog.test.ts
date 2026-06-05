@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { debounce, applySnapshot } from "./catalog";
 import { get } from "svelte/store";
 import {
-  images, editsById, cropById, dustById, metaById, developMode, quality,
+  images, editsById, cropById, dustById, metaById, quality,
   selectedFolder, gridZoom, module as moduleStore, activeId,
 } from "./store";
 import type { CatalogSnapshot } from "./api";
@@ -48,7 +48,7 @@ describe("applySnapshot", () => {
         dust: { strokes: [], irRemoval: { enabled: false, sensitivity: 50 } },
         meta: { camera: "Leica M6", note: "roll 12" },
       }],
-      prefs: { develop_mode: "c", quality: "quality" },
+      prefs: { quality: "quality" },
       app_state: { selected_folder: "/x", grid_zoom: "70", module: "develop", active_id: "a" },
     };
     applySnapshot(snap);
@@ -57,7 +57,6 @@ describe("applySnapshot", () => {
     expect(get(editsById)["a"].exposure).toBe(1.5);
     expect(get(dustById)["a"].irRemoval.sensitivity).toBe(50);
     expect(get(metaById)["a"].camera).toBe("Leica M6");
-    expect(get(developMode)).toBe("c");
     expect(get(quality)).toBe("quality");
     expect(get(selectedFolder)).toBe("/x");
     expect(get(gridZoom)).toBe(70);

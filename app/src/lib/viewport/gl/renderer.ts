@@ -1,4 +1,5 @@
-import { VERT, FRAG } from "./shaders";
+import { VERT, FRAG, INVERT_FRAG } from "./shaders";
+import { type InversionUniforms } from "./invert";
 import type { FinishUniforms } from "./uniforms";
 import type { ColorGradeUniforms } from "../../develop/finish";
 import { LUT_SIZE } from "../../develop/curve";
@@ -82,6 +83,20 @@ export class FinishRenderer {
   private srcW = 0;
   private srcH = 0;
   private hasSource = false;
+  private invProg: WebGLProgram | null = null;
+  private srcTexF: WebGLTexture | null = null;   // RGBA16F raw negative
+  private interTex: WebGLTexture | null = null;   // RGBA16F inverted intermediate
+  private fbo: WebGLFramebuffer | null = null;
+  private inv: InversionUniforms | null = null;
+  private invLoc: Record<string, WebGLUniformLocation | null> = {};
+  private geom = {
+    crop_off: new Float32Array([0, 0]),
+    crop_scale: new Float32Array([1, 1]),
+    angle: 0,
+    orient: new Float32Array([1, 0, 0, 1]),
+    raw: false,
+  };
+  private useFloat = false; // true once setSourceFloat is used
 
   constructor(private canvas: HTMLCanvasElement) {
     const gl = canvas.getContext("webgl2", { preserveDrawingBuffer: true, premultipliedAlpha: false });
@@ -114,6 +129,41 @@ export class FinishRenderer {
     for (const [u] of CG_FLOAT) this.loc[u] = gl.getUniformLocation(prog, u);
     gl.uniform1i(this.loc.u_src, 0);
     gl.uniform1i(this.loc.u_lut, 1);
+
+    // Invert program (pass 1). Requires float color-buffer for the FBO.
+    if (!gl.getExtension("EXT_color_buffer_float")) { this.available = false; return; }
+    const ivs = this.compile(gl, gl.VERTEX_SHADER, VERT);
+    const ifs = this.compile(gl, gl.FRAGMENT_SHADER, INVERT_FRAG);
+    if (!ivs || !ifs) { this.available = false; return; }
+    const ip = gl.createProgram()!;
+    gl.attachShader(ip, ivs); gl.attachShader(ip, ifs); gl.linkProgram(ip);
+    if (!gl.getProgramParameter(ip, gl.LINK_STATUS)) {
+      console.error("invert link:", gl.getProgramInfoLog(ip)); this.available = false; return;
+    }
+    this.invProg = ip;
+    for (const n of [
+      "u_src","u_base","u_wb","u_m_pre","u_m_post","u_exposure","u_black","u_gamma",
+      "u_mode","u_raw","u_crop_off","u_crop_scale","u_angle","u_orient",
+    ]) this.invLoc[n] = gl.getUniformLocation(ip, n);
+    gl.useProgram(ip); gl.uniform1i(this.invLoc.u_src, 0);
+
+    // RGBA16F raw-negative source texture.
+    this.srcTexF = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.srcTexF);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+    // RGBA16F intermediate (inverted) + FBO.
+    this.interTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.interTex);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    this.fbo = gl.createFramebuffer();
+
     this.available = true;
   }
 
@@ -150,6 +200,7 @@ export class FinishRenderer {
   /** Upload a decoded preview image as the source texture; sizes the canvas. */
   setSource(img: TexImageSource, w: number, h: number) {
     const gl = this.gl; if (!gl || !this.tex) return;
+    this.useFloat = false; // 8-bit CPU-fallback source → draw() uses the single finishing pass
     this.srcW = w; this.srcH = h;
     this.canvas.width = w; this.canvas.height = h;
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
@@ -160,22 +211,82 @@ export class FinishRenderer {
 
   setUniforms(u: FinishUniforms) { this.uniforms = u; }
 
+  /** Upload the raw linear negative as an RGBA16F texture (once per image). */
+  setSourceFloat(pixels: Uint16Array, w: number, h: number) {
+    const gl = this.gl; if (!gl || !this.srcTexF || !this.interTex) return;
+    this.srcW = w; this.srcH = h; this.useFloat = true;
+    gl.bindTexture(gl.TEXTURE_2D, this.srcTexF);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); // geometry handled in-shader
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, pixels);
+    // (Re)allocate the intermediate to the OUTPUT size; default = source size.
+    this.allocInter(w, h);
+    this.hasSource = true;
+  }
+
+  /** Size the intermediate FBO texture (output dims = post-geometry canvas). */
+  private allocInter(w: number, h: number) {
+    const gl = this.gl; if (!gl || !this.interTex) return;
+    gl.bindTexture(gl.TEXTURE_2D, this.interTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+  }
+
+  setInversion(u: InversionUniforms) { this.inv = u; }
+
+  /** Geometry from the host (identity-safe). out{W,H} = post-geometry canvas size. */
+  setGeometry(g: {
+    crop_off: [number, number]; crop_scale: [number, number];
+    angle: number; orient: [number, number, number, number];
+    raw: boolean; outW: number; outH: number;
+  }) {
+    this.geom.crop_off = new Float32Array(g.crop_off);
+    this.geom.crop_scale = new Float32Array(g.crop_scale);
+    this.geom.angle = g.angle;
+    this.geom.orient = new Float32Array(g.orient);
+    this.geom.raw = g.raw;
+    this.canvas.width = g.outW; this.canvas.height = g.outH;
+    this.allocInter(g.outW, g.outH);
+    this.srcW = g.outW; this.srcH = g.outH; // finishing pass uses these for u_texel/viewport
+  }
+
   draw() {
-    const gl = this.gl, p = this.prog, u = this.uniforms;
-    if (!gl || !p || !u || !this.hasSource) return;
+    const gl = this.gl; if (!gl || !this.hasSource) return;
+    if (this.useFloat && this.invProg && this.inv) {
+      // PASS 1: INVERT raw negative → intermediate FBO (output-sized).
+      gl.useProgram(this.invProg);
+      gl.bindVertexArray(this.vao);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, this.fbo);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, this.interTex, 0);
+      gl.viewport(0, 0, this.srcW, this.srcH);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, this.srcTexF);
+      const L = this.invLoc, u = this.inv;
+      gl.uniform3fv(L.u_base, u.base); gl.uniform3fv(L.u_wb, u.wb);
+      gl.uniformMatrix3fv(L.u_m_pre, false, u.m_pre);
+      gl.uniformMatrix3fv(L.u_m_post, false, u.m_post);
+      gl.uniform1f(L.u_exposure, u.exposure); gl.uniform1f(L.u_black, u.black);
+      gl.uniform1f(L.u_gamma, u.gamma); gl.uniform1i(L.u_mode, u.mode);
+      gl.uniform1i(L.u_raw, this.geom.raw ? 1 : 0);
+      gl.uniform2fv(L.u_crop_off, this.geom.crop_off);
+      gl.uniform2fv(L.u_crop_scale, this.geom.crop_scale);
+      gl.uniform1f(L.u_angle, this.geom.angle);
+      gl.uniformMatrix2fv(L.u_orient, false, this.geom.orient);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    }
+    // PASS 2: FINISH (existing program) reads the intermediate, draws to canvas.
+    const p = this.prog, fu = this.uniforms;
+    if (!p || !fu) return;
     gl.useProgram(p);
     gl.bindVertexArray(this.vao);
     gl.viewport(0, 0, this.srcW, this.srcH);
     gl.activeTexture(gl.TEXTURE0);
-    gl.bindTexture(gl.TEXTURE_2D, this.tex);
-    gl.activeTexture(gl.TEXTURE1);
-    gl.bindTexture(gl.TEXTURE_2D, this.lutTex);
+    gl.bindTexture(gl.TEXTURE_2D, this.useFloat ? this.interTex : this.tex);
+    gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, this.lutTex);
     gl.uniform2f(this.loc.u_texel, 1 / this.srcW, 1 / this.srcH);
-    for (const n of UNIFORM_NAMES) gl.uniform1f(this.loc[`u_${n}`], (u as unknown as Record<string, number>)[n]);
+    for (const n of UNIFORM_NAMES) gl.uniform1f(this.loc[`u_${n}`], (fu as unknown as Record<string, number>)[n]);
     const cg = this.cg;
     if (cg) {
-      for (const [u, k] of CG_VEC3) gl.uniform3fv(this.loc[u], cg[k] as [number, number, number]);
-      for (const [u, k] of CG_FLOAT) gl.uniform1f(this.loc[u], cg[k] as number);
+      for (const [uu, k] of CG_VEC3) gl.uniform3fv(this.loc[uu], cg[k] as [number, number, number]);
+      for (const [uu, k] of CG_FLOAT) gl.uniform1f(this.loc[uu], cg[k] as number);
     }
     gl.drawArrays(gl.TRIANGLES, 0, 3);
   }

@@ -1,19 +1,19 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
   import { fade } from "svelte/transition";
-  import { developMode } from "../store";
+  import { locale, LOCALES, t } from "../i18n";
   const dispatch = createEventDispatcher();
 </script>
 
 <div class="backdrop" on:click={() => dispatch("close")}></div>
-<div class="menu" role="dialog" aria-label="Settings" transition:fade={{ duration: 120 }}>
+<div class="menu" role="dialog" aria-label={$t("settings.dialogAriaLabel")} transition:fade={{ duration: 120 }}>
   <div class="grp">
-    <div class="head">Develop mode</div>
+    <div class="head">{$t("settings.language.heading")}</div>
     <div class="seg">
-      <button class:on={$developMode === "b"} on:click={() => developMode.set("b")}>B · density</button>
-      <button class:on={$developMode === "c"} on:click={() => developMode.set("c")}>C · per-chan</button>
+      {#each LOCALES as l}
+        <button class:on={$locale === l.id} on:click={() => locale.set(l.id)}>{l.label}</button>
+      {/each}
     </div>
-    <div class="hint">Applies to every image.</div>
   </div>
 </div>
 
@@ -28,5 +28,4 @@
   .seg button { flex: 1; padding: 7px; border-radius: 8px; font-size: 12px;
     border: 1px solid var(--glass-brd); background: transparent; color: var(--text-dim); }
   .seg button.on { color: #fff; background: rgba(244,157,78,0.18); border-color: rgba(244,157,78,0.5); }
-  .hint { font-size: 11px; color: var(--text-faint); margin-top: 8px; }
 </style>

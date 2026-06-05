@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
+  import { t } from "$lib/i18n";
 
   export let label = "";
   export let hue = 0;   // 0..360
@@ -53,12 +54,12 @@
     class="disc" bind:this={disc}
     on:pointerdown={onDown} on:pointermove={onMove} on:pointerup={onUp} on:pointercancel={onUp}
     on:dblclick={reset}
-    role="application" aria-label="{label} hue and saturation: hue {Math.round(hue)}, saturation {Math.round(sat)}"
+    role="application" aria-label={$t('colorWheel.hueSatAriaLabel', { label, hue: Math.round(hue), sat: Math.round(sat) })}
   >
     <div class="thumb" style="left:{tx}%; top:{ty}%; background:{thumbColor}"></div>
   </div>
   <input class="lum" type="range" min="-100" max="100" step="1"
-    value={lum} on:input={onLum} on:dblclick={resetLum} aria-label="{label} luminance" />
+    value={lum} on:input={onLum} on:dblclick={resetLum} aria-label={$t('colorWheel.luminanceAriaLabel', { label })} />
 </div>
 
 <style>

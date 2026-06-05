@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
+  import { t } from "$lib/i18n";
   import { PRESETS } from "./presets";
   import Icon from "../icons/Icon.svelte";
 
@@ -10,36 +11,36 @@
 </script>
 
 <div class="section">
-  <div class="head"><span>Crop</span></div>
+  <div class="head"><span>{$t('crop.title')}</span></div>
 
-  <div class="sub">Aspect ratio</div>
+  <div class="sub">{$t('crop.aspectRatio')}</div>
   <select value={aspect} on:change={(e) => dispatch("preset", (e.target as HTMLSelectElement).value)}>
-    {#if aspect === "custom"}<option value="custom">Custom</option>{/if}
-    {#each PRESETS as p}<option value={p.id}>{p.label}</option>{/each}
+    {#if aspect === "custom"}<option value="custom">{$t('crop.custom')}</option>{/if}
+    {#each PRESETS as p}<option value={p.id}>{$t(p.label)}</option>{/each}
   </select>
 
-  <div class="sub">Orientation</div>
-  <button class="orient" title="Toggle orientation (X)" aria-label="Orientation"
+  <div class="sub">{$t('crop.orientation')}</div>
+  <button class="orient" title={$t('crop.toggleOrientation')} aria-label={$t('crop.orientationAriaLabel')}
           on:click={() => dispatch("swap")}>
     <Icon name={orientation === "landscape" ? "landscape" : "portrait"} size={20} />
   </button>
 
-  <div class="sub">Transform</div>
+  <div class="sub">{$t('crop.transform')}</div>
   <div class="btns">
-    <button title="Rotate left (⌘/Ctrl + [)" on:click={() => dispatch("rotate", -1)}><Icon name="rotate-ccw" size={16} /></button>
-    <button title="Rotate right (⌘/Ctrl + ])" on:click={() => dispatch("rotate", 1)}><Icon name="rotate-cw" size={16} /></button>
-    <button title="Flip horizontal" on:click={() => dispatch("flip", "h")}><Icon name="flip-h" size={16} /></button>
-    <button title="Flip vertical" on:click={() => dispatch("flip", "v")}><Icon name="flip-v" size={16} /></button>
+    <button title={$t('crop.rotateLeft')} on:click={() => dispatch("rotate", -1)}><Icon name="rotate-ccw" size={16} /></button>
+    <button title={$t('crop.rotateRight')} on:click={() => dispatch("rotate", 1)}><Icon name="rotate-cw" size={16} /></button>
+    <button title={$t('crop.flipHorizontal')} on:click={() => dispatch("flip", "h")}><Icon name="flip-h" size={16} /></button>
+    <button title={$t('crop.flipVertical')} on:click={() => dispatch("flip", "v")}><Icon name="flip-v" size={16} /></button>
   </div>
 
-  <div class="sub">Straighten</div>
+  <div class="sub">{$t('crop.straighten')}</div>
   <div class="slrow">
     <input type="range" min="-45" max="45" step="0.1" bind:value={angle} on:dblclick={() => (angle = 0)} />
     <span class="val">{angle.toFixed(1)}°</span>
   </div>
 
-  <button class="row" on:click={() => dispatch("reset")}>Reset</button>
-  <div class="hint">Enter to apply · Esc to discard · Shift locks the ratio</div>
+  <button class="row" on:click={() => dispatch("reset")}>{$t('crop.reset')}</button>
+  <div class="hint">{$t('crop.hint')}</div>
 </div>
 
 <style>

@@ -12,6 +12,7 @@
   import { emptyDust } from "../develop/dust";
   import { allSelected, noneSelected, click, isAllSelected, toggleAll, type SelState } from "./selection";
   import { outName } from "./naming";
+  import { t } from "$lib/i18n";
 
   const dispatch = createEventDispatcher<{ close: void }>();
 
@@ -66,10 +67,20 @@
   let running = false;
   let done = 0;
   let total = 0;
-  let summary = "";
+  let finished = false;
   let failedCount = 0;
   let lastFolder = "";
   let exportedPaths: string[] = [];
+
+  // Reactive so the summary re-evaluates (and re-translates) on language change.
+  $: summary = !finished
+    ? ""
+    : failedCount > 0
+      ? $t("export.summaryPartial", { done, total, failed: failedCount })
+      : $t("export.summaryDone", {
+          done,
+          imageOrImages: $t(done === 1 ? "export.imageSingular" : "export.imagePlural"),
+        });
 
   async function runExport() {
     const chosen = imgs.filter((i) => sel.selected.has(i.id));
@@ -77,7 +88,7 @@
     const folder = await open({ directory: true });
     if (!folder || typeof folder !== "string") return;
 
-    running = true; done = 0; total = chosen.length; summary = "";
+    running = true; done = 0; total = chosen.length; finished = false;
     failedCount = 0; exportedPaths = []; lastFolder = folder;
     const written: string[] = [];
     const failures: string[] = [];
@@ -104,9 +115,7 @@
     running = false;
     exportedPaths = written;
     failedCount = failures.length;
-    summary = failures.length
-      ? `Exported ${done} of ${total} · ${failures.length} failed`
-      : `Exported ${done} ${done === 1 ? "image" : "images"}`;
+    finished = true;
   }
 
   async function openFolder() {
@@ -121,16 +130,16 @@
     <header>
       <div class="title">
         <span class="dot"></span>
-        <h2>Export</h2>
+        <h2>{$t('export.title')}</h2>
       </div>
-      <button class="x" on:click={() => dispatch("close")} aria-label="Close">✕</button>
+      <button class="x" on:click={() => dispatch("close")} aria-label={$t('export.close')}>✕</button>
     </header>
 
     <div class="bar">
       <button class="link" on:click={() => (sel = toggleAll(sel, ids))} disabled={running}>
-        {allOn ? "Deselect all" : "Select all"}
+        {allOn ? $t('export.deselectAll') : $t('export.selectAll')}
       </button>
-      <span class="count">{sel.selected.size} of {ids.length} selected</span>
+      <span class="count">{$t('export.selectionCount', { selected: sel.selected.size, total: ids.length })}</span>
     </div>
 
     <div class="grid">
@@ -145,16 +154,16 @@
           {#if sel.selected.has(img.id)}<span class="check">✓</span>{/if}
         </button>
       {/each}
-      {#if imgs.length === 0}<div class="empty">No developed images to export.</div>{/if}
+      {#if imgs.length === 0}<div class="empty">{$t('export.emptyState')}</div>{/if}
     </div>
 
     <div class="format" class:busy={running}>
       <div class="field">
-        <span class="flabel">Format</span>
+        <span class="flabel">{$t('export.formatLabel')}</span>
         <div class="seg" style="--n:3; --i:{kindIndex}">
-          <button type="button" class:active={kind === "jpeg"} on:click={() => (kind = "jpeg")}>JPEG</button>
-          <button type="button" class:active={kind === "tiff"} on:click={() => (kind = "tiff")}>TIFF</button>
-          <button type="button" class:active={kind === "png"} on:click={() => (kind = "png")}>PNG</button>
+          <button type="button" class:active={kind === "jpeg"} on:click={() => (kind = "jpeg")}>{$t('export.formatJpeg')}</button>
+          <button type="button" class:active={kind === "tiff"} on:click={() => (kind = "tiff")}>{$t('export.formatTiff')}</button>
+          <button type="button" class:active={kind === "png"} on:click={() => (kind = "png")}>{$t('export.formatPng')}</button>
           <span class="seg-ind"></span>
         </div>
       </div>
@@ -162,12 +171,12 @@
       {#if kind === "jpeg"}
         <div class="opts" transition:slideFade>
           <div class="field">
-            <span class="flabel">Quality <b>{quality}</b></span>
+            <span class="flabel">{$t('export.quality')} <b>{quality}</b></span>
             <input class="range" type="range" min="1" max="100" bind:value={quality}
                    style="--pct:{((quality - 1) / 99) * 100}%" />
           </div>
           <div class="field">
-            <span class="flabel">Max size <b>{maxMb === 0 ? "Unlimited" : `${maxMb} MB`}</b></span>
+            <span class="flabel">{$t('export.maxSize')} <b>{maxMb === 0 ? $t('export.unlimited') : $t('export.maxSizeMb', { mb: maxMb })}</b></span>
             <input class="range" type="range" min="0" max="20" step="0.5" bind:value={maxMb}
                    style="--pct:{(maxMb / 20) * 100}%" />
           </div>
@@ -175,10 +184,10 @@
       {:else}
         <div class="opts" transition:slideFade>
           <div class="field">
-            <span class="flabel">Bit depth</span>
+            <span class="flabel">{$t('export.bitDepth')}</span>
             <div class="seg" style="--n:2; --i:{bitDepth === 8 ? 0 : 1}">
-              <button type="button" class:active={bitDepth === 8} on:click={() => (bitDepth = 8)}>8-bit</button>
-              <button type="button" class:active={bitDepth === 16} on:click={() => (bitDepth = 16)}>16-bit</button>
+              <button type="button" class:active={bitDepth === 8} on:click={() => (bitDepth = 8)}>{$t('export.bitDepth8')}</button>
+              <button type="button" class:active={bitDepth === 16} on:click={() => (bitDepth = 16)}>{$t('export.bitDepth16')}</button>
               <span class="seg-ind"></span>
             </div>
           </div>
@@ -188,16 +197,16 @@
 
     <footer>
       {#if running}
-        <span class="msg"><span class="spinner"></span> Exporting {done} of {total}…</span>
+        <span class="msg"><span class="spinner"></span> {$t('export.exportingProgress', { done, total })}</span>
       {:else if summary}
         <span class="msg" class:ok={failedCount === 0} class:warn={failedCount > 0}>{summary}</span>
       {/if}
       <div class="actions">
         {#if !running && exportedPaths.length > 0}
-          <button class="ghost" on:click={openFolder} in:fade={{ duration: 200 }}>Open folder</button>
+          <button class="ghost" on:click={openFolder} in:fade={{ duration: 200 }}>{$t('export.openFolder')}</button>
         {/if}
         <button class="primary" on:click={runExport} disabled={running || sel.selected.size === 0}>
-          {running ? "Exporting…" : `Export ${sel.selected.size}`}
+          {running ? $t('export.exporting') : $t('export.exportCount', { count: sel.selected.size })}
         </button>
       </div>
     </footer>

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
+  import { t } from "$lib/i18n";
 
   /** Brush radius normalized to image width (0.005..0.2). */
   export let brush: number;
@@ -14,15 +15,15 @@
 </script>
 
 <div class="section">
-  <div class="head"><span>Eraser</span></div>
+  <div class="head"><span>{$t('eraser.title')}</span></div>
 
   {#if hasIr}
     <button class="ir on" class:active={irEnabled} aria-pressed={irEnabled}
             on:click={() => dispatch("irEnabled", !irEnabled)}>
-      Remove dust (IR) <span class="state">{irEnabled ? "On" : "Off"}</span>
+      {$t('eraser.removeDustIr')} <span class="state">{irEnabled ? $t('eraser.on') : $t('eraser.off')}</span>
     </button>
     {#if irEnabled}
-      <div class="sub">Sensitivity</div>
+      <div class="sub">{$t('eraser.sensitivity')}</div>
       <div class="slrow">
         <input type="range" min="0" max="100" step="1" value={irSensitivity}
                on:input={(e) => dispatch("irSensitivity", +(e.target as HTMLInputElement).value)} />
@@ -30,21 +31,21 @@
       </div>
     {/if}
   {:else}
-    <span class="ir-wrap" title="Requires an infrared scan channel">
+    <span class="ir-wrap" title={$t('eraser.requiresIrChannel')}>
       <button class="ir" disabled>
-        Remove dust (IR) <span class="soon">soon</span>
+        {$t('eraser.removeDustIr')} <span class="soon">{$t('eraser.soon')}</span>
       </button>
     </span>
   {/if}
 
-  <div class="sub">Brush size</div>
+  <div class="sub">{$t('eraser.brushSize')}</div>
   <div class="slrow">
     <input type="range" min="0.005" max="0.2" step="0.001" bind:value={brush} />
     <span class="val">{(brush * 100).toFixed(1)}%</span>
   </div>
 
-  <button class="row" on:click={() => dispatch("reset")}>Reset</button>
-  <div class="hint">Scroll to resize · click or drag to erase dust · ⌘Z to undo</div>
+  <button class="row" on:click={() => dispatch("reset")}>{$t('eraser.reset')}</button>
+  <div class="hint">{$t('eraser.hint')}</div>
 </div>
 
 <style>

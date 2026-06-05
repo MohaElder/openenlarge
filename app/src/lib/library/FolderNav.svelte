@@ -6,8 +6,10 @@
   import TreeNode from "./TreeNode.svelte";
   import Icon from "../icons/Icon.svelte";
   import GlassPanel from "../glass/GlassPanel.svelte";
+  import { t } from "$lib/i18n";
 
   let importing = false;
+  $: filterFilmScans = $t("folderNav.filterFilmScans");
   $: tree = buildTree($images);
   $: if (!$selectedFolder && $images.length) {
     const last = $images[$images.length - 1];
@@ -16,7 +18,7 @@
   }
 
   async function pickAndImport() {
-    const sel = await openDialog({ multiple: true, filters: [{ name: "Film scans", extensions: ["dng", "tif", "tiff", "raf"] }] });
+    const sel = await openDialog({ multiple: true, filters: [{ name: filterFilmScans, extensions: ["dng", "tif", "tiff", "raf"] }] });
     if (!sel) return;
     const paths = Array.isArray(sel) ? sel : [sel];
     importing = true;
@@ -36,13 +38,13 @@
 
 <GlassPanel>
   <div class="wrap">
-    <div class="ttl">Imported</div>
+    <div class="ttl">{$t('folderNav.imported')}</div>
     <div class="tree">
       {#each tree as root}<TreeNode node={root} isRoot={true} />{/each}
-      {#if $images.length === 0}<div class="empty">No images yet</div>{/if}
+      {#if $images.length === 0}<div class="empty">{$t('folderNav.noImages')}</div>{/if}
     </div>
     <button class="import" on:click={pickAndImport} disabled={importing}>
-      <Icon name="plus" /> {importing ? "Importing…" : "Import"}
+      <Icon name="plus" /> {importing ? $t('folderNav.importing') : $t('folderNav.import')}
     </button>
   </div>
 </GlassPanel>

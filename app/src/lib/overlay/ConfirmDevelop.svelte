@@ -1,17 +1,18 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
   import { fade, scale } from "svelte/transition";
+  import { t } from "$lib/i18n";
   export let count = 0;
   const dispatch = createEventDispatcher();
 </script>
 
 <div class="scrim" on:click|self={() => dispatch("cancel")} transition:fade={{ duration: 150 }}>
   <div class="card" transition:scale={{ duration: 160, start: 0.96, opacity: 0 }}>
-    <div class="title">Develop all {count} image{count === 1 ? "" : "s"}?</div>
-    <div class="sub">They'll be decoded and inverted, then opened in Develop.</div>
+    <div class="title">{$t('confirmDevelop.title', { count, plural: count === 1 ? '' : 's' })}</div>
+    <div class="sub">{$t('confirmDevelop.sub')}</div>
     <div class="row">
-      <button class="ghost" on:click={() => dispatch("cancel")}>Cancel</button>
-      <button class="go" on:click={() => dispatch("confirm")}>Develop all</button>
+      <button class="ghost" on:click={() => dispatch("cancel")}>{$t('confirmDevelop.cancel')}</button>
+      <button class="go" on:click={() => dispatch("confirm")}>{$t('confirmDevelop.confirm')}</button>
     </div>
   </div>
 </div>

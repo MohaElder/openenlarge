@@ -2,6 +2,7 @@
 
 use crate::convert::{crop, orient, orient_dims, proxy, resize_to, rotate};
 use crate::encode::{to_jpeg_b64, to_png_b64, write_jpeg, write_png, write_tiff8};
+use crate::gpu_upload::{bake_geometry, bake_working, capped_dims, pack_rgba16f, resolve_to_uniforms, BakeSpec, ResolvedInversion, MAX_GPU_EDGE};
 use crate::metadata::extract;
 use crate::session::{CachedImage, Developed, ImageEntry, InvertParams, Quality, Session};
 use film_core::calibrate::{auto_wb_gains, sample_base};
@@ -76,7 +77,7 @@ const AUTOWB_EDGE: u32 = 256;
 const PREVIEW_JPEG_QUALITY: u8 = 88;
 const CACHE_WORKING_CAP: u32 = 4096;
 
-fn default_invert_params() -> InvertParams {
+pub(crate) fn default_invert_params() -> InvertParams {
     InvertParams {
         mode: "b".into(), stock: "none".into(), base_rect: None,
         exposure: 0.0, black: 0.0, gamma: 0.4545, auto_wb: true,
@@ -116,11 +117,11 @@ fn stock_from(s: &str) -> Option<Stock> {
     }
 }
 
-fn mode_from(s: &str) -> Mode {
+pub(crate) fn mode_from(s: &str) -> Mode {
     match s { "c" => Mode::C, _ => Mode::B }
 }
 
-fn build_params(p: &InvertParams, base: [f32; 3]) -> InversionParams {
+pub(crate) fn build_params(p: &InvertParams, base: [f32; 3]) -> InversionParams {
     let exposure = 2f32.powf(p.exposure); // EV stops → linear multiplier
     match stock_from(&p.stock) {
         Some(s) if p.mode == "b" => params_for_stock(s, base, exposure, p.black, p.gamma),
@@ -128,7 +129,7 @@ fn build_params(p: &InvertParams, base: [f32; 3]) -> InversionParams {
     }
 }
 
-fn wb_from_params(temp: f32, tint: f32) -> [f32; 3] {
+pub(crate) fn wb_from_params(temp: f32, tint: f32) -> [f32; 3] {
     wb_from_kelvin(temp, tint / 150.0)
 }
 
@@ -142,7 +143,7 @@ fn finish_default() -> bool { true }
 
 /// Map a normalized crop rect [x,y,w,h] (0..1) to integer pixels on a w×h image,
 /// clamped to bounds with a 1px minimum.
-fn crop_px(norm: [f64; 4], w: usize, h: usize) -> (usize, usize, usize, usize) {
+pub(crate) fn crop_px(norm: [f64; 4], w: usize, h: usize) -> (usize, usize, usize, usize) {
     let x = (norm[0] * w as f64).round().clamp(0.0, (w - 1) as f64) as usize;
     let y = (norm[1] * h as f64).round().clamp(0.0, (h - 1) as f64) as usize;
     let cw = (norm[2] * w as f64).round().clamp(1.0, (w - x) as f64) as usize;
@@ -184,7 +185,7 @@ fn view_stamps(
 
 /// Map normalized strokes → `Stamp`s on a full-res `w`×`h` image (no view crop).
 /// Mirrors `view_stamps` but for export: points normalize to image dims, radius to width.
-fn export_stamps(dust: &[DustStroke], w: usize, h: usize) -> Vec<Stamp> {
+pub(crate) fn export_stamps(dust: &[DustStroke], w: usize, h: usize) -> Vec<Stamp> {
     let mut out = Vec::new();
     for stroke in dust {
         let r = (stroke.r * w as f64).max(0.5) as f32;
@@ -467,17 +468,57 @@ pub fn render_view(id: String, params: InvertParams, view: ViewSpec, session: St
     to_jpeg_b64(&out, false, PREVIEW_JPEG_QUALITY)
 }
 
+/// The persistent per-image edits that shape a thumbnail's geometry and retouching.
+/// Mirrors the relevant `ViewSpec` fields but without the zoom/view crop — a
+/// thumbnail always shows the whole (cropped) frame. All fields default so the
+/// grid can request a plain develop-only thumbnail with `{}`.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct ThumbView {
+    #[serde(default)] pub image_crop: Option<[f64; 4]>,
+    #[serde(default)] pub rot90: u8,
+    #[serde(default)] pub flip_h: bool,
+    #[serde(default)] pub flip_v: bool,
+    #[serde(default)] pub angle: f32,
+    #[serde(default)] pub dust: Vec<DustStroke>,
+    #[serde(default)] pub ir_removal: IrRemoval,
+}
+
 /// Render a small (~320px) inverted JPEG of the developed image at the given
-/// params — used to live-refresh the Library grid cell while editing.
+/// params and persistent edits — used to live-refresh the Library grid cell and
+/// filmstrip while editing. Applies orientation/straighten/crop, develop params,
+/// dust strokes, and IR removal so the thumbnail matches the viewport.
 #[tauri::command]
-pub fn thumbnail(id: String, params: InvertParams, session: State<Session>) -> Result<String, String> {
+pub fn thumbnail(id: String, params: InvertParams, view: ThumbView, session: State<Session>) -> Result<String, String> {
     ensure_resident(&session, &id)?;
     let images = session.images.lock().unwrap();
     let img = images.get(&id).ok_or("unknown image id")?;
     let dev = img.developed.as_ref().ok_or("not developed")?;
-    let small = proxy(&dev.working, THUMB_EDGE);
+
+    // Geometry: orient (lossless) → straighten → persistent crop. No view crop —
+    // the whole frame is shown, scaled to fit THUMB_EDGE.
+    let oriented = orient(&dev.working, view.rot90, view.flip_h, view.flip_v);
+    let straightened = rotate(&oriented, view.angle);
+    let base_img = match view.image_crop {
+        Some(nc) => {
+            let (ix, iy, iw, ih) = crop_px(nc, straightened.width, straightened.height);
+            crop(&straightened, ix, iy, iw, ih)
+        }
+        None => straightened,
+    };
+    let small = proxy(&base_img, THUMB_EDGE);
+    let (ow, oh) = (small.width as u32, small.height as u32);
     let ip = resolve_params(&params, &dev.thumb, dev.base);
-    let inv = invert_image(&small, &ip, mode_from(&params.mode));
+    let mut inv = invert_image(&small, &ip, mode_from(&params.mode));
+    let stamps = view_stamps(
+        &view.dust, base_img.width, base_img.height,
+        0, 0, base_img.width, base_img.height, ow, oh,
+    );
+    dust::apply(&mut inv, &stamps);
+    if view.ir_removal.enabled {
+        if let Some(ir) = small.ir.as_ref() {
+            dust::apply_ir(&mut inv, ir, view.ir_removal.sensitivity);
+        }
+    }
     let fin = finish_image(&inv, &finish_from(&params));
     to_jpeg_b64(&fin, false, 82)
 }
@@ -551,7 +592,7 @@ pub fn export_image(
 pub struct AsShotWb { pub temp: f32, pub tint: f32 }
 
 #[tauri::command]
-pub fn as_shot_wb(id: String, session: State<Session>) -> Result<AsShotWb, String> {
+pub fn as_shot_wb(id: String, params: InvertParams, session: State<Session>) -> Result<AsShotWb, String> {
     ensure_resident(&session, &id)?;
     let (base, thumb) = {
         let images = session.images.lock().unwrap();
@@ -560,9 +601,11 @@ pub fn as_shot_wb(id: String, session: State<Session>) -> Result<AsShotWb, Strin
         (dev.base, dev.thumb.clone())
     };
     // Lock released — the inversion + gray-world estimate run unlocked.
-    let neutral = default_invert_params();
-    let ip = build_params(&neutral, base);
-    let first = invert_image(&thumb, &ip, mode_from(&neutral.mode));
+    // Estimate WB against the user's ACTUAL stock/mode so the gains neutralise the
+    // colour space the image is actually rendered in. `build_params` leaves `wb` at
+    // [1,1,1], so the estimate is independent of any temp/tint already on the sliders.
+    let ip = build_params(&params, base);
+    let first = invert_image(&thumb, &ip, mode_from(&params.mode));
     let gains = auto_wb_gains(&first);
     let (temp, tint) = gains_to_cct(gains);
     Ok(AsShotWb { temp, tint: tint * 150.0 }) // back to UI −150..150
@@ -661,6 +704,78 @@ pub fn save_app_state(
     catalog: State<crate::catalog::Catalog>,
 ) -> Result<(), String> {
     catalog.save_app_state(&key, &value).map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct WorkingInfo {
+    /// Capped dimensions of the float texture working_pixels will return.
+    pub w: u32,
+    pub h: u32,
+}
+
+/// Dimensions of the GPU float texture for this image (after the MAX_GPU_EDGE cap).
+#[tauri::command]
+pub fn working_info(id: String, session: State<Session>) -> Result<WorkingInfo, String> {
+    ensure_resident(&session, &id)?;
+    let images = session.images.lock().unwrap();
+    let img = images.get(&id).ok_or("unknown image id")?;
+    let dev = img.developed.as_ref().ok_or("not developed")?;
+    let (w, h) = capped_dims(&dev.working, MAX_GPU_EDGE);
+    Ok(WorkingInfo { w, h })
+}
+
+/// Raw half-float RGBA bytes of the linear working image (pre-inversion), for a
+/// one-shot WebGL2 RGBA16F upload. Returned as raw IPC bytes (no base64/JPEG).
+#[tauri::command]
+pub fn working_pixels(id: String, session: State<Session>) -> Result<tauri::ipc::Response, String> {
+    ensure_resident(&session, &id)?;
+    let images = session.images.lock().unwrap();
+    let img = images.get(&id).ok_or("unknown image id")?;
+    let dev = img.developed.as_ref().ok_or("not developed")?;
+    let (_, _, bytes) = pack_rgba16f(&dev.working, MAX_GPU_EDGE);
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
+/// Capped dims of the BAKED (geometry + heal) working texture.
+#[tauri::command]
+pub fn working_baked_info(id: String, spec: BakeSpec, session: State<Session>) -> Result<WorkingInfo, String> {
+    ensure_resident(&session, &id)?;
+    let working = {
+        let images = session.images.lock().unwrap();
+        let img = images.get(&id).ok_or("unknown image id")?;
+        img.developed.as_ref().ok_or("not developed")?.working.clone()
+    };
+    let geom = bake_geometry(&working, &spec); // geometry only — exact dims, no Telea heal
+    let (w, h) = capped_dims(&geom, MAX_GPU_EDGE);
+    Ok(WorkingInfo { w, h })
+}
+
+/// Half-float RGBA bytes of the BAKED working buffer (geometry applied, dust/IR
+/// healed pre-invert), for a one-shot RGBA16F upload. GPU then inverts with
+/// IDENTITY geometry.
+#[tauri::command]
+pub fn working_baked_pixels(id: String, spec: BakeSpec, session: State<Session>) -> Result<tauri::ipc::Response, String> {
+    ensure_resident(&session, &id)?;
+    let working = {
+        let images = session.images.lock().unwrap();
+        let img = images.get(&id).ok_or("unknown image id")?;
+        img.developed.as_ref().ok_or("not developed")?.working.clone()
+    };
+    let baked = bake_working(&working, &spec);
+    let (_, _, bytes) = pack_rgba16f(&baked, MAX_GPU_EDGE);
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
+/// Resolve inversion params (+ this image's sampled base) into GPU uniforms.
+#[tauri::command]
+pub fn resolved_inversion(
+    id: String, params: InvertParams, session: State<Session>,
+) -> Result<ResolvedInversion, String> {
+    ensure_resident(&session, &id)?;
+    let images = session.images.lock().unwrap();
+    let img = images.get(&id).ok_or("unknown image id")?;
+    let dev = img.developed.as_ref().ok_or("not developed")?;
+    Ok(resolve_to_uniforms(&params, dev.base))
 }
 
 #[cfg(test)]

@@ -4,8 +4,17 @@ mod commands;
 mod convert;
 mod encode;
 mod exif_write;
+mod gpu_upload;
 mod metadata;
 mod session;
+
+#[cfg(test)]
+pub mod commands_test_support {
+    /// A neutral InvertParams for tests (delegates to commands::default_invert_params).
+    pub fn sample_invert_params() -> crate::session::InvertParams {
+        crate::commands::default_invert_params()
+    }
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -53,6 +62,11 @@ pub fn run() {
             commands::save_meta,
             commands::save_pref,
             commands::save_app_state,
+            commands::working_info,
+            commands::working_pixels,
+            commands::working_baked_info,
+            commands::working_baked_pixels,
+            commands::resolved_inversion,
         ])
         .run(tauri::generate_context!())
         .expect("error while running OpenEnlarge");
