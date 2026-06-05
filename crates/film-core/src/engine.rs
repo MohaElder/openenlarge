@@ -5,6 +5,7 @@
 //! Mode "naive flip":        1 - normalized, the strawman baseline.
 
 use nalgebra::{Matrix3, Vector3};
+use rayon::prelude::*;
 
 /// All knobs for one inversion. Defaults give a reasonable neutral result.
 #[derive(Debug, Clone)]
@@ -114,7 +115,9 @@ pub fn invert_image(img: &crate::Image, p: &InversionParams, mode: Mode) -> crat
         Mode::C => invert_c,
         Mode::Naive => invert_naive,
     };
-    let pixels = img.pixels.iter().map(|&px| f(px, p)).collect();
+    // par_iter + collect into Vec preserves index order, so output is identical
+    // to the sequential map; the per-pixel fn `f` is pure (no shared state).
+    let pixels = img.pixels.par_iter().map(|&px| f(px, p)).collect();
     crate::Image { width: img.width, height: img.height, pixels, ir: img.ir.clone() }
 }
 
@@ -279,6 +282,29 @@ mod tests {
         assert!(b[0] > a[0], "R gain 1.5 should brighten R: {} vs {}", b[0], a[0]);
         assert!((b[1] - a[1]).abs() < 1e-6, "G gain 1.0 unchanged");
         assert!(b[2] < a[2], "B gain 0.5 should darken B: {} vs {}", b[2], a[2]);
+    }
+
+    #[test]
+    fn invert_image_is_per_pixel_and_order_preserving() {
+        // A multi-pixel image must invert each pixel exactly as the scalar fn does,
+        // in the same order — this guards the parallel collect() against reordering.
+        let p = InversionParams { base: [0.8, 0.6, 0.4], ..Default::default() };
+        let pixels = vec![
+            [0.8, 0.6, 0.4],
+            [0.1, 0.2, 0.3],
+            [0.5, 0.5, 0.5],
+            [0.05, 0.9, 0.45],
+        ];
+        let img = Image { width: 2, height: 2, pixels: pixels.clone(), ir: None };
+        let out = invert_image(&img, &p, Mode::B);
+        assert_eq!(out.width, 2);
+        assert_eq!(out.height, 2);
+        for (i, &px) in pixels.iter().enumerate() {
+            let want = invert_b(px, &p);
+            for c in 0..3 {
+                assert!((out.pixels[i][c] - want[c]).abs() < 1e-6, "pixel {i} chan {c}");
+            }
+        }
     }
 
     #[test]
