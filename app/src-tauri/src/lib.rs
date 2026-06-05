@@ -79,6 +79,9 @@ pub fn run() {
             commands::save_meta,
             commands::save_pref,
             commands::save_app_state,
+            commands::working_info,
+            commands::working_pixels,
+            commands::resolved_inversion,
         ])
         .run(tauri::generate_context!())
         .expect("error while running OpenEnlarge");

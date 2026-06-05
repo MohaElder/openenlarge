@@ -703,6 +703,50 @@ pub fn save_app_state(
     catalog.save_app_state(&key, &value).map_err(|e| e.to_string())
 }
 
+use crate::gpu_upload::{pack_rgba16f, resolve_to_uniforms, ResolvedInversion, MAX_GPU_EDGE};
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct WorkingInfo {
+    /// Capped dimensions of the float texture working_pixels will return.
+    pub w: u32,
+    pub h: u32,
+}
+
+/// Dimensions of the GPU float texture for this image (after the MAX_GPU_EDGE cap).
+#[tauri::command]
+pub fn working_info(id: String, session: State<Session>) -> Result<WorkingInfo, String> {
+    ensure_resident(&session, &id)?;
+    let images = session.images.lock().unwrap();
+    let img = images.get(&id).ok_or("unknown image id")?;
+    let dev = img.developed.as_ref().ok_or("not developed")?;
+    let (w, h, _) = pack_rgba16f(&dev.working, MAX_GPU_EDGE);
+    Ok(WorkingInfo { w, h })
+}
+
+/// Raw half-float RGBA bytes of the linear working image (pre-inversion), for a
+/// one-shot WebGL2 RGBA16F upload. Returned as raw IPC bytes (no base64/JPEG).
+#[tauri::command]
+pub fn working_pixels(id: String, session: State<Session>) -> Result<tauri::ipc::Response, String> {
+    ensure_resident(&session, &id)?;
+    let images = session.images.lock().unwrap();
+    let img = images.get(&id).ok_or("unknown image id")?;
+    let dev = img.developed.as_ref().ok_or("not developed")?;
+    let (_, _, bytes) = pack_rgba16f(&dev.working, MAX_GPU_EDGE);
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
+/// Resolve inversion params (+ this image's sampled base) into GPU uniforms.
+#[tauri::command]
+pub fn resolved_inversion(
+    id: String, params: InvertParams, session: State<Session>,
+) -> Result<ResolvedInversion, String> {
+    ensure_resident(&session, &id)?;
+    let images = session.images.lock().unwrap();
+    let img = images.get(&id).ok_or("unknown image id")?;
+    let dev = img.developed.as_ref().ok_or("not developed")?;
+    Ok(resolve_to_uniforms(&params, dev.base))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
