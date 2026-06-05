@@ -164,6 +164,7 @@ pub fn develop_image(id: String, session: State<Session>) -> Result<ImageEntry, 
     };
     let full = decode_any(Path::new(&path))?;
     let working = proxy(&full, cap);
+    let has_ir = working.ir.is_some();
     let thumb = proxy(&full, AUTOWB_EDGE);
     let base = sample_base(&working, None);
     let (w, h) = (full.width as u32, full.height as u32);
@@ -189,6 +190,7 @@ pub fn develop_image(id: String, session: State<Session>) -> Result<ImageEntry, 
         thumbnail,
         metadata: img.metadata.clone(),
         developed: true,
+        has_ir,
     })
 }
 

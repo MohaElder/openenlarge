@@ -70,6 +70,7 @@ pub struct ImageEntry {
     pub thumbnail: String,
     pub metadata: Metadata,
     pub developed: bool,
+    pub has_ir: bool,
 }
 
 /// Decoded working data, present once an image is developed.
@@ -108,6 +109,7 @@ impl Session {
             thumbnail: img.thumbnail.clone(),
             metadata: img.metadata.clone(),
             developed: img.developed.is_some(),
+            has_ir: img.developed.as_ref().map(|d| d.working.ir.is_some()).unwrap_or(false),
         };
         self.images.lock().unwrap().insert(id, img);
         entry
@@ -146,5 +148,16 @@ mod tests {
         let e = s.insert(img);
         assert_eq!(e.id, "img0");
         assert!(!e.developed);
+    }
+
+    #[test]
+    fn insert_reports_has_ir_false_when_undeveloped() {
+        let s = Session::default();
+        let img = CachedImage {
+            path: "/x/a.tif".into(), file_name: "a.tif".into(),
+            metadata: Metadata::default(), thumbnail: "data:,".into(), developed: None,
+        };
+        let e = s.insert(img);
+        assert!(!e.has_ir);
     }
 }
