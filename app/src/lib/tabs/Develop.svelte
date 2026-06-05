@@ -12,53 +12,61 @@
   import CropView from "../crop/CropView.svelte";
   import CropPanel from "../crop/CropPanel.svelte";
   import type { Rect, CropRect } from "../crop/types";
-  import { default80, conform } from "../crop/cropMath";
+  import { default80, conform, constrainToRotated } from "../crop/cropMath";
   import { presetNormAspect } from "../crop/presets";
+  import { rotateRectCW, rotateRectCCW, flipRectH, flipRectV, orientDims } from "../crop/transforms";
 
   $: active = $images.find((i) => i.id === $activeId);
   $: origW = active?.metadata.width ?? 0;
   $: origH = active?.metadata.height ?? 0;
-  $: nativeRatio = origH > 0 ? origW / origH : 1;
 
-  $: committed = $activeCrop;
-  $: effW = committed ? Math.max(1, Math.round(committed.rect.w * origW)) : origW;
-  $: effH = committed ? Math.max(1, Math.round(committed.rect.h * origH)) : origH;
-  $: imageCrop = committed
-    ? [committed.rect.x, committed.rect.y, committed.rect.w, committed.rect.h] as [number, number, number, number]
-    : null;
-
+  // ---- Crop draft state (only while tool === "crop") ----
   let rect: Rect = { x: 0.1, y: 0.1, w: 0.8, h: 0.8 };
   let aspect = "original";
   let orientation: "landscape" | "portrait" = "landscape";
+  let rot90 = 0, flipH = false, flipV = false, angle = 0;
   let cropInit = false;
+
+  $: [oW, oH] = orientDims(origW, origH, rot90);
+  $: orientedRatio = oH > 0 ? oW / oH : 1;
 
   function startCrop() {
     const c = $activeCrop;
-    if (c) { rect = { ...c.rect }; aspect = c.aspect; orientation = c.orientation; }
-    else { rect = default80(); aspect = "original"; orientation = nativeRatio >= 1 ? "landscape" : "portrait"; }
+    if (c) {
+      rect = { ...c.rect }; aspect = c.aspect; orientation = c.orientation;
+      rot90 = c.rot90; flipH = c.flipH; flipV = c.flipV; angle = c.angle;
+    } else {
+      rect = default80(); aspect = "original"; orientation = origW >= origH ? "landscape" : "portrait";
+      rot90 = 0; flipH = false; flipV = false; angle = 0;
+    }
     cropInit = true;
   }
+  function draftCrop(): CropRect { return { rect, aspect, orientation, rot90: rot90 as 0 | 1 | 2 | 3, flipH, flipV, angle }; }
   function commitCrop() {
     const id = $activeId; if (!id || !cropInit) return;
-    const c: CropRect = { rect, aspect, orientation };
-    cropById.update((m) => ({ ...m, [id]: c }));
+    cropById.update((m) => ({ ...m, [id]: draftCrop() }));
   }
   function discardCrop() {
     const c = $activeCrop;
-    if (c) { rect = { ...c.rect }; aspect = c.aspect; orientation = c.orientation; }
-    else { rect = default80(); aspect = "original"; }
+    if (c) { rect = { ...c.rect }; aspect = c.aspect; orientation = c.orientation; rot90 = c.rot90; flipH = c.flipH; flipV = c.flipV; angle = c.angle; }
+    else { rect = default80(); aspect = "original"; rot90 = 0; flipH = false; flipV = false; angle = 0; }
   }
-  function onPreset(id: string) {
-    aspect = id;
-    rect = conform(rect, presetNormAspect(id, nativeRatio, orientation));
+  function onPreset(id: string) { aspect = id; rect = conform(rect, presetNormAspect(id, orientedRatio, orientation)); }
+  function onSwap() { orientation = orientation === "landscape" ? "portrait" : "landscape"; rect = conform(rect, presetNormAspect(aspect, orientedRatio, orientation)); }
+  function onReset() { rect = default80(); aspect = "original"; orientation = origW >= origH ? "landscape" : "portrait"; rot90 = 0; flipH = false; flipV = false; angle = 0; }
+  function onRotate(dir: number) {
+    if (dir > 0) { rot90 = (rot90 + 1) % 4; rect = rotateRectCW(rect); }
+    else { rot90 = (rot90 + 3) % 4; rect = rotateRectCCW(rect); }
   }
-  function onSwap() {
-    orientation = orientation === "landscape" ? "portrait" : "landscape";
-    rect = conform(rect, presetNormAspect(aspect, nativeRatio, orientation));
+  function onFlip(axis: "h" | "v") {
+    if (axis === "h") { flipH = !flipH; rect = flipRectH(rect); } else { flipV = !flipV; rect = flipRectV(rect); }
+    angle = -angle;
   }
-  function onReset() { rect = default80(); aspect = "original"; orientation = nativeRatio >= 1 ? "landscape" : "portrait"; }
+  function onStraighten(v: number) { angle = Math.max(-45, Math.min(45, v)); }
 
-  $: lockRatio = presetNormAspect(aspect, nativeRatio, orientation);
+  $: lockRatio = presetNormAspect(aspect, orientedRatio, orientation);
+  // Keep the crop inside the rotated image (constrainToRotated is idempotent → no loop).
+  $: if (angle !== 0) rect = constrainToRotated(rect, angle, oW, oH);
 
   let prevTool = $tool;
   $: {
@@ -67,12 +75,34 @@
     prevTool = $tool;
   }
 
+  function rotateCommitted(dir: number) {
+    const id = $activeId; if (!id) return;
+    const base: CropRect = $activeCrop ?? { rect: { x: 0, y: 0, w: 1, h: 1 }, aspect: "custom", orientation: origW >= origH ? "landscape" : "portrait", rot90: 0, flipH: false, flipV: false, angle: 0 };
+    const nr = dir > 0 ? rotateRectCW(base.rect) : rotateRectCCW(base.rect);
+    const nrot = ((base.rot90 + (dir > 0 ? 1 : 3)) % 4) as 0 | 1 | 2 | 3;
+    cropById.update((m) => ({ ...m, [id]: { ...base, rect: nr, rot90: nrot } }));
+  }
   function onKey(e: KeyboardEvent) {
+    const meta = e.metaKey || e.ctrlKey;
+    if (meta && (e.key === "]" || e.key === "[")) {
+      e.preventDefault();
+      const dir = e.key === "]" ? 1 : -1;
+      if ($tool === "crop") onRotate(dir); else rotateCommitted(dir);
+      return;
+    }
     if ($tool !== "crop") return;
     if (e.key === "Enter") { commitCrop(); tool.set("edit"); }
     else if (e.key === "Escape") { discardCrop(); }
     else if (e.key === "x" || e.key === "X") { onSwap(); }
   }
+
+  // Committed crop → effective dims + image_crop for the normal Viewport.
+  $: committed = $activeCrop;
+  $: cRot = committed?.rot90 ?? 0;
+  $: [coW, coH] = orientDims(origW, origH, cRot);
+  $: effW = committed ? Math.max(1, Math.round(committed.rect.w * coW)) : coW;
+  $: effH = committed ? Math.max(1, Math.round(committed.rect.h * coH)) : coH;
+  $: imageCrop = committed ? [committed.rect.x, committed.rect.y, committed.rect.w, committed.rect.h] as [number, number, number, number] : null;
 
   let thumbTimer: ReturnType<typeof setTimeout> | null = null;
   function refreshThumb() {
@@ -97,8 +127,13 @@
     const out = await save({ defaultPath: "redroom-export.tiff", filters: [{ name: "TIFF", extensions: ["tiff"] }] });
     if (!out) return;
     exporting = true; msg = "";
-    try { await api.exportImage($activeId, $params, out, imageCrop); msg = "Exported ✓"; }
-    catch (e) { msg = "Error: " + e; }
+    try {
+      await api.exportImage($activeId, $params, out, imageCrop, {
+        rot90: committed?.rot90 ?? 0, flip_h: committed?.flipH ?? false,
+        flip_v: committed?.flipV ?? false, angle: committed?.angle ?? 0,
+      });
+      msg = "Exported ✓";
+    } catch (e) { msg = "Error: " + e; }
     exporting = false;
   }
 </script>
@@ -109,10 +144,12 @@
   <section class="center">
     {#if active?.developed}
       {#if $tool === "crop"}
-        <CropView id={$activeId} params={$params} imgW={origW} imgH={origH}
-                  bind:rect {lockRatio} on:custom={() => (aspect = "custom")} />
+        <CropView id={$activeId} params={$params} imgW={oW} imgH={oH}
+                  bind:rect {lockRatio} {rot90} {flipH} {flipV} {angle}
+                  on:custom={() => (aspect = "custom")} on:straighten={(e) => onStraighten(e.detail)} />
       {:else}
-        <Viewport id={$activeId} params={$params} imgW={effW} imgH={effH} imageCrop={imageCrop} />
+        <Viewport id={$activeId} params={$params} imgW={effW} imgH={effH} imageCrop={imageCrop}
+                  rot90={cRot} flipH={committed?.flipH ?? false} flipV={committed?.flipV ?? false} angle={committed?.angle ?? 0} />
       {/if}
     {:else}<div class="hint">Not developed yet</div>{/if}
   </section>
@@ -124,8 +161,9 @@
       {#if $tool === "edit"}
         <Basic />
       {:else if $tool === "crop"}
-        <CropPanel bind:aspect bind:orientation
-                   on:preset={(e) => onPreset(e.detail)} on:swap={onSwap} on:reset={onReset} />
+        <CropPanel bind:aspect bind:orientation bind:angle
+                   on:preset={(e) => onPreset(e.detail)} on:swap={onSwap} on:reset={onReset}
+                   on:rotate={(e) => onRotate(e.detail)} on:flip={(e) => onFlip(e.detail)} />
       {/if}
       <button class="export" on:click={exportTiff} disabled={exporting || !$activeId}>
         {exporting ? "Exporting…" : "Export 16-bit TIFF"}
