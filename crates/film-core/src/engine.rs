@@ -132,7 +132,10 @@ pub fn params_for_stock(
     gamma: f32,
 ) -> InversionParams {
     let data = crate::spectral::load_stock(stock);
-    let m_post = crate::calibrate::fit_m_post(&data);
+    // Neutral-balance the fit so a neutral input maps to neutral (else the raw
+    // concentration-recovery matrix injects a per-channel cast — e.g. Portra reads
+    // magenta). Crosstalk correction is preserved; WB handles the residual.
+    let m_post = crate::calibrate::balance_neutral(crate::calibrate::fit_m_post(&data));
     InversionParams {
         base,
         m_pre: Matrix3::identity(),

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { get } from "svelte/store";
   import { t } from "$lib/i18n";
   import { params, activeId } from "../store";
   import { api, defaultParams } from "../api";
@@ -10,19 +11,23 @@
 
   let open = true;
 
-  // Seed Temp/Tint from the estimated as-shot white point when the image changes.
+  // Seed Temp/Tint from the estimated as-shot white point when the image OR the
+  // film profile changes. The estimate runs against the current stock/mode, so
+  // switching a profile re-balances to its colour space (prevents the cast that
+  // appears when a profile's M_post rotates colours under a stale white balance).
   let seededFor: string | null = null;
-  async function seed(id: string | null) {
-    if (!id || seededFor === id) return;
-    seededFor = id;
+  async function seed(id: string | null, stock: string) {
+    const key = id ? `${id}:${stock}` : null;
+    if (!key || seededFor === key) return;
+    seededFor = key;
     try {
-      const wb = await api.asShotWb(id);
+      const wb = await api.asShotWb(id!, get(params));
       params.update((p) => ({ ...p, temp: wb.temp, tint: wb.tint }));
     } catch { /* not developed yet */ }
   }
-  $: seed($activeId);
+  $: seed($activeId, $params.stock);
 
-  function autoWb() { seededFor = null; seed($activeId); }
+  function autoWb() { seededFor = null; seed($activeId, $params.stock); }
 
   // Reset every Basic-section control to its default, leaving all other develop
   // state (mode, base_rect, black/gamma, tone curve, color grading) untouched.
