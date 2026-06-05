@@ -4,8 +4,7 @@
   import { defaultParams, CM_BANDS, type PointColorSample } from "../api";
   import Icon from "../icons/Icon.svelte";
   import Slider from "./Slider.svelte";
-  import { signed } from "./gradients";
-  import { CM_HUE_GRADIENTS, CM_SAT_GRADIENTS, CM_LUM_GRADIENT } from "./gradients";
+  import { signed, CM_HUE_GRADIENTS, CM_SAT_GRADIENTS, CM_LUM_GRADIENT } from "./gradients";
   import { slide } from "svelte/transition";
   import { cubicInOut } from "svelte/easing";
 
@@ -66,9 +65,9 @@
     params.update((p) => {
       const arr = (p.pc_samples ?? []).slice();
       arr.splice(i, 1);
+      if (selected >= arr.length) selected = Math.max(0, arr.length - 1);
       return { ...p, pc_samples: arr };
     });
-    if (selected >= samples.length - 1) selected = Math.max(0, samples.length - 2);
   }
   // CSS color for a sample swatch (its sampled HSL).
   const swatch = (s: PointColorSample) => `hsl(${s.hue} ${Math.round(s.sat * 100)}% ${Math.round(s.lum * 100)}%)`;
@@ -134,15 +133,14 @@
           {:else}
             <div class="swatches">
               {#each samples as s, i}
-                <button class="sw" class:sel={i === selected} style="background:{swatch(s)}"
-                  on:click={() => (selected = i)} title={`${Math.round(s.hue)}°`}>
+                <div class="sw-wrap">
+                  <button class="sw" class:sel={i === selected} style="background:{swatch(s)}"
+                    on:click={() => (selected = i)} title={`${Math.round(s.hue)}°`} aria-label={`Sample ${i + 1}`}></button>
                   {#if i === selected}
-                    <span class="rm" role="button" tabindex="-1"
-                      on:click|stopPropagation={() => removeSample(i)}
-                      on:keydown|stopPropagation={() => removeSample(i)}
-                      title={$t('colorMixer.point.delete')}>×</span>
+                    <button class="rm" on:click={() => removeSample(i)}
+                      title={$t('colorMixer.point.delete')} aria-label={$t('colorMixer.point.delete')}>×</button>
                   {/if}
-                </button>
+                </div>
               {/each}
             </div>
 
@@ -194,10 +192,11 @@
   .dropper.on { color: var(--text); border-color: var(--accent); }
   .hint { color: var(--text-dim); font-size: 11px; margin: 10px 2px; }
   .swatches { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+  .sw-wrap { position: relative; width: 26px; height: 26px; }
   .sw { width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--glass-brd);
-    position: relative; cursor: pointer; padding: 0; }
+    cursor: pointer; padding: 0; display: block; }
   .sw.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
   .rm { position: absolute; top: -6px; right: -6px; width: 14px; height: 14px; line-height: 13px;
-    text-align: center; font-size: 11px; border-radius: 50%; background: #222; color: #fff;
-    border: 1px solid var(--glass-brd); }
+    text-align: center; font-size: 11px; border-radius: 50%; background: var(--bg-1, #222); color: var(--text, #fff);
+    border: 1px solid var(--glass-brd); cursor: pointer; padding: 0; }
 </style>
