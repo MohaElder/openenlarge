@@ -1,11 +1,12 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, createEventDispatcher } from "svelte";
   import { api, type InvertParams } from "../api";
   import { previewSrc } from "../store";
   import { FinishRenderer, webgl2Available } from "./gl/renderer";
   import { finishUniforms } from "./gl/uniforms";
   import SpinOverlay from "./SpinOverlay.svelte";
   import { spinGeometry } from "./spin";
+  import { screenRadius, type DustStroke } from "../develop/dust";
 
   export let id: string | null;
   export let params: InvertParams;
@@ -18,6 +19,15 @@
   export let flipH = false;
   export let flipV = false;
   export let angle = 0;
+  export let eraser = false;
+  /** Brush radius normalized to image width. */
+  export let brush = 0.03;
+  /** Committed strokes for this image (rendered by the backend). */
+  export let dust: DustStroke[] = [];
+  /** Bumped by the parent on any dust change to force a re-render. */
+  export let dustRev = 0;
+
+  const dispatch = createEventDispatcher<{ stroke: DustStroke; brush: number }>();
 
   const CAP = 5000;
   const PAD = 60;
@@ -108,7 +118,7 @@
     try {
       const data = await api.renderView(id, params, {
         crop: [0, 0, imgW, imgH], out_w, out_h, raw, finish: !(useGL && renderer),
-        image_crop: imageCrop, rot90, flip_h: flipH, flip_v: flipV, angle,
+        image_crop: imageCrop, rot90, flip_h: flipH, flip_v: flipV, angle, dust,
       });
       if (useGL && renderer) {
         const im = await loadImage(data);
@@ -138,7 +148,7 @@
 
   // Re-fetch the SOURCE only when the inversion / zoom / view changes. In Plan 2A
   // exposure/temp/tint are still baked by the backend, so they live in this key.
-  $: srcKey = `${id}|${raw}|${eff}|${vpW}|${vpH}|${params.mode}|${params.stock}|${params.exposure}|${params.temp}|${params.tint}|${imageCrop ? imageCrop.join(',') : 'full'}|${rot90}|${flipH}|${flipV}|${angle}`;
+  $: srcKey = `${id}|${raw}|${eff}|${vpW}|${vpH}|${params.mode}|${params.stock}|${params.exposure}|${params.temp}|${params.tint}|${imageCrop ? imageCrop.join(',') : 'full'}|${rot90}|${flipH}|${flipV}|${angle}|${dustRev}`;
   $: srcKey, imgW, imgH, scheduleIfReady();
 
   // Finishing-only change → GPU redraw, no backend fetch.
@@ -162,6 +172,13 @@
 
   function onWheel(e: WheelEvent) {
     if (!interactive) return;
+    // Eraser mode: the wheel resizes the brush; a trackpad PINCH (ctrlKey) still zooms.
+    if (eraser && !e.ctrlKey) {
+      e.preventDefault();
+      const next = Math.min(0.2, Math.max(0.005, brush * Math.exp(-e.deltaY * 0.0015)));
+      dispatch("brush", next);
+      return;
+    }
     stopAnim();
     e.preventDefault();
     const [ix, iy] = imgPoint(e);
@@ -172,15 +189,43 @@
   }
 
   let lastX = 0, lastY = 0, downX = 0, downY = 0, moved = false, panning = false;
+
+  // Eraser: live cursor position (element coords) + the in-progress stroke (normalized).
+  let curX = -100, curY = -100, hovering = false;
+  let painting = false;
+  let pending: { x: number; y: number }[] = [];
+  $: cursorR = screenRadius(brush, imgW, eff);
+
+  function normPoint(e: { clientX: number; clientY: number }): { x: number; y: number } {
+    const [ix, iy] = imgPoint(e);
+    return { x: ix / imgW, y: iy / imgH };
+  }
+  function onEraserMove(e: PointerEvent) {
+    const rect = el.getBoundingClientRect();
+    curX = e.clientX - rect.left;
+    curY = e.clientY - rect.top;
+    if (painting) pending = [...pending, normPoint(e)];
+  }
+  function onEnter() { if (eraser) hovering = true; }
+  function onLeave() { hovering = false; painting = false; pending = []; }
+
   function onDown(e: PointerEvent) {
     if (!interactive) return;
+    if (eraser) {
+      painting = true;
+      pending = [normPoint(e)];
+      (e.target as Element).setPointerCapture?.(e.pointerId);
+      return;
+    }
     stopAnim();
     downX = lastX = e.clientX; downY = lastY = e.clientY; moved = false;
     panning = zoomed;
     (e.target as Element).setPointerCapture?.(e.pointerId);
   }
   function onMove(e: PointerEvent) {
-    if (!interactive || !(e.buttons & 1)) return;
+    if (!interactive) return;
+    if (eraser) { onEraserMove(e); return; }
+    if (!(e.buttons & 1)) return;
     if (Math.abs(e.clientX - downX) > 3 || Math.abs(e.clientY - downY) > 3) moved = true;
     if (panning && moved) {
       cx -= (e.clientX - lastX) / eff;
@@ -190,6 +235,11 @@
     lastX = e.clientX; lastY = e.clientY;
   }
   function onUp(e: PointerEvent) {
+    if (eraser) {
+      if (painting && pending.length > 0) dispatch("stroke", { points: pending, r: brush });
+      painting = false; pending = [];
+      return;
+    }
     if (interactive && !moved) {
       const [ix, iy] = imgPoint(e);
       startAnim();
@@ -202,10 +252,11 @@
 </script>
 
 <div
-  class="vp" class:interactive class:zoomed
+  class="vp" class:interactive class:zoomed class:erasing={eraser}
   bind:this={el}
   on:wheel={onWheel}
   on:pointerdown={onDown} on:pointermove={onMove} on:pointerup={onUp} on:pointercancel={onCancel}
+  on:pointerenter={onEnter} on:pointerleave={onLeave}
 >
   {#if useGL}
     <canvas
@@ -220,6 +271,9 @@
     />
   {:else}<div class="hint">…</div>{/if}
   <SpinOverlay bind:this={spinOverlay} />
+  {#if eraser && hovering}
+    <div class="brush" style="left:{curX}px; top:{curY}px; width:{cursorR * 2}px; height:{cursorR * 2}px;"></div>
+  {/if}
   {#if id && interactive}<div class="zoom">{label}</div>{/if}
 </div>
 
@@ -237,4 +291,8 @@
   .hint { color: var(--text-dim); position: absolute; inset: 0; display: grid; place-items: center; }
   .zoom { position: absolute; bottom: 8px; right: 10px; font-size: 11px; color: var(--text-dim);
     background: rgba(0,0,0,0.45); padding: 2px 8px; border-radius: 6px; z-index: 2; }
+  .vp.erasing { cursor: none; }
+  .brush { position: absolute; border-radius: 50%; pointer-events: none; z-index: 3;
+    transform: translate(-50%, -50%); border: 1.5px solid rgba(255,255,255,0.9);
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(0,0,0,0.4); }
 </style>
