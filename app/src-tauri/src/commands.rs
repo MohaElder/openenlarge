@@ -111,6 +111,19 @@ fn view_stamps(
     out
 }
 
+/// Map normalized strokes → `Stamp`s on a full-res `w`×`h` image (no view crop).
+/// Mirrors `view_stamps` but for export: points normalize to image dims, radius to width.
+fn export_stamps(dust: &[DustStroke], w: usize, h: usize) -> Vec<Stamp> {
+    let mut out = Vec::new();
+    for stroke in dust {
+        let r = (stroke.r * w as f64).max(0.5) as f32;
+        for pt in &stroke.points {
+            out.push(Stamp { cx: (pt[0] * w as f64) as f32, cy: (pt[1] * h as f64) as f32, r });
+        }
+    }
+    out
+}
+
 fn finish_from(p: &InvertParams) -> FinishParams {
     FinishParams {
         contrast: p.contrast / 100.0,
@@ -282,6 +295,7 @@ pub fn export_image(
     id: String, params: InvertParams, out_path: String,
     image_crop: Option<[f64; 4]>,
     rot90: u8, flip_h: bool, flip_v: bool, angle: f32,
+    dust: Vec<DustStroke>,
     session: State<Session>,
 ) -> Result<(), String> {
     let (path, base, thumb) = {
@@ -301,7 +315,9 @@ pub fn export_image(
         None => full,
     };
     let ip = resolve_params(&params, &thumb, base);
-    let inv = invert_image(&full, &ip, mode_from(&params.mode));
+    let mut inv = invert_image(&full, &ip, mode_from(&params.mode));
+    let stamps = export_stamps(&dust, inv.width, inv.height);
+    dust::apply(&mut inv, &stamps);
     let fin = finish_image(&inv, &finish_from(&params));
     film_core::export::write_tiff16(&fin, Path::new(&out_path)).map_err(|e| format!("{e}"))
 }
@@ -384,5 +400,15 @@ mod tests {
         assert!((s[0].cy - 100.0).abs() < 0.5, "y: 0.5*100*2 = 100");
         // r normalized to base width: 0.01*200 = 2 base px → *2 scale = 4 out px.
         assert!((s[0].r - 4.0).abs() < 0.5, "r mapped to output px, got {}", s[0].r);
+    }
+
+    #[test]
+    fn export_stamps_maps_normalized_points_to_full_res_pixels() {
+        let dust = vec![DustStroke { points: vec![[0.25, 0.5]], r: 0.01 }];
+        let s = export_stamps(&dust, 400, 200);
+        assert_eq!(s.len(), 1);
+        assert!((s[0].cx - 100.0).abs() < 0.5, "0.25*400");
+        assert!((s[0].cy - 100.0).abs() < 0.5, "0.5*200");
+        assert!((s[0].r - 4.0).abs() < 0.5, "0.01*400");
     }
 }
