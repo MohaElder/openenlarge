@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OpenEnlarge — develop your film negatives with real physics</title>
+<meta name="description" content="Open-source desktop darkroom for color film negatives. A physically-based, density-domain inverter — not a flipped tone curve.">
+<link rel="icon" href="https://raw.githubusercontent.com/mohaelder/openenlarge/main/app/src-tauri/icons/32x32.png">
+<style>
+  :root{
+    --bg-0:#0a0a0c; --bg-1:#141418;
+    --glass-bg:rgba(28,28,34,.55); --glass-brd:rgba(255,255,255,.08); --glass-hi:rgba(255,255,255,.04);
+    --text:#e8e8ea; --text-dim:#9a9aa2; --text-faint:#5f5f68;
+    --accent:#f49d4e; --accent-dim:#df7136; --accent-grad:linear-gradient(90deg,#f49d4e,#df7136);
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;scroll-behavior:smooth;}
+  body{
+    background:var(--bg-0); color:var(--text);
+    font:15px/1.5 -apple-system,system-ui,sans-serif; -webkit-font-smoothing:antialiased;
+    background-image:
+      radial-gradient(80% 55% at 78% -5%, rgba(244,157,78,.16) 0%, transparent 55%),
+      radial-gradient(60% 50% at 8% 8%, rgba(223,113,54,.10) 0%, transparent 50%);
+    background-attachment:fixed;
+  }
+  a{color:inherit;}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 28px;}
+  .glass{background:var(--glass-bg);border:1px solid var(--glass-brd);border-radius:var(--radius);
+    backdrop-filter:blur(22px) saturate(140%);-webkit-backdrop-filter:blur(22px) saturate(140%);
+    box-shadow:inset 0 1px 0 var(--glass-hi),0 8px 30px rgba(0,0,0,.35);}
+
+  nav{position:sticky;top:14px;z-index:10;margin-top:14px;}
+  .navbar{display:flex;align-items:center;gap:14px;padding:10px 16px;}
+  .brand{display:flex;align-items:center;gap:9px;font-weight:600;letter-spacing:-.01em;text-decoration:none;}
+  .brand img{width:26px;height:26px;border-radius:7px;}
+  .navlinks{margin-left:auto;display:flex;gap:22px;color:var(--text-dim);font-size:13.5px;}
+  .navlinks a{text-decoration:none;}
+  .navlinks a:hover{color:var(--text);}
+  .nav-cta{margin-left:6px;padding:7px 14px;border-radius:9px;background:var(--accent-grad);color:#1a1206;font-weight:700;font-size:13px;text-decoration:none;}
+
+  .hero{display:grid;grid-template-columns:1.05fr .95fr;gap:30px;align-items:center;padding:74px 0 40px;}
+  .eyebrow{display:inline-flex;align-items:center;gap:8px;font:600 11.5px/1 ui-monospace,monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);padding:6px 11px;border:1px solid var(--glass-brd);border-radius:999px;background:rgba(244,157,78,.06);}
+  h1{font-size:50px;line-height:1.03;letter-spacing:-.025em;margin:20px 0 16px;font-weight:680;}
+  h1 .grad{background:var(--accent-grad);-webkit-background-clip:text;background-clip:text;color:transparent;}
+  .lede{color:var(--text-dim);font-size:17px;max-width:30em;margin:0 0 26px;}
+  .cta-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  .btn-primary{display:inline-flex;align-items:center;gap:9px;padding:12px 20px;border-radius:11px;background:var(--accent-grad);color:#1a1206;font-weight:700;font-size:14.5px;text-decoration:none;box-shadow:0 6px 24px rgba(244,157,78,.28);}
+  .btn-ghost{display:inline-flex;align-items:center;gap:8px;padding:12px 18px;border-radius:11px;color:var(--text);font-weight:600;font-size:14px;text-decoration:none;}
+  .meta{margin-top:14px;color:var(--text-faint);font-size:12.5px;}
+
+  .card{position:relative;padding:20px;border-radius:18px;
+    background:var(--glass-bg);border:1px solid var(--glass-brd);
+    backdrop-filter:blur(22px) saturate(140%);-webkit-backdrop-filter:blur(22px) saturate(140%);
+    box-shadow:inset 0 1px 0 var(--glass-hi),0 18px 60px rgba(0,0,0,.5);}
+  .card .label{font:600 10.5px/1 ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--text-faint);display:flex;justify-content:space-between;margin-bottom:12px;}
+  .graph{position:relative;height:200px;border-radius:12px;background:linear-gradient(180deg,#0d0d11,#08080a);border:1px solid rgba(255,255,255,.05);overflow:hidden;}
+  .graph .grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);background-size:25px 25px;}
+  .eq{margin-top:14px;padding:11px 13px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid var(--glass-brd);font:13px/1 ui-monospace,monospace;color:var(--accent);display:flex;justify-content:space-between;align-items:center;}
+  .eq span:last-child{color:var(--text-faint);font-size:11px;}
+
+  section.block{padding:46px 0;}
+  .kicker{font:600 11.5px/1 ui-monospace,monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);}
+  h2{font-size:30px;letter-spacing:-.02em;margin:12px 0 26px;}
+  .features{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  .feature{padding:20px;}
+  .feature h3{margin:0 0 8px;font-size:16px;}
+  .feature p{margin:0;color:var(--text-dim);font-size:13.5px;}
+  .feature .ic{font-size:22px;margin-bottom:10px;}
+
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  .step{padding:20px;}
+  .step .n{font:700 13px/1 ui-monospace,monospace;color:var(--accent);}
+  .step h3{margin:10px 0 8px;font-size:16px;}
+  .step p{margin:0;color:var(--text-dim);font-size:13.5px;}
+
+  .shots{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .shot{border-radius:14px;overflow:hidden;border:1px solid var(--glass-brd);aspect-ratio:16/10;background:linear-gradient(180deg,#161620,#0c0c10);display:grid;place-items:center;color:var(--text-faint);font-size:13px;}
+  .shot img{width:100%;height:100%;object-fit:cover;display:block;}
+
+  .download{text-align:center;padding:60px 0;}
+  .download .card-dl{display:inline-block;padding:34px 40px;}
+  .os-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:18px;}
+  .os-link{padding:9px 16px;border-radius:10px;border:1px solid var(--glass-brd);background:rgba(255,255,255,.03);text-decoration:none;font-size:13.5px;color:var(--text-dim);}
+  .os-link:hover{color:var(--text);}
+
+  footer{border-top:1px solid var(--glass-brd);margin-top:40px;padding:26px 0;color:var(--text-faint);font-size:13px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+  footer a{text-decoration:none;color:var(--text-dim);}
+
+  @media(max-width:820px){
+    .hero{grid-template-columns:1fr;}
+    .features,.steps{grid-template-columns:1fr;}
+    h1{font-size:38px;}
+    .navlinks{display:none;}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <nav><div class="navbar glass">
+    <a class="brand" href="#top">
+      <img src="https://raw.githubusercontent.com/mohaelder/openenlarge/main/app/src-tauri/icons/128x128.png" alt="">
+      OpenEnlarge
+    </a>
+    <div class="navlinks">
+      <a href="#features">Features</a><a href="#how">How it works</a><a href="#download">Download</a>
+      <a href="https://github.com/mohaelder/openenlarge">GitHub</a>
+    </div>
+    <a class="nav-cta" id="nav-download" href="https://github.com/mohaelder/openenlarge/releases/latest">Download</a>
+  </div></nav>
+
+  <section class="hero" id="top">
+    <div>
+      <span class="eyebrow">◆ Open source · density-domain</span>
+      <h1>The physics of film,<br><span class="grad">inverted properly.</span></h1>
+      <p class="lede">OpenEnlarge develops your color negatives with a real Beer-Lambert density model — not a flipped tone curve. A darkroom enlarger, reimagined as a desktop app.</p>
+      <div class="cta-row">
+        <a class="btn-primary" id="hero-download" href="https://github.com/mohaelder/openenlarge/releases/latest">↓ Download</a>
+        <a class="btn-ghost glass" href="https://github.com/mohaelder/openenlarge">★ Star on GitHub</a>
+      </div>
+      <div class="meta" id="release-meta">Free · MIT licensed · macOS, Windows &amp; Linux</div>
+    </div>
+
+    <div class="card">
+      <div class="label"><span>Density inversion</span><span>film-core</span></div>
+      <div class="graph">
+        <div class="grid"></div>
+        <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <path d="M3,94 C28,90 42,58 56,34 S86,10 97,5" fill="none" stroke="#f49d4e" stroke-width="2.2" vector-effect="non-scaling-stroke"/>
+          <path d="M3,96 C30,93 45,64 58,40 S88,16 97,9" fill="none" stroke="#df7136" stroke-width="1.6" opacity=".8" vector-effect="non-scaling-stroke"/>
+          <path d="M3,92 C26,87 40,52 54,30 S84,8 97,3" fill="none" stroke="#5fb0e8" stroke-width="1.4" opacity=".55" vector-effect="non-scaling-stroke"/>
+        </svg>
+      </div>
+      <div class="eq"><span>Ĉ = M_post · log₁₀(M_pre · I₀ / I)</span><span>Beer-Lambert</span></div>
+    </div>
+  </section>
+
+  <section class="block" id="features">
+    <div class="kicker">Features</div>
+    <h2>A real darkroom, on your desktop.</h2>
+    <div class="features">
+      <div class="feature glass"><div class="ic">🎞️</div><h3>Density-domain inversion</h3><p>Physically-based Beer-Lambert engine recovers dye concentrations with a cross-channel matrix — not a flipped curve.</p></div>
+      <div class="feature glass"><div class="ic">📥</div><h3>RAW &amp; TIFF decode</h3><p>Fuji RAF, DNG and 16-bit TIFF scans decoded to linear RGB, infrared plane preserved.</p></div>
+      <div class="feature glass"><div class="ic">🧪</div><h3>Per-roll base calibration</h3><p>Sample the orange film base once per roll and apply it across every frame.</p></div>
+      <div class="feature glass"><div class="ic">🎚️</div><h3>Full develop controls</h3><p>Tonal curves, color grading, color wheels, exposure, black point and gamma — live.</p></div>
+      <div class="feature glass"><div class="ic">✂️</div><h3>Crop, rotate &amp; export</h3><p>Straighten and crop with a live histogram, then batch export to 16-bit TIFF, PNG or JPEG.</p></div>
+      <div class="feature glass"><div class="ic">⌨️</div><h3>Headless CLI</h3><p><code>film-cli</code> runs the same engine for scripting and B-vs-C comparison.</p></div>
+    </div>
+  </section>
+
+  <section class="block" id="how">
+    <div class="kicker">How it works</div>
+    <h2>Density first, aesthetics second.</h2>
+    <div class="steps">
+      <div class="step glass"><div class="n">01</div><h3>Decode</h3><p>Your RAF/DNG/TIFF scan is decoded to linear RGB — the light the scanner actually measured through the film.</p></div>
+      <div class="step glass"><div class="n">02</div><h3>Invert in density</h3><p>Take the log to enter the density domain, then unmix dye layers with a matrix. Density is linear in dye; transmittance isn't — so this is where naive flips go wrong.</p></div>
+      <div class="step glass"><div class="n">03</div><h3>Develop</h3><p>Apply creative finishing — curves, color, exposure — on a faithful base. Export, or batch the whole roll.</p></div>
+    </div>
+  </section>
+
+  <section class="block">
+    <div class="kicker">Screenshots</div>
+    <h2>See it in action.</h2>
+    <div class="shots">
+      <!-- TODO: replace placeholders once screenshots exist in web/img/ -->
+      <div class="shot"><img src="img/library.png" alt="OpenEnlarge library view" onerror="this.replaceWith(document.createTextNode('library.png'))"></div>
+      <div class="shot"><img src="img/develop.png" alt="OpenEnlarge develop view" onerror="this.replaceWith(document.createTextNode('develop.png'))"></div>
+    </div>
+  </section>
+
+  <section class="download" id="download">
+    <div class="card-dl glass card">
+      <div class="kicker">Download</div>
+      <h2 style="margin-bottom:6px">Get OpenEnlarge</h2>
+      <p class="lede" style="margin:0 auto 4px;text-align:center">Free and open source. macOS, Windows &amp; Linux.</p>
+      <div class="cta-row" style="justify-content:center;margin-top:18px">
+        <a class="btn-primary" id="dl-download" href="https://github.com/mohaelder/openenlarge/releases/latest">↓ Download</a>
+      </div>
+      <div class="os-row" id="os-row">
+        <a class="os-link" href="https://github.com/mohaelder/openenlarge/releases/latest">macOS</a>
+        <a class="os-link" href="https://github.com/mohaelder/openenlarge/releases/latest">Windows</a>
+        <a class="os-link" href="https://github.com/mohaelder/openenlarge/releases/latest">Linux</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <span>© 2026 OpenEnlarge · <a href="https://github.com/mohaelder/openenlarge/blob/main/LICENSE">MIT</a></span>
+    <span><a href="https://github.com/mohaelder/openenlarge">GitHub</a> · <a href="https://github.com/mohaelder/openenlarge/releases/latest">Releases</a></span>
+  </footer>
+</div>
+
+<script src="releases.js"></script>
+</body>
+</html>
