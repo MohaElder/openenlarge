@@ -2,7 +2,7 @@
 
 use crate::convert::{crop, orient, orient_dims, proxy, resize_to, rotate};
 use crate::encode::{to_jpeg_b64, to_png_b64, write_jpeg, write_png, write_tiff8};
-use crate::gpu_upload::{capped_dims, pack_rgba16f, resolve_to_uniforms, ResolvedInversion, MAX_GPU_EDGE};
+use crate::gpu_upload::{bake_working, capped_dims, pack_rgba16f, resolve_to_uniforms, BakeSpec, ResolvedInversion, MAX_GPU_EDGE};
 use crate::metadata::extract;
 use crate::session::{CachedImage, Developed, ImageEntry, InvertParams, Quality, Session};
 use film_core::calibrate::{auto_wb_gains, sample_base};
@@ -733,6 +733,32 @@ pub fn working_pixels(id: String, session: State<Session>) -> Result<tauri::ipc:
     let img = images.get(&id).ok_or("unknown image id")?;
     let dev = img.developed.as_ref().ok_or("not developed")?;
     let (_, _, bytes) = pack_rgba16f(&dev.working, MAX_GPU_EDGE);
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
+/// Capped dims of the BAKED (geometry + heal) working texture.
+#[tauri::command]
+pub fn working_baked_info(id: String, spec: BakeSpec, session: State<Session>) -> Result<WorkingInfo, String> {
+    ensure_resident(&session, &id)?;
+    let images = session.images.lock().unwrap();
+    let img = images.get(&id).ok_or("unknown image id")?;
+    let dev = img.developed.as_ref().ok_or("not developed")?;
+    let baked = bake_working(&dev.working, &spec);
+    let (w, h) = capped_dims(&baked, MAX_GPU_EDGE);
+    Ok(WorkingInfo { w, h })
+}
+
+/// Half-float RGBA bytes of the BAKED working buffer (geometry applied, dust/IR
+/// healed pre-invert), for a one-shot RGBA16F upload. GPU then inverts with
+/// IDENTITY geometry.
+#[tauri::command]
+pub fn working_baked_pixels(id: String, spec: BakeSpec, session: State<Session>) -> Result<tauri::ipc::Response, String> {
+    ensure_resident(&session, &id)?;
+    let images = session.images.lock().unwrap();
+    let img = images.get(&id).ok_or("unknown image id")?;
+    let dev = img.developed.as_ref().ok_or("not developed")?;
+    let baked = bake_working(&dev.working, &spec);
+    let (_, _, bytes) = pack_rgba16f(&baked, MAX_GPU_EDGE);
     Ok(tauri::ipc::Response::new(bytes))
 }
 

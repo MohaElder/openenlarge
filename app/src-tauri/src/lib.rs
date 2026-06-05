@@ -64,6 +64,8 @@ pub fn run() {
             commands::save_app_state,
             commands::working_info,
             commands::working_pixels,
+            commands::working_baked_info,
+            commands::working_baked_pixels,
             commands::resolved_inversion,
         ])
         .run(tauri::generate_context!())
