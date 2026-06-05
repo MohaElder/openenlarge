@@ -1,5 +1,5 @@
 import { get } from "svelte/store";
-import { api, type InvertParams, type CatalogSnapshot, type ImageEntry } from "./api";
+import { api, defaultParams, type InvertParams, type CatalogSnapshot, type ImageEntry } from "./api";
 import type { CropRect } from "./crop/types";
 import type { DustEdits } from "./develop/dust";
 import {
@@ -43,7 +43,9 @@ export function applySnapshot(snap: CatalogSnapshot): void {
   const cropMap: Record<string, CropRect | null> = {};
   const dustMap: Record<string, DustEdits> = {};
   for (const e of snap.edits) {
-    if (e.params) editsMap[e.image_id] = e.params;
+    // Backfill any fields absent from older stored blobs (e.g. tone curve /
+    // color grading added later) so the frontend always has a complete schema.
+    if (e.params) editsMap[e.image_id] = { ...defaultParams(), ...e.params };
     if (e.crop !== undefined) cropMap[e.image_id] = e.crop;
     if (e.dust) dustMap[e.image_id] = e.dust;
   }

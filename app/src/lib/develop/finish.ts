@@ -5,7 +5,14 @@
 // finish.rs so the live preview matches thumbnails/export.
 
 import { curveLut, sampleLut, LUT_SIZE } from "./curve";
-import type { InvertParams } from "../api";
+import { IDENTITY_CURVE, type CurvePoint, type InvertParams } from "../api";
+
+/** Fall back to the identity curve if a stored curve is missing/degenerate. */
+const safeCurve = (c: CurvePoint[] | undefined | null): CurvePoint[] =>
+  Array.isArray(c) && c.length >= 2 ? c : IDENTITY_CURVE;
+
+/** Coerce a possibly-missing numeric field to a finite number (default 0). */
+const num = (v: number | undefined | null): number => (typeof v === "number" && isFinite(v) ? v : 0);
 
 // --- Tone Curve region constants (mirror finish.rs). ---
 const REGION_GAIN = 0.25;
@@ -33,11 +40,11 @@ function parametric(v: number, regions: number[]): number {
 
 /** Build the composed tone LUT as a 256×1 RGBA8 byte array (R=lut_r, etc.). */
 export function toneLutBytes(p: InvertParams): Uint8Array {
-  const regions = [p.tc_shadows / 100, p.tc_darks / 100, p.tc_lights / 100, p.tc_highlights / 100];
-  const m = curveLut(p.tc_curve);
-  const r = curveLut(p.tc_red);
-  const g = curveLut(p.tc_green);
-  const b = curveLut(p.tc_blue);
+  const regions = [num(p.tc_shadows) / 100, num(p.tc_darks) / 100, num(p.tc_lights) / 100, num(p.tc_highlights) / 100];
+  const m = curveLut(safeCurve(p.tc_curve));
+  const r = curveLut(safeCurve(p.tc_red));
+  const g = curveLut(safeCurve(p.tc_green));
+  const b = curveLut(safeCurve(p.tc_blue));
   const out = new Uint8Array(LUT_SIZE * 4);
   for (let i = 0; i < LUT_SIZE; i++) {
     const x = i / (LUT_SIZE - 1);
@@ -82,15 +89,15 @@ export interface ColorGradeUniforms {
 }
 
 export function colorGrade(p: InvertParams): ColorGradeUniforms {
-  const lum = (v: number) => (v / 100) * CG_LUM_GAIN;
-  const balance = p.cg_balance / 100;
+  const lum = (v: number) => (num(v) / 100) * CG_LUM_GAIN;
+  const balance = num(p.cg_balance) / 100;
   return {
-    sh_off: wheelOffset(p.cg_sh_hue, p.cg_sh_sat / 100), sh_lum: lum(p.cg_sh_lum),
-    mid_off: wheelOffset(p.cg_mid_hue, p.cg_mid_sat / 100), mid_lum: lum(p.cg_mid_lum),
-    hi_off: wheelOffset(p.cg_hi_hue, p.cg_hi_sat / 100), hi_lum: lum(p.cg_hi_lum),
-    glob_off: wheelOffset(p.cg_glob_hue, p.cg_glob_sat / 100), glob_lum: lum(p.cg_glob_lum),
+    sh_off: wheelOffset(num(p.cg_sh_hue), num(p.cg_sh_sat) / 100), sh_lum: lum(p.cg_sh_lum),
+    mid_off: wheelOffset(num(p.cg_mid_hue), num(p.cg_mid_sat) / 100), mid_lum: lum(p.cg_mid_lum),
+    hi_off: wheelOffset(num(p.cg_hi_hue), num(p.cg_hi_sat) / 100), hi_lum: lum(p.cg_hi_lum),
+    glob_off: wheelOffset(num(p.cg_glob_hue), num(p.cg_glob_sat) / 100), glob_lum: lum(p.cg_glob_lum),
     sh_edge: 0.33 + balance * 0.25,
     hi_edge: 0.66 + balance * 0.25,
-    softness: 0.1 + 0.3 * (p.cg_blending / 100),
+    softness: 0.1 + 0.3 * (num(p.cg_blending) / 100),
   };
 }

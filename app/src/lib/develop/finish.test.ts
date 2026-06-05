@@ -22,6 +22,17 @@ describe("toneLutBytes", () => {
     expect(Math.abs(mid - 128)).toBeLessThan(8);
   });
 
+  it("tolerates params missing the curve fields (old stored blob)", () => {
+    // Simulate an edits blob saved before tone-curve fields existed.
+    const stale = { ...defaultParams() } as Record<string, unknown>;
+    delete stale.tc_curve; delete stale.tc_red; delete stale.tc_green; delete stale.tc_blue;
+    delete stale.tc_shadows;
+    const lut = toneLutBytes(stale as unknown as InvertParams);
+    expect(lut.length).toBe(256 * 4);
+    expect(lut[0]).toBe(0);
+    expect(lut[255 * 4]).toBe(255); // identity ramp, not all-zero (black)
+  });
+
   it("a red point curve only moves the red channel", () => {
     const lut = toneLutBytes(P({ tc_red: [[0, 0], [0.5, 0.7], [1, 1]] }));
     const i = 128 * 4;
