@@ -19,7 +19,7 @@
   html,body{margin:0;scroll-behavior:smooth;}
   body{
     background:var(--bg-0); color:var(--text);
-    font:15px/1.5 -apple-system,system-ui,sans-serif; -webkit-font-smoothing:antialiased;
+    font:15px/1.5 -apple-system,system-ui,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif; -webkit-font-smoothing:antialiased;
     background-image:
       radial-gradient(80% 55% at 78% -5%, rgba(244,157,78,.16) 0%, transparent 55%),
       radial-gradient(60% 50% at 8% 8%, rgba(223,113,54,.10) 0%, transparent 50%);
@@ -38,7 +38,9 @@
   .navlinks{margin-left:auto;display:flex;gap:22px;color:var(--text-dim);font-size:13.5px;}
   .navlinks a{text-decoration:none;}
   .navlinks a:hover{color:var(--text);}
-  .nav-cta{margin-left:6px;padding:7px 14px;border-radius:9px;background:var(--accent-grad);color:#1a1206;font-weight:700;font-size:13px;text-decoration:none;}
+  .lang-toggle{background:rgba(255,255,255,.04);border:1px solid var(--glass-brd);color:var(--text-dim);font:inherit;font-size:12.5px;line-height:1;padding:7px 11px;border-radius:9px;cursor:pointer;}
+  .lang-toggle:hover{color:var(--text);}
+  .nav-cta{padding:7px 14px;border-radius:9px;background:var(--accent-grad);color:#1a1206;font-weight:700;font-size:13px;text-decoration:none;}
 
   .hero{display:grid;grid-template-columns:1.05fr .95fr;gap:30px;align-items:center;padding:74px 0 40px;}
   .eyebrow{display:inline-flex;align-items:center;gap:8px;font:600 11.5px/1 ui-monospace,monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);padding:6px 11px;border:1px solid var(--glass-brd);border-radius:999px;background:rgba(244,157,78,.06);}
@@ -105,26 +107,27 @@
       OpenEnlarge
     </a>
     <div class="navlinks">
-      <a href="#features">Features</a><a href="#how">How it works</a><a href="#download">Download</a>
+      <a href="#features" data-i18n="nav.features">Features</a><a href="#how" data-i18n="nav.how">How it works</a><a href="#download" data-i18n="nav.download">Download</a>
       <a href="https://github.com/mohaelder/openenlarge">GitHub</a>
     </div>
-    <a class="nav-cta" id="nav-download" href="https://github.com/mohaelder/openenlarge/releases/latest">Download</a>
+    <button class="lang-toggle" id="lang-toggle" type="button" aria-label="Switch language / 切换语言">中文</button>
+    <a class="nav-cta" id="nav-download" href="https://github.com/mohaelder/openenlarge/releases/latest" data-i18n="nav.cta">Download</a>
   </div></nav>
 
   <section class="hero" id="top">
     <div>
-      <span class="eyebrow">◆ Open source · density-domain</span>
-      <h1>The physics of film,<br><span class="grad">inverted properly.</span></h1>
-      <p class="lede">OpenEnlarge develops your color negatives with a real Beer-Lambert density model — not a flipped tone curve. A darkroom enlarger, reimagined as a desktop app.</p>
+      <span class="eyebrow" data-i18n="hero.eyebrow">◆ Open source · density-domain</span>
+      <h1 data-i18n-html="hero.h1">The physics of film,<br><span class="grad">inverted properly.</span></h1>
+      <p class="lede" data-i18n="hero.lede">OpenEnlarge develops your color negatives with a real Beer-Lambert density model — not a flipped tone curve. A darkroom enlarger, reimagined as a desktop app.</p>
       <div class="cta-row">
-        <a class="btn-primary" id="hero-download" href="https://github.com/mohaelder/openenlarge/releases/latest">↓ Download</a>
-        <a class="btn-ghost glass" href="https://github.com/mohaelder/openenlarge">★ Star on GitHub</a>
+        <a class="btn-primary" id="hero-download" href="https://github.com/mohaelder/openenlarge/releases/latest" data-i18n="hero.dl">↓ Download</a>
+        <a class="btn-ghost glass" href="https://github.com/mohaelder/openenlarge" data-i18n="hero.star">★ Star on GitHub</a>
       </div>
-      <div class="meta" id="release-meta">Free · MIT licensed · macOS, Windows &amp; Linux</div>
+      <div class="meta" id="release-meta" data-i18n="hero.metaLine">Free · MIT licensed · macOS, Windows &amp; Linux</div>
     </div>
 
     <div class="card">
-      <div class="label"><span>Density inversion</span><span>film-core</span></div>
+      <div class="label"><span data-i18n="card.label">Density inversion</span><span>film-core</span></div>
       <div class="graph">
         <div class="grid"></div>
         <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -138,31 +141,31 @@
   </section>
 
   <section class="block" id="features">
-    <div class="kicker">Features</div>
-    <h2>A real darkroom, on your desktop.</h2>
+    <div class="kicker" data-i18n="features.kicker">Features</div>
+    <h2 data-i18n="features.h2">A real darkroom, on your desktop.</h2>
     <div class="features">
-      <div class="feature glass"><div class="ic">🎞️</div><h3>Density-domain inversion</h3><p>Physically-based Beer-Lambert engine recovers dye concentrations with a cross-channel matrix — not a flipped curve.</p></div>
-      <div class="feature glass"><div class="ic">📥</div><h3>RAW &amp; TIFF decode</h3><p>Fuji RAF, DNG and 16-bit TIFF scans decoded to linear RGB, infrared plane preserved.</p></div>
-      <div class="feature glass"><div class="ic">🧪</div><h3>Per-roll base calibration</h3><p>Sample the orange film base once per roll and apply it across every frame.</p></div>
-      <div class="feature glass"><div class="ic">🎚️</div><h3>Full develop controls</h3><p>Tonal curves, color grading, color wheels, exposure, black point and gamma — live.</p></div>
-      <div class="feature glass"><div class="ic">✂️</div><h3>Crop, rotate &amp; export</h3><p>Straighten and crop with a live histogram, then batch export to 16-bit TIFF, PNG or JPEG.</p></div>
-      <div class="feature glass"><div class="ic">⌨️</div><h3>Headless CLI</h3><p><code>film-cli</code> runs the same density engine for scripting and batch inversion.</p></div>
+      <div class="feature glass"><div class="ic">🎞️</div><h3 data-i18n="feat.density.h3">Density-domain inversion</h3><p data-i18n="feat.density.p">Physically-based Beer-Lambert engine recovers dye concentrations with a cross-channel matrix — not a flipped curve.</p></div>
+      <div class="feature glass"><div class="ic">📥</div><h3 data-i18n="feat.decode.h3">RAW &amp; TIFF decode</h3><p data-i18n="feat.decode.p">Fuji RAF, DNG and 16-bit TIFF scans decoded to linear RGB, infrared plane preserved.</p></div>
+      <div class="feature glass"><div class="ic">🧪</div><h3 data-i18n="feat.base.h3">Per-roll base calibration</h3><p data-i18n="feat.base.p">Sample the orange film base once per roll and apply it across every frame.</p></div>
+      <div class="feature glass"><div class="ic">🎚️</div><h3 data-i18n="feat.develop.h3">Full develop controls</h3><p data-i18n="feat.develop.p">Tonal curves, color grading, color wheels, exposure, black point and gamma — live.</p></div>
+      <div class="feature glass"><div class="ic">✂️</div><h3 data-i18n="feat.crop.h3">Crop, rotate &amp; export</h3><p data-i18n="feat.crop.p">Straighten and crop with a live histogram, then batch export to 16-bit TIFF, PNG or JPEG.</p></div>
+      <div class="feature glass"><div class="ic">⌨️</div><h3 data-i18n="feat.cli.h3">Headless CLI</h3><p data-i18n-html="feat.cli.p"><code>film-cli</code> runs the same density engine for scripting and batch inversion.</p></div>
     </div>
   </section>
 
   <section class="block" id="how">
-    <div class="kicker">How it works</div>
-    <h2>Density first, aesthetics second.</h2>
+    <div class="kicker" data-i18n="how.kicker">How it works</div>
+    <h2 data-i18n="how.h2">Density first, aesthetics second.</h2>
     <div class="steps">
-      <div class="step glass"><div class="n">01</div><h3>Decode</h3><p>Your RAF/DNG/TIFF scan is decoded to linear RGB — the light the scanner actually measured through the film.</p></div>
-      <div class="step glass"><div class="n">02</div><h3>Invert in density</h3><p>Take the log to enter the density domain, then unmix dye layers with a matrix. Density is linear in dye; transmittance isn't — so this is where naive flips go wrong.</p></div>
-      <div class="step glass"><div class="n">03</div><h3>Develop</h3><p>Apply creative finishing — curves, color, exposure — on a faithful base. Export, or batch the whole roll.</p></div>
+      <div class="step glass"><div class="n">01</div><h3 data-i18n="step1.h3">Decode</h3><p data-i18n="step1.p">Your RAF/DNG/TIFF scan is decoded to linear RGB — the light the scanner actually measured through the film.</p></div>
+      <div class="step glass"><div class="n">02</div><h3 data-i18n="step2.h3">Invert in density</h3><p data-i18n="step2.p">Take the log to enter the density domain, then unmix dye layers with a matrix. Density is linear in dye; transmittance isn't — so this is where naive flips go wrong.</p></div>
+      <div class="step glass"><div class="n">03</div><h3 data-i18n="step3.h3">Develop</h3><p data-i18n="step3.p">Apply creative finishing — curves, color, exposure — on a faithful base. Export, or batch the whole roll.</p></div>
     </div>
   </section>
 
   <section class="block">
-    <div class="kicker">Screenshots</div>
-    <h2>See it in action.</h2>
+    <div class="kicker" data-i18n="shots.kicker">Screenshots</div>
+    <h2 data-i18n="shots.h2">See it in action.</h2>
     <div class="shots">
       <!-- TODO: replace placeholders once screenshots exist in web/img/ -->
       <div class="shot"><img src="img/library.png" alt="OpenEnlarge library view" onerror="this.replaceWith(document.createTextNode('library.png'))"></div>
@@ -172,11 +175,11 @@
 
   <section class="download" id="download">
     <div class="card-dl glass card">
-      <div class="kicker">Download</div>
-      <h2 style="margin-bottom:6px">Get OpenEnlarge</h2>
-      <p class="lede" style="margin:0 auto 4px;text-align:center">Free and open source. macOS, Windows &amp; Linux.</p>
+      <div class="kicker" data-i18n="dl.kicker">Download</div>
+      <h2 style="margin-bottom:6px" data-i18n="dl.h2">Get OpenEnlarge</h2>
+      <p class="lede" style="margin:0 auto 4px;text-align:center" data-i18n="dl.lede">Free and open source. macOS, Windows &amp; Linux.</p>
       <div class="cta-row" style="justify-content:center;margin-top:18px">
-        <a class="btn-primary" id="dl-download" href="https://github.com/mohaelder/openenlarge/releases/latest">↓ Download</a>
+        <a class="btn-primary" id="dl-download" href="https://github.com/mohaelder/openenlarge/releases/latest" data-i18n="dl.base">↓ Download</a>
       </div>
       <div class="os-row" id="os-row">
         <a class="os-link" data-os="macos" href="https://github.com/mohaelder/openenlarge/releases/latest">macOS</a>
@@ -192,6 +195,7 @@
   </footer>
 </div>
 
+<script src="i18n.js"></script>
 <script src="releases.js"></script>
 </body>
 </html>
