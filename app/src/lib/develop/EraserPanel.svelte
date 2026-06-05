@@ -17,7 +17,7 @@
   <div class="head"><span>Eraser</span></div>
 
   {#if hasIr}
-    <button class="ir on" class:active={irEnabled}
+    <button class="ir on" class:active={irEnabled} aria-pressed={irEnabled}
             on:click={() => dispatch("irEnabled", !irEnabled)}>
       Remove dust (IR) <span class="state">{irEnabled ? "On" : "Off"}</span>
     </button>
@@ -58,9 +58,7 @@
     background: transparent; color: var(--text); cursor: default; opacity: 0.5; }
   .ir.on { cursor: pointer; opacity: 1; }
   .ir.on.active { background: rgba(224,52,52,0.18); border-color: rgba(224,52,52,0.5); }
-  .state { font-size: 10px; border: 1px solid var(--glass-brd); border-radius: 4px;
-    padding: 0 5px; color: var(--text-dim); }
-  .soon { font-size: 10px; border: 1px solid var(--glass-brd); border-radius: 4px;
+  .soon, .state { font-size: 10px; border: 1px solid var(--glass-brd); border-radius: 4px;
     padding: 0 5px; color: var(--text-dim); }
   .slrow { display: flex; align-items: center; gap: 8px; }
   .slrow input[type="range"] { flex: 1; accent-color: var(--accent); }
