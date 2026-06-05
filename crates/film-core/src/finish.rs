@@ -163,6 +163,40 @@ fn color_mix(rgb: [f32; 3], cm: &ColorMix) -> [f32; 3] {
     hsl2rgb(h, s, l)
 }
 
+#[inline]
+fn pc_tol(base: f32, variance: f32) -> f32 {
+    (base * (1.0 + (variance / 100.0) * PC_VAR_SPAN)).max(0.02)
+}
+
+#[inline]
+fn pc_hue_weight(h: f32, target: f32, range: f32) -> f32 {
+    let hw = PC_RANGE_MIN_DEG + (range / 100.0) * (PC_RANGE_MAX_DEG - PC_RANGE_MIN_DEG);
+    let d = wrap180(h - target).abs();
+    if d >= hw { 0.0 } else { 0.5 * (1.0 + (PI * d / hw).cos()) }
+}
+
+/// Apply all Point Color samples to one pixel. Masks use the input HSL so samples
+/// are order-independent; shifts accumulate then apply once.
+fn point_color(rgb: [f32; 3], samples: &[PcSample]) -> [f32; 3] {
+    if samples.is_empty() { return rgb; }
+    let (h, s, l) = rgb2hsl(rgb);
+    let mut hue_delta = 0.0_f32;
+    let mut sat_factor = 1.0_f32;
+    let mut lum_delta = 0.0_f32;
+    for sm in samples {
+        let wh = pc_hue_weight(h, sm.hue, sm.range);
+        if wh <= 0.0 { continue; }
+        let ws = (1.0 - (s - sm.sat).abs() / pc_tol(PC_SAT_TOL, sm.variance)).clamp(0.0, 1.0);
+        let wl = (1.0 - (l - sm.lum).abs() / pc_tol(PC_LUM_TOL, sm.variance)).clamp(0.0, 1.0);
+        let w = wh * ws * wl;
+        if w <= 0.0 { continue; }
+        hue_delta += w * sm.hue_shift * CM_HUE_SHIFT_MAX;
+        sat_factor += w * sm.sat_shift;
+        lum_delta += w * sm.lum_shift * CM_LUM_GAIN;
+    }
+    hsl2rgb(h + hue_delta, (s * sat_factor).clamp(0.0, 1.0), (l + lum_delta).clamp(0.0, 1.0))
+}
+
 /// Parabolic region bump centered at `c` (finite support, peak 1.0).
 #[inline]
 fn region_bump(v: f32, c: f32) -> f32 {
@@ -653,6 +687,43 @@ mod tests {
         let cm = mix_with(|m| { m.cm_hue[0] = 1.0; m.cm_hue[5] = 1.0; });
         let out = color_mix([0.5, 0.5, 0.5], &cm);
         for k in 0..3 { assert!((out[k] - 0.5).abs() < 1e-3, "gray moved: {out:?}"); }
+    }
+
+    fn sample(hue: f32) -> PcSample {
+        PcSample { hue, sat: 0.6, lum: 0.5, hue_shift: 0.0, sat_shift: 1.0,
+                   lum_shift: 0.0, variance: 0.0, range: 50.0 }
+    }
+
+    #[test]
+    fn point_color_default_no_samples_is_identity() {
+        let cm = ColorMix::default(); // no samples
+        let c = [0.8, 0.2, 0.2];
+        let out = point_color(c, &cm.samples);
+        for k in 0..3 { assert!((out[k] - c[k]).abs() < 1e-4, "{out:?}"); }
+    }
+
+    #[test]
+    fn point_color_sample_isolation() {
+        // Sample targets RED (hue 0); a red pixel gains chroma, a green pixel is untouched.
+        let samples = vec![sample(0.0)];
+        let chroma = |p: [f32; 3]| p.iter().cloned().fold(0.0_f32, f32::max)
+            - p.iter().cloned().fold(1.0_f32, f32::min);
+        let red_in = [0.8, 0.25, 0.25];
+        let red = point_color(red_in, &samples);
+        assert!(chroma(red) > chroma(red_in), "red chroma {} -> {}", chroma(red_in), chroma(red));
+        let green_in = [0.2, 0.8, 0.25];
+        let green = point_color(green_in, &samples);
+        for k in 0..3 { assert!((green[k] - green_in[k]).abs() < 0.02, "green moved {green:?}"); }
+    }
+
+    #[test]
+    fn point_color_order_independent() {
+        let a = sample(0.0);
+        let b = sample(120.0);
+        let c = [0.6, 0.5, 0.3];
+        let ab = point_color(c, &vec![a, b]);
+        let ba = point_color(c, &vec![b, a]);
+        for k in 0..3 { assert!((ab[k] - ba[k]).abs() < 1e-5, "order matters {ab:?} {ba:?}"); }
     }
 
     #[test]
