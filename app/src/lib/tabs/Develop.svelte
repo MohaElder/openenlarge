@@ -16,7 +16,9 @@
   import CropView from "../crop/CropView.svelte";
   import CropPanel from "../crop/CropPanel.svelte";
   import BaseView from "../develop/BaseView.svelte";
+  import BasePanel from "../develop/BasePanel.svelte";
   import EraserPanel from "../develop/EraserPanel.svelte";
+  import { setFolderBase, clearFolderBase } from "../develop/base";
   import { addStroke, resetDust, emptyDust, setIrEnabled, setIrSensitivity, type DustStroke, type DustEdits } from "../develop/dust";
   import type { Rect, CropRect } from "../crop/types";
   import { default80, conform, constrainToRotated } from "../crop/cropMath";
@@ -34,6 +36,24 @@
 
   // ---- Base picker state ----
   let sampledBase: [number, number, number] | null = null;
+
+  function applyBaseRoll() {
+    if (!sampledBase || !dir) return;
+    setFolderBase(dir, sampledBase);
+  }
+  function applyBaseThisImage() {
+    if (!sampledBase) return;
+    params.update((p) => ({ ...p, base_override: sampledBase }));
+    commitActive();
+  }
+  function resetBase() {
+    // Clear the per-image override first; if none, clear the folder default.
+    if ($params.base_override) {
+      params.update((p) => ({ ...p, base_override: null }));
+      commitActive();
+    } else if (dir) clearFolderBase(dir);
+  }
+  $: baseScope = ($params.base_override ? "override" : ($folderBaseByPath[dir] ? "folder" : "auto")) as "override" | "folder" | "auto";
 
   // ---- Crop draft state (only while tool === "crop") ----
   let rect: Rect = { x: 0.1, y: 0.1, w: 0.8, h: 0.8 };
@@ -233,6 +253,9 @@
                      on:reset={resetDustEdits}
                      on:irEnabled={(e) => setIrOn(e.detail)}
                      on:irSensitivity={(e) => setIrSens(e.detail)} />
+      {:else if $tool === "base_picker"}
+        <BasePanel sampled={sampledBase} scope={baseScope}
+                   on:applyRoll={applyBaseRoll} on:thisImage={applyBaseThisImage} on:reset={resetBase} />
       {/if}
     </GlassPanel>
   </aside>
