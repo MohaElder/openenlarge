@@ -5,8 +5,10 @@
   import { previewSrc } from "../store";
   import { FinishRenderer, webgl2Available, float16RenderTargetSupported } from "./gl/renderer";
   import { finishUniforms } from "./gl/uniforms";
+  import { toInversionUniforms } from "./gl/invert";
   import { toneLutBytes, colorGrade } from "../develop/finish";
   import { screenRadius, type DustStroke } from "../develop/dust";
+  import { t } from "$lib/i18n";
 
   export let id: string | null;
   export let params: InvertParams;
@@ -49,6 +51,11 @@
   let animating = false;
   let animTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // GPU upload-once state. The raw working buffer is uploaded to the GPU as a
+  // float texture once per image; inversion + geometry then update via uniforms.
+  let uploadedId: string | null = null;
+  let texW = 0, texH = 0;
+
   $: ready = imgW > 0 && imgH > 0 && vpW > 0 && vpH > 0;
   $: pad = interactive ? PAD : 0;
   $: avW = Math.max(1, vpW - 2 * pad);
@@ -56,7 +63,7 @@
   $: fit = ready ? Math.min(avW / imgW, avH / imgH) : 0;
   $: eff = interactive ? (scale > 0 ? scale : fit) : fit;
   $: zoomed = interactive && eff > fit + 1e-6;
-  $: label = eff <= fit + 1e-6 ? "Fit" : Math.round(eff * 100) + "%";
+  $: label = eff <= fit + 1e-6 ? $t("viewport.fit") : $t("viewport.zoomPercent", { percent: Math.round(eff * 100) });
 
   function clampCenter() {
     const halfW = avW / 2 / eff, halfH = avH / 2 / eff;
@@ -144,10 +151,77 @@
   function schedule() { if (timer) clearTimeout(timer); timer = setTimeout(render, 80); }
   function scheduleIfReady() { if (id && vpW && imgW) { clampCenter(); schedule(); } }
 
-  // Re-fetch the SOURCE only when the inversion / zoom / view changes. In Plan 2A
-  // exposure/temp/tint are still baked by the backend, so they live in this key.
-  $: srcKey = `${id}|${raw}|${eff}|${vpW}|${vpH}|${params.mode}|${params.stock}|${params.exposure}|${params.temp}|${params.tint}|${imageCrop ? imageCrop.join(',') : 'full'}|${rot90}|${flipH}|${flipV}|${angle}|${dustRev}|${irRemoval.enabled}|${irRemoval.sensitivity}`;
-  $: srcKey, imgW, imgH, scheduleIfReady();
+  // GPU path is used only when WebGL2 is available AND no dust/IR/raw is active.
+  // Dust/IR/raw keep the proven CPU render_view path (Plan 3 moves them to GPU).
+  $: gpuEligible = !!(useGL && renderer && !raw && dust.length === 0 && !irRemoval.enabled);
+
+  // Upload the raw linear working buffer to the GPU as a float texture, once per
+  // image. Sets uniforms + draws after the upload.
+  async function uploadWorking() {
+    if (!gpuEligible || !id || !renderer) return;
+    if (uploadedId === id) return; // already on the GPU
+    const curId = id;
+    const info = await api.workingInfo(curId);
+    const buf = await api.workingPixels(curId);
+    if (!renderer || id !== curId) return; // image changed mid-fetch
+    renderer.setSourceFloat(new Uint16Array(buf), info.w, info.h);
+    uploadedId = curId;
+    texW = info.w; texH = info.h;
+    await refreshInversion();
+    applyGeometryAndDraw();
+  }
+
+  // Resolve inversion params (+ sampled base) into GPU uniforms — no fetch of pixels.
+  async function refreshInversion() {
+    if (!gpuEligible || !id || !renderer) return;
+    const res = await api.resolvedInversion(id, params);
+    if (!renderer) return;
+    renderer.setInversion(toInversionUniforms(res));
+  }
+
+  // Map orient/flip/straighten/persistent-crop into GPU geometry uniforms, then draw.
+  function applyGeometryAndDraw() {
+    if (!gpuEligible || !renderer) return;
+    // orient as a 2x2 on centred UV: rot90 (clockwise) + flips.
+    const ang = (rot90 % 4) * Math.PI / 2;
+    const s = Math.sin(ang), c = Math.cos(ang);
+    let o = [c, -s, s, c]; // rotation
+    const fx = flipH ? -1 : 1, fy = flipV ? -1 : 1;
+    o = [o[0] * fx, o[1] * fy, o[2] * fx, o[3] * fy];
+    // persistent crop in source UV (imageCrop is normalized [x,y,w,h] or null).
+    const [cropX, cropY, cropW, cropH] = imageCrop ?? [0, 0, 1, 1];
+    // output canvas = oriented+cropped aspect; for odd rot90, swap dims.
+    const baseW = texW * cropW, baseH = texH * cropH;
+    const swap = (rot90 % 2) === 1;
+    const outW = Math.max(1, Math.round(swap ? baseH : baseW));
+    const outH = Math.max(1, Math.round(swap ? baseW : baseH));
+    renderer.setGeometry({
+      crop_off: [cropX, cropY], crop_scale: [cropW, cropH],
+      angle: (angle * Math.PI) / 180, orient: o as [number, number, number, number],
+      raw: false, outW, outH,
+    });
+    drawGL();
+  }
+
+  // Upload the working float texture once per image (and re-upload after the GPU
+  // path becomes eligible again, e.g. dust/IR turned off).
+  $: if (gpuEligible) { id; uploadWorking(); }
+  $: if (gpuEligible && uploadedId !== id) uploadWorking();
+  $: if (!gpuEligible) uploadedId = null;
+
+  // Inversion params now drive GPU uniforms (no backend pixel fetch) when eligible.
+  $: invKey = `${params.mode}|${params.stock}|${params.exposure}|${params.temp}|${params.tint}|${params.black}|${params.gamma}`;
+  $: if (gpuEligible) { invKey; refreshInversion().then(applyGeometryAndDraw); }
+
+  // Geometry also drives GPU uniforms (no fetch) when eligible.
+  $: geomKey = `${imageCrop ? imageCrop.join(',') : 'full'}|${rot90}|${flipH}|${flipV}|${angle}`;
+  $: if (gpuEligible) { geomKey; texW; applyGeometryAndDraw(); }
+
+  // CPU fallback path: re-fetch the SOURCE from the backend only when NOT eligible
+  // (dust/IR active, raw view, or no WebGL2). Reuses the existing render()/schedule.
+  $: cpuKey = gpuEligible ? '' :
+    `${id}|${raw}|${eff}|${vpW}|${vpH}|${params.mode}|${params.stock}|${params.exposure}|${params.temp}|${params.tint}|${imageCrop ? imageCrop.join(',') : 'full'}|${rot90}|${flipH}|${flipV}|${angle}|${dustRev}|${irRemoval.enabled}|${irRemoval.sensitivity}`;
+  $: cpuKey, imgW, imgH, scheduleIfReady();
 
   // Finishing-only change → GPU redraw, no backend fetch. Tone curve + color
   // grading are all finishing-layer controls, so they live here too.
