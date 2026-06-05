@@ -26,6 +26,7 @@
   let downClientX = 0, downClientY = 0;
   let armedIdx = -1;
   let hadHit = false;
+  let grabOffset: CurvePoint = [0, 0]; // press point − grabbed point, so drags don't teleport
 
   // Local working copy; resync from the prop whenever we're not dragging.
   let pts: CurvePoint[] = points;
@@ -100,6 +101,7 @@
     hadHit = hit >= 0;
     // If this becomes a drag, move the point under the cursor, else the nearest one.
     armedIdx = hadHit ? hit : nearestByX(p);
+    grabOffset = [p[0] - pts[armedIdx][0], p[1] - pts[armedIdx][1]];
     downPt = p;
     downClientX = e.clientX; downClientY = e.clientY;
     moved = false;
@@ -114,7 +116,10 @@
       dragIdx = armedIdx; // promote the armed point to an active drag
     }
     if (dragIdx < 0) return;
-    const [nx, ny] = toLocal(e);
+    const [cx, cy] = toLocal(e);
+    // Apply the grab offset so the point tracks the cursor without jumping to it.
+    const nx = clamp01(cx - grabOffset[0]);
+    const ny = clamp01(cy - grabOffset[1]);
     const last = pts.length - 1;
     const isEnd = dragIdx === 0 || dragIdx === last;
     let x = pts[dragIdx][0];
