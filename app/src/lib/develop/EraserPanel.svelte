@@ -12,12 +12,11 @@
 <div class="section">
   <div class="head"><span>Eraser</span></div>
 
-  <button
-    class="ir" disabled
-    title={hasIr ? "Coming soon" : "Requires an infrared scan channel"}
-  >
-    Remove dust (IR) <span class="soon">soon</span>
-  </button>
+  <span class="ir-wrap" title={hasIr ? "Coming soon" : "Requires an infrared scan channel"}>
+    <button class="ir" disabled>
+      Remove dust (IR) <span class="soon">soon</span>
+    </button>
+  </span>
 
   <div class="sub">Brush size</div>
   <div class="slrow">
@@ -34,6 +33,7 @@
   .head { color: var(--text); font-weight: 600; padding: 4px 0; }
   .sub { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em;
     color: var(--text-dim); margin: 12px 0 4px; }
+  .ir-wrap { display: block; width: 100%; }
   .ir { width: 100%; display: flex; justify-content: space-between; align-items: center;
     padding: 7px 10px; border-radius: 8px; border: 1px solid var(--glass-brd);
     background: transparent; color: var(--text); cursor: default; opacity: 0.5; }
