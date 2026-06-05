@@ -3,6 +3,7 @@ import type { ImageEntry, Quality } from "./api";
 import { defaultParams } from "./api";
 import type { CropRect } from "./crop/types";
 import { createPerImageParams } from "./perImage";
+import { emptyDust, type DustEdits } from "./develop/dust";
 
 export const images = writable<ImageEntry[]>([]);
 export const activeId = writable<string | null>(null);
@@ -18,6 +19,12 @@ export const quality = writable<Quality>("performance");
 export const cropById = writable<Record<string, CropRect | null>>({});
 /** The active image's committed crop. */
 export const activeCrop = derived([cropById, activeId], ([m, id]) => (id ? m[id] ?? null : null));
+
+/** Per-image dust edits (eraser strokes). */
+export const dustById = writable<Record<string, DustEdits>>({});
+/** The active image's dust edits. */
+export const activeDust = derived([dustById, activeId], ([m, id]) =>
+  id ? m[id] ?? emptyDust() : emptyDust());
 
 /** Develop-all progress. active=true shows the overlay. */
 export const developProgress = writable<{ active: boolean; done: number; total: number }>({

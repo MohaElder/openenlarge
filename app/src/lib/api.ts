@@ -22,6 +22,7 @@ export interface InvertParams {
   texture: number; vibrance: number; saturation: number;
 }
 export interface AsShotWb { temp: number; tint: number }
+export interface DustStroke { points: { x: number; y: number }[]; r: number }
 export interface ViewSpec {
   crop: [number, number, number, number];
   out_w: number;
@@ -30,21 +31,27 @@ export interface ViewSpec {
   finish?: boolean; // omit/true = backend applies finishing; false = GPU does it
   image_crop?: [number, number, number, number] | null; // normalized persistent crop
   rot90?: number; flip_h?: boolean; flip_v?: boolean; angle?: number;
+  dust?: DustStroke[];
 }
+
+/** Convert app-internal {x,y} points to the [x,y] tuple format the Rust side expects. */
+const wireDust = (dust?: DustStroke[]) =>
+  (dust ?? []).map((s) => ({ points: s.points.map((p) => [p.x, p.y]), r: s.r }));
 
 export const api = {
   importImage: (path: string) => invoke<ImageEntry>("import_image", { path }),
   renderView: (id: string, params: InvertParams, view: ViewSpec) =>
-    invoke<string>("render_view", { id, params, view }),
+    invoke<string>("render_view", { id, params, view: { ...view, dust: wireDust(view.dust) } }),
   exportImage: (
     id: string, params: InvertParams, outPath: string,
     imageCrop: [number, number, number, number] | null = null,
     geom: { rot90?: number; flip_h?: boolean; flip_v?: boolean; angle?: number } = {},
+    dust: DustStroke[] = [],
   ) =>
     invoke<void>("export_image", {
       id, params, outPath, imageCrop,
       rot90: geom.rot90 ?? 0, flipH: geom.flip_h ?? false,
-      flipV: geom.flip_v ?? false, angle: geom.angle ?? 0,
+      flipV: geom.flip_v ?? false, angle: geom.angle ?? 0, dust: wireDust(dust),
     }),
   developImage: (id: string) => invoke<ImageEntry>("develop_image", { id }),
   setQuality: (quality: Quality) => invoke<void>("set_quality", { quality }),
