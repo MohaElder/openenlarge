@@ -33,6 +33,8 @@
         <div class="spacer"></div>
         <button class="go" on:click={() => dispatch("close")}>{$t('about.close')}</button>
       </div>
+      <img class="hero" src="/about-hero.jpeg" alt="" />
+      <div class="caption">New York, 2026 May</div>
     {:else}
       <div class="head">
         <button class="back" on:click={() => (view = "about")} aria-label={$t('about.back')}>←</button>
@@ -70,6 +72,8 @@
   .title { font-weight: 600; }
   .sub { color: var(--text-dim); font-size: 12px; margin-top: 2px; }
   .body { color: var(--text-dim); font-size: 13px; line-height: 1.5; margin: 0 0 18px; }
+  .hero { display: block; width: 100%; height: auto; margin-top: 16px; }
+  .caption { color: var(--text-dim); font-size: 11px; margin-top: 6px; }
   .row { display: flex; align-items: center; gap: 10px; }
   .spacer { flex: 1; }
   button { padding: 8px 14px; border-radius: 9px; border: 1px solid var(--glass-brd); background: transparent; color: var(--text); }
