@@ -1,14 +1,19 @@
 # Bundled Spectral Data — Sources & Licenses
 
 All curves resampled to the 380–730 nm @ 5 nm grid (71 points) by linear interpolation;
-densities clamped to ≥ 0. Conversion script: `/tmp/convert.py` (recorded in commit history).
+densities clamped to ≥ 0. Conversion script: `scripts/build_film_data.py` (reproducible; regenerates every `dye_*.csv`).
 
-## `dye_portra400.csv`, `dye_fujic200.csv` — film dye spectral densities + base
+## `dye_*.csv` — film dye spectral densities + base
 
 - **Source:** `spektrafilm` by Andrea Volpato — https://github.com/andreavolpato/spektrafilm
-  - Profiles: `src/spektrafilm/data/profiles/kodak_portra_400.json`,
-    `.../fujifilm_c200.json` (`data.channel_density` → C/M/Y per-dye spectral density;
-    `data.base_density` → `D_min`, the orange mask).
+  - Profiles (spektrafilm `src/spektrafilm/data/profiles/*.json`,
+    `data.channel_density` → C/M/Y per-dye spectral density; `data.base_density` → `D_min`):
+    `kodak_portra_400`, `fujifilm_c200`, `kodak_portra_160`, `kodak_portra_800`,
+    `kodak_ektar_100`, `kodak_gold_200`, `kodak_ultramax_400`, `fujifilm_pro_400h`,
+    `fujifilm_xtra_400`, `kodak_vision3_50d`, `kodak_vision3_200t`,
+    `kodak_vision3_250d`, `kodak_vision3_500t`. All color negatives (C-41/ECN-2).
+    Reversal/slide stocks (e.g. Kodachrome) are excluded — they are positives and
+    do not fit the negative-inversion model.
   - These are community-digitized/processed from manufacturer datasheets; they include
     realistic dye spectral overlap / secondary absorptions (the crosstalk M_post corrects).
   - Verified peaks: C ≈ 695–700 nm (absorbs red), M ≈ 540–545 nm (green), Y ≈ 450 nm (blue);
