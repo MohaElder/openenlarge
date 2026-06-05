@@ -32,7 +32,7 @@
   function autoWb() { seededFor = null; seed($activeId, $params.stock); }
 
   // Reset every Basic-section control to its default, leaving all other develop
-  // state (mode, base_rect, black/gamma, tone curve, color grading) untouched.
+  // state (mode, base_override, black/gamma, tone curve, color grading) untouched.
   // Temp/Tint are re-seeded to the as-shot white point rather than the hard
   // slider defaults, matching the Auto button.
   function resetBasic() {

@@ -28,7 +28,7 @@ export const IDENTITY_CURVE: CurvePoint[] = [[0, 0], [1, 1]];
 export interface InvertParams {
   mode: "b" | "c";
   stock: "none" | "portra400" | "fujic200";
-  base_rect: [number, number, number, number] | null;
+  base_override: [number, number, number] | null;
   exposure: number; // EV stops (−5..5)
   black: number; gamma: number;
   auto_wb: boolean;
@@ -169,6 +169,9 @@ export const api = {
   resolvedInversion: (id: string, params: InvertParams) =>
     invoke<import("./viewport/gl/invert").ResolvedInversion>("resolved_inversion", { id, params }),
 
+  sampleBaseAt: (id: string, rect: [number, number, number, number]) =>
+    invoke<[number, number, number]>("sample_base_at", { id, rect }),
+
   // ---- GPU export (offscreen invert+finish through the preview shader) ----
   /** Decode+bake full-res, stash the half-float bytes, return dims + inversion uniforms. */
   exportBegin: (id: string, params: InvertParams, spec: BakeSpec) =>
@@ -185,7 +188,7 @@ export const api = {
 };
 
 export const defaultParams = (): InvertParams => ({
-  mode: "b", stock: "none", base_rect: null,
+  mode: "b", stock: "none", base_override: null,
   exposure: 0, black: 0, gamma: 0.4545,
   auto_wb: true, temp: 5500, tint: 0,
   contrast: 0, highlights: 0, shadows: 0, whites: 0, blacks: 0,
