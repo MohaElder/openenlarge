@@ -77,10 +77,15 @@ pub fn rasterize(img_w: usize, img_h: usize, stamps: &[Stamp], grow: f32, pad: u
 /// Inpaint the masked pixels of `img` using Telea / Fast Marching, operating only
 /// on the mask's window. `radius` is the Telea neighborhood size (px). No-op on an
 /// empty mask.
+/// The mask must come from `rasterize()` against the same image dimensions (its window must lie within `img`).
 pub fn inpaint_masked(img: &mut Image, mask: &Mask, radius: u32) {
     if mask.w == 0 || mask.h == 0 {
         return;
     }
+    debug_assert!(
+        mask.x0 + mask.w <= img.width && mask.y0 + mask.h <= img.height,
+        "mask window exceeds image bounds"
+    );
     let (w, h) = (mask.w, mask.h);
     // Copy the window into (h, w, 3) and the mask into (h, w).
     let mut region = Array3::<f32>::zeros((h, w, 3));
@@ -97,7 +102,8 @@ pub fn inpaint_masked(img: &mut Image, mask: &Mask, radius: u32) {
             }
         }
     }
-    // Isolated third-party call. Real signature: telea_inpaint(image, mask, radius: i32) -> Result<()>
+    // Isolated third-party seam (swap algorithm here). On the rare inpaint error we
+    // leave the original pixels untouched — degrading a render is better than aborting it.
     let _ = inpaint::telea_inpaint(&mut region.view_mut(), &m.view(), radius as i32);
     // Write back only the masked pixels.
     for yy in 0..h {
