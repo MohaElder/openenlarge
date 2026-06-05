@@ -17,6 +17,15 @@ pub struct CatalogImage {
     pub offline: bool,
 }
 
+/// One image's stored edits. Each field is an opaque JSON string (or null).
+#[derive(Debug, Clone, Serialize)]
+pub struct CatalogEdits {
+    pub image_id: String,
+    pub params: Option<Value>,
+    pub crop: Option<Value>,
+    pub dust: Option<Value>,
+}
+
 /// The on-disk catalog. Wraps a single SQLite connection behind a Mutex
 /// (rusqlite Connection is not Sync).
 pub struct Catalog {
@@ -123,6 +132,53 @@ impl Catalog {
         rows.collect()
     }
 
+    /// Upsert the params JSON for an image's edits row.
+    pub fn save_params(&self, image_id: &str, params_json: &str) -> rusqlite::Result<()> {
+        self.conn.lock().unwrap().execute(
+            "INSERT INTO edits (image_id, params_json) VALUES (?1, ?2)
+             ON CONFLICT(image_id) DO UPDATE SET params_json = excluded.params_json",
+            rusqlite::params![image_id, params_json],
+        )?;
+        Ok(())
+    }
+
+    /// Upsert the crop JSON for an image's edits row.
+    pub fn save_crop(&self, image_id: &str, crop_json: &str) -> rusqlite::Result<()> {
+        self.conn.lock().unwrap().execute(
+            "INSERT INTO edits (image_id, crop_json) VALUES (?1, ?2)
+             ON CONFLICT(image_id) DO UPDATE SET crop_json = excluded.crop_json",
+            rusqlite::params![image_id, crop_json],
+        )?;
+        Ok(())
+    }
+
+    /// Upsert the dust JSON for an image's edits row.
+    pub fn save_dust(&self, image_id: &str, dust_json: &str) -> rusqlite::Result<()> {
+        self.conn.lock().unwrap().execute(
+            "INSERT INTO edits (image_id, dust_json) VALUES (?1, ?2)
+             ON CONFLICT(image_id) DO UPDATE SET dust_json = excluded.dust_json",
+            rusqlite::params![image_id, dust_json],
+        )?;
+        Ok(())
+    }
+
+    /// Load every image's edits row.
+    pub fn load_edits(&self) -> rusqlite::Result<Vec<CatalogEdits>> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt =
+            conn.prepare("SELECT image_id, params_json, crop_json, dust_json FROM edits")?;
+        let parse = |s: Option<String>| s.and_then(|t| serde_json::from_str(&t).ok());
+        let rows = stmt.query_map([], |r| {
+            Ok(CatalogEdits {
+                image_id: r.get(0)?,
+                params: parse(r.get(1)?),
+                crop: parse(r.get(2)?),
+                dust: parse(r.get(3)?),
+            })
+        })?;
+        rows.collect()
+    }
+
     /// Current schema version (for tests).
     pub fn user_version(&self) -> i64 {
         self.conn
@@ -222,5 +278,29 @@ mod tests {
         let id = cat.upsert_image("/x/a.dng", "a.dng", "{}", "t", 1).unwrap();
         cat.delete_image(&id).unwrap();
         assert!(cat.load_images(&|_| true).unwrap().is_empty());
+    }
+
+    #[test]
+    fn edits_round_trip_each_family_independently() {
+        let cat = Catalog::open_in_memory().unwrap();
+        cat.save_params("img-1", r#"{"exposure":1.5}"#).unwrap();
+        cat.save_crop("img-1", r#"{"angle":2.0}"#).unwrap();
+        cat.save_dust("img-1", r#"{"strokes":[]}"#).unwrap();
+        let edits = cat.load_edits().unwrap();
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].image_id, "img-1");
+        assert_eq!(edits[0].params.as_ref().unwrap()["exposure"], 1.5);
+        assert_eq!(edits[0].crop.as_ref().unwrap()["angle"], 2.0);
+        assert!(edits[0].dust.is_some());
+    }
+
+    #[test]
+    fn save_params_twice_updates_in_place() {
+        let cat = Catalog::open_in_memory().unwrap();
+        cat.save_params("img-1", r#"{"exposure":0.0}"#).unwrap();
+        cat.save_params("img-1", r#"{"exposure":2.0}"#).unwrap();
+        let edits = cat.load_edits().unwrap();
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].params.as_ref().unwrap()["exposure"], 2.0);
     }
 }

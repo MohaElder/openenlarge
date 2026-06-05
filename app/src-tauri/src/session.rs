@@ -192,4 +192,19 @@ mod tests {
         let e = s.insert(img);
         assert!(!e.has_ir);
     }
+
+    #[test]
+    fn invert_params_backfills_missing_fields_via_serde_default() {
+        // An "old" catalog blob saved before color-grading/tone-curve fields existed.
+        let old = r#"{
+            "mode":"b","stock":"none","base_rect":null,
+            "exposure":0.0,"black":0.0,"gamma":0.4545,"auto_wb":true,
+            "temp":5500.0,"tint":0.0,"contrast":0.0,"highlights":0.0,
+            "shadows":0.0,"whites":0.0,"blacks":0.0,"texture":0.0,
+            "vibrance":0.0,"saturation":0.0
+        }"#;
+        let p: InvertParams = serde_json::from_str(old).unwrap();
+        assert_eq!(p.cg_blending, 50.0); // defaulted
+        assert_eq!(p.tc_curve, super::identity_curve()); // defaulted
+    }
 }
