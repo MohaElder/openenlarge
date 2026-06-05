@@ -50,6 +50,8 @@ confirmDevelop.title,"Develop all {count} image{plural}?","显影全部 {count} 
 confirmDevelop.sub,"They'll be decoded and inverted, then opened in Develop.","它们将被解码并反相，然后在显影中打开。","src/lib/overlay/ConfirmDevelop.svelte","paragraph"
 confirmDevelop.cancel,"Cancel","取消","src/lib/overlay/ConfirmDevelop.svelte","button"
 confirmDevelop.confirm,"Develop all","全部显影","src/lib/overlay/ConfirmDevelop.svelte","button"
+confirmDevelop.filmStock,"Film stock","胶片型号","src/lib/overlay/ConfirmDevelop.svelte","label"
+confirmDevelop.filmStockOptional,"optional","可选","src/lib/overlay/ConfirmDevelop.svelte","hint"
 contextMenu.delete,"Delete…","删除…","src/lib/overlay/ImageContextMenu.svelte","button"
 progress.developing,"Developing {current} of {total}…","正在显影 {current} / {total}…","src/lib/overlay/ProgressOverlay.svelte","heading"
 export.title,"Export","导出","src/lib/export/ExportModal.svelte","heading"
