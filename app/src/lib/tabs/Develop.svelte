@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t } from "$lib/i18n";
-  import { activeId, params, images, folderImages, tool, cropById, activeCrop, dustById, activeDust, deleteTarget } from "../store";
+  import { activeId, params, images, folderImages, tool, cropById, activeCrop, dustById, activeDust, deleteTarget, dustRev } from "../store";
   import { api } from "../api";
   import Filmstrip from "../panels/Filmstrip.svelte";
   import Viewport from "../viewport/Viewport.svelte";
@@ -14,11 +14,12 @@
   import CropView from "../crop/CropView.svelte";
   import CropPanel from "../crop/CropPanel.svelte";
   import EraserPanel from "../develop/EraserPanel.svelte";
-  import { addStroke, undoStroke, resetDust, emptyDust, setIrEnabled, setIrSensitivity, type DustStroke, type DustEdits } from "../develop/dust";
+  import { addStroke, resetDust, emptyDust, setIrEnabled, setIrSensitivity, type DustStroke, type DustEdits } from "../develop/dust";
   import type { Rect, CropRect } from "../crop/types";
   import { default80, conform, constrainToRotated } from "../crop/cropMath";
   import { presetNormAspect } from "../crop/presets";
   import { rotateRectCW, rotateRectCCW, flipRectH, flipRectV, orientDims } from "../crop/transforms";
+  import { commitActive } from "../develop/historyStore";
 
   $: active = $images.find((i) => i.id === $activeId);
   $: origW = active?.metadata.width ?? 0;
@@ -49,6 +50,7 @@
   function commitCrop() {
     const id = $activeId; if (!id || !cropInit) return;
     cropById.update((m) => ({ ...m, [id]: draftCrop() }));
+    commitActive();
   }
   function discardCrop() {
     const c = $activeCrop;
@@ -85,6 +87,7 @@
     const nr = dir > 0 ? rotateRectCW(base.rect) : rotateRectCCW(base.rect);
     const nrot = ((base.rot90 + (dir > 0 ? 1 : 3)) % 4) as 0 | 1 | 2 | 3;
     cropById.update((m) => ({ ...m, [id]: { ...base, rect: nr, rot90: nrot } }));
+    commitActive();
   }
   // True while a form control has focus, so its own arrow-key behaviour wins
   // (e.g. nudging a slider) instead of stepping the image.
@@ -118,9 +121,6 @@
       e.preventDefault();
       if ($activeId && !formFocused()) deleteTarget.set($activeId);
       return;
-    }
-    if ($tool === "eraser" && meta && (e.key === "z" || e.key === "Z")) {
-      e.preventDefault(); undoDust(); return;
     }
     if (meta && (e.key === "]" || e.key === "[")) {
       e.preventDefault();
@@ -165,17 +165,15 @@
   $: $params, $activeId, $activeCrop, $activeDust, refreshThumb();
 
   let brush = 0.03;            // normalized-to-width brush radius
-  let dustRev = 0;            // bumped on any dust change to force Viewport re-render
   $: dust = $activeDust;
 
   // Apply a reducer to the active image's dust edits and force a Viewport re-render.
   function updateDust(fn: (d: DustEdits) => DustEdits) {
     const id = $activeId; if (!id) return;
     dustById.update((m) => ({ ...m, [id]: fn(m[id] ?? emptyDust()) }));
-    dustRev++;
+    dustRev.update((n) => n + 1);
   }
   const commitStroke = (s: DustStroke) => updateDust((d) => addStroke(d, s));
-  const undoDust = () => updateDust((d) => undoStroke(d));
   const resetDustEdits = () => updateDust((d) => resetDust(d));
   function setIrOn(on: boolean) { updateDust((d) => setIrEnabled(d, on)); }
   function setIrSens(v: number) { updateDust((d) => setIrSensitivity(d, v)); }
@@ -198,7 +196,7 @@
       {:else}
         <Viewport id={$activeId} params={$params} imgW={effW} imgH={effH} imageCrop={imageCrop}
                   rot90={cRot} flipH={committed?.flipH ?? false} flipV={committed?.flipV ?? false} angle={committed?.angle ?? 0}
-                  eraser={$tool === "eraser"} {brush} dust={dust.strokes} irRemoval={dust.irRemoval} {dustRev}
+                  eraser={$tool === "eraser"} {brush} dust={dust.strokes} irRemoval={dust.irRemoval} dustRev={$dustRev}
                   on:stroke={(e) => commitStroke(e.detail)} on:brush={(e) => (brush = e.detail)} />
       {/if}
     {:else}<div class="hint">{$t('develop.notDevelopedYet')}</div>{/if}

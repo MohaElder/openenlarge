@@ -1,6 +1,7 @@
 import { get } from "svelte/store";
 import { images, activeId, module, developProgress, editsById, cropById, dustById, folderImages } from "./store";
 import { api, type ImageEntry } from "./api";
+import { dropHistory } from "./develop/historyStore";
 
 /** Ids of images not yet developed, in order. Pure helper (testable). */
 export function undevelopedIds(list: ImageEntry[]): string[] {
@@ -72,6 +73,7 @@ export async function deleteImage(id: string, deleteFile: boolean): Promise<void
   editsById.update(drop);
   cropById.update(drop);
   dustById.update(drop);
+  dropHistory(id);
 
   if (wasActive) activeId.set(neighbour ? neighbour.id : null);
   if (get(images).length === 0) module.set("library");

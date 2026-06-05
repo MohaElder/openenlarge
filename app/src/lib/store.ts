@@ -72,3 +72,6 @@ export const tool = writable<Tool>("edit");
 
 /** Id of the image awaiting a delete confirmation (null = no dialog). */
 export const deleteTarget = writable<string | null>(null);
+
+/** Bumped on any dust change and on undo/redo so the Viewport re-renders. */
+export const dustRev = writable<number>(0);

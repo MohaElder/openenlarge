@@ -41,6 +41,7 @@ about.credits.group.storageSystem,"Storage & system","存储与系统","src/lib/
 confirmDelete.title,"Delete {name}?","删除 {name}？","src/lib/overlay/ConfirmDelete.svelte","heading"
 confirmDelete.fallbackName,"this image","这张照片","src/lib/overlay/ConfirmDelete.svelte","fallback"
 confirmDelete.sub,"Remove it from OpenEnlarge, or also move the original file to the Trash.","从 OpenEnlarge 中移除，或同时将原始文件移至回收站。","src/lib/overlay/ConfirmDelete.svelte","paragraph"
+confirmDelete.warn,"This can't be undone.","此操作无法撤销。","src/lib/overlay/ConfirmDelete.svelte","paragraph"
 confirmDelete.cancel,"Cancel","取消","src/lib/overlay/ConfirmDelete.svelte","button"
 confirmDelete.remove,"Remove from OpenEnlarge","从 OpenEnlarge 中移除","src/lib/overlay/ConfirmDelete.svelte","button"
 confirmDelete.trash,"Move file to Trash","将文件移至回收站","src/lib/overlay/ConfirmDelete.svelte","button"

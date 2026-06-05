@@ -2,7 +2,9 @@
   import "../styles/theme.css";
   import { onMount } from "svelte";
   import { hydrate, initPersistence } from "$lib/catalog";
-  import { module, hasImages, images, undevelopedCount, deleteTarget } from "$lib/store";
+  import { module, hasImages, images, undevelopedCount, deleteTarget, activeId } from "$lib/store";
+  import { matchUndoRedo } from "$lib/develop/history";
+  import { commitActive, undoActive, redoActive, seedActive } from "$lib/develop/historyStore";
   import { developAll, deleteImage } from "$lib/workflow";
   import Library from "$lib/tabs/Library.svelte";
   import Develop from "$lib/tabs/Develop.svelte";
@@ -20,7 +22,9 @@
   onMount(() => {
     let flush: (() => void) | undefined;
     hydrate().finally(() => { flush = initPersistence(); });
-    return () => flush?.();
+    // Start an undo/redo timeline for each image the moment it becomes active.
+    const unseed = activeId.subscribe(() => seedActive());
+    return () => { flush?.(); unseed(); };
   });
 
   let confirmCount = 0;
@@ -46,7 +50,44 @@
     deleteTarget.set(null);
     if (id) deleteImage(id, deleteFile);
   }
+
+  // ⌘Z inside a text field should do the browser's native text undo, not image
+  // undo. Range sliders are <input> too but have no text to undo, so they don't
+  // count here — undo while a slider is focused still affects the image.
+  function inTextField(): boolean {
+    const el = document.activeElement as HTMLElement | null;
+    if (!el) return false;
+    if (el.tagName === "TEXTAREA") return true;
+    if (el.isContentEditable) return true;
+    if (el.tagName === "INPUT") {
+      const t = (el as HTMLInputElement).type;
+      return ["text", "number", "search", "email", "url", "tel", "datetime-local"].includes(t);
+    }
+    return false;
+  }
+
+  function onKey(e: KeyboardEvent) {
+    const action = matchUndoRedo(e);
+    if (!action) return;
+    if (inTextField()) return; // let native text undo win
+    e.preventDefault();
+    if (action === "undo") undoActive(); else redoActive();
+  }
 </script>
+
+<!-- Delegated commit trigger: snapshot the active image once a gesture ends.
+     pointerup = drags (sliders/curve/eraser); click = button-driven mutations
+     (resets/flips/IR toggle) which mutate AFTER pointerup; change = sliders via
+     keyboard + text-field blur. commitActive() deep-equal-guards, so the broad
+     net produces at most one step per real change. (DOM change only — Svelte
+     component "change" events don't bubble to window.) -->
+<svelte:window
+  on:keydown={onKey}
+  on:pointerup={() => commitActive()}
+  on:pointercancel={() => commitActive()}
+  on:click={() => commitActive()}
+  on:change={() => commitActive()}
+/>
 
 <div class="app">
   <header class="topbar">
