@@ -144,6 +144,15 @@ export const api = {
     invoke<void>("save_pref", { key, value }),
   saveAppState: (key: string, value: string) =>
     invoke<void>("save_app_state", { key, value }),
+  workingInfo: (id: string) =>
+    invoke<{ w: number; h: number }>("working_info", { id }),
+
+  // Tauri returns the command's `Response` bytes as an ArrayBuffer.
+  workingPixels: (id: string) =>
+    invoke<ArrayBuffer>("working_pixels", { id }),
+
+  resolvedInversion: (id: string, params: InvertParams) =>
+    invoke<import("./viewport/gl/invert").ResolvedInversion>("resolved_inversion", { id, params }),
 };
 
 export const defaultParams = (): InvertParams => ({
