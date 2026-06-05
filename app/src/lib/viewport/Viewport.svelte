@@ -174,8 +174,9 @@
   // Resolve inversion params (+ sampled base) into GPU uniforms — no fetch of pixels.
   async function refreshInversion() {
     if (!gpuEligible || !id || !renderer) return;
+    const curId = id;
     const res = await api.resolvedInversion(id, params);
-    if (!renderer) return;
+    if (id !== curId || !renderer) return;
     renderer.setInversion(toInversionUniforms(res));
   }
 
@@ -198,7 +199,7 @@
     renderer.setGeometry({
       crop_off: [cropX, cropY], crop_scale: [cropW, cropH],
       angle: (angle * Math.PI) / 180, orient: o as [number, number, number, number],
-      raw: false, outW, outH,
+      raw, outW, outH,
     });
     drawGL();
   }
@@ -206,7 +207,6 @@
   // Upload the working float texture once per image (and re-upload after the GPU
   // path becomes eligible again, e.g. dust/IR turned off).
   $: if (gpuEligible) { id; uploadWorking(); }
-  $: if (gpuEligible && uploadedId !== id) uploadWorking();
   $: if (!gpuEligible) uploadedId = null;
 
   // Inversion params now drive GPU uniforms (no backend pixel fetch) when eligible.
@@ -215,7 +215,7 @@
 
   // Geometry also drives GPU uniforms (no fetch) when eligible.
   $: geomKey = `${imageCrop ? imageCrop.join(',') : 'full'}|${rot90}|${flipH}|${flipV}|${angle}`;
-  $: if (gpuEligible) { geomKey; texW; applyGeometryAndDraw(); }
+  $: if (gpuEligible) { geomKey; applyGeometryAndDraw(); }
 
   // CPU fallback path: re-fetch the SOURCE from the backend only when NOT eligible
   // (dust/IR active, raw view, or no WebGL2). Reuses the existing render()/schedule.
