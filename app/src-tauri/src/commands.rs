@@ -208,6 +208,13 @@ pub struct DustStroke {
     pub r: f64,
 }
 
+/// IR-driven auto dust removal settings from the UI.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct IrRemoval {
+    pub enabled: bool,
+    pub sensitivity: f32,
+}
+
 /// The visible region to render, in FULL-RES pixel coordinates, plus the output
 /// (≈ viewport) pixel size. `raw` selects the un-inverted scan.
 #[derive(Debug, Clone, Deserialize)]
@@ -229,6 +236,7 @@ pub struct ViewSpec {
     #[serde(default)] pub flip_v: bool,
     #[serde(default)] pub angle: f32,
     #[serde(default)] pub dust: Vec<DustStroke>,
+    #[serde(default)] pub ir_removal: IrRemoval,
 }
 
 #[tauri::command]
@@ -272,6 +280,11 @@ pub fn render_view(id: String, params: InvertParams, view: ViewSpec, session: St
         cx, cy, cw_px, ch_px, view.out_w.max(1), view.out_h.max(1),
     );
     dust::apply(&mut inv, &stamps);
+    if view.ir_removal.enabled {
+        if let Some(ir) = scaled.ir.as_ref() {
+            dust::apply_ir(&mut inv, ir, view.ir_removal.sensitivity);
+        }
+    }
     let out = if view.finish { finish_image(&inv, &finish_from(&params)) } else { inv };
     to_jpeg_b64(&out, false, PREVIEW_JPEG_QUALITY)
 }
@@ -412,5 +425,17 @@ mod tests {
         assert!((s[0].cx - 100.0).abs() < 0.5, "0.25*400");
         assert!((s[0].cy - 100.0).abs() < 0.5, "0.5*200");
         assert!((s[0].r - 4.0).abs() < 0.5, "0.01*400");
+    }
+
+    #[test]
+    fn viewspec_ir_removal_defaults_off_and_parses() {
+        let d: ViewSpec = serde_json::from_str(
+            r#"{"crop":[0,0,10,10],"out_w":10,"out_h":10,"raw":false}"#).unwrap();
+        assert!(!d.ir_removal.enabled, "ir_removal defaults disabled");
+        let p: ViewSpec = serde_json::from_str(
+            r#"{"crop":[0,0,10,10],"out_w":10,"out_h":10,"raw":false,
+                "ir_removal":{"enabled":true,"sensitivity":60}}"#).unwrap();
+        assert!(p.ir_removal.enabled);
+        assert!((p.ir_removal.sensitivity - 60.0).abs() < 1e-6);
     }
 }
