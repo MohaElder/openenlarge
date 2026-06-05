@@ -1,6 +1,6 @@
 import { get } from "svelte/store";
 import { images, activeId, module, developProgress, editsById, cropById, dustById, folderImages } from "./store";
-import { api, type ImageEntry, type InvertParams } from "./api";
+import { api, defaultParams, type ImageEntry, type InvertParams } from "./api";
 import { dropHistory } from "./develop/historyStore";
 
 /** Ids of images not yet developed, in order. Pure helper (testable). */
@@ -33,9 +33,12 @@ function nextPaint(): Promise<void> {
 
 /** Develop every not-yet-developed image IN THE SELECTED FOLDER sequentially,
  * updating progress, then switch to the Develop module. Resolves when done. */
-export async function developAll(): Promise<void> {
+export async function developAll(stock?: string): Promise<void> {
   const ids = undevelopedIds(get(folderImages));
   if (ids.length === 0) { module.set("develop"); return; }
+  if (stock && stock !== "none") {
+    editsById.update((m) => applyStockToIds(m, ids, stock, defaultParams));
+  }
   developProgress.set({ active: true, done: 0, total: ids.length });
   // Let the overlay paint (and fade in) before kicking off the first develop call.
   await nextPaint();
