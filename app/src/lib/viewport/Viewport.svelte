@@ -51,9 +51,10 @@
   let animating = false;
   let animTimer: ReturnType<typeof setTimeout> | null = null;
 
-  // GPU upload-once state. The raw working buffer is uploaded to the GPU as a
-  // float texture once per image; inversion + geometry then update via uniforms.
-  let uploadedId: string | null = null;
+  // GPU upload state. The working buffer is uploaded to the GPU as a float texture;
+  // inversion + geometry then update via uniforms. In bake mode the upload re-fires
+  // when strokes/geometry change (keyed by uploadKey); otherwise once per image.
+  let uploadKey = "";
   let texW = 0, texH = 0;
 
   $: ready = imgW > 0 && imgH > 0 && vpW > 0 && vpH > 0;
@@ -152,22 +153,47 @@
   function schedule() { if (timer) clearTimeout(timer); timer = setTimeout(render, 80); }
   function scheduleIfReady() { if (id && vpW && imgW) { clampCenter(); schedule(); } }
 
-  // GPU path is used only when WebGL2 is available AND no dust/IR/raw is active.
-  // Dust/IR/raw keep the proven CPU render_view path (Plan 3 moves them to GPU).
-  $: gpuEligible = !!(useGL && renderer && !raw && dust.length === 0 && !irRemoval.enabled);
+  // GPU path: WebGL2 available + non-raw. Dust/IR now stay on the GPU via a baked
+  // (geometry + pre-invert heal) working texture; only raw/no-WebGL2 fall to CPU.
+  $: gpuEligible = !!(useGL && renderer && !raw);
+  // Bake mode: dust/IR active → request the baked working texture + identity geometry.
+  $: bakeMode = dust.length > 0 || irRemoval.enabled;
 
-  // Upload the raw linear working buffer to the GPU as a float texture, once per
-  // image. Sets uniforms + draws after the upload.
+  // Key the uploaded working texture. In bake mode it depends on dust strokes + the
+  // baked geometry (re-bake on commit/geometry change); else just the image id.
+  function currentUploadKey(): string {
+    if (bakeMode) {
+      return `bake|${id}|${dustRev}|${irRemoval.enabled}|${irRemoval.sensitivity}|${imageCrop ? imageCrop.join(',') : 'full'}|${rot90}|${flipH}|${flipV}|${angle}`;
+    }
+    return `raw|${id}`;
+  }
+
+  // Upload the working float texture to the GPU. In bake mode, fetch the BAKED
+  // (geometry + pre-invert heal) buffer; else the raw working buffer. Sets uniforms
+  // + draws after upload. Re-fetches only when the upload key changes.
   async function uploadWorking() {
     if (!gpuEligible || !id || !renderer) return;
-    if (uploadedId === id) return; // already on the GPU
-    const curId = id;
-    const info = await api.workingInfo(curId);
-    const buf = await api.workingPixels(curId);
-    if (!renderer || id !== curId) return; // image changed mid-fetch
-    renderer.setSourceFloat(new Uint16Array(buf), info.w, info.h);
-    uploadedId = curId;
-    texW = info.w; texH = info.h;
+    const key = currentUploadKey();
+    if (uploadKey === key) return; // already on the GPU for these inputs
+    const k = key;
+    if (bakeMode) {
+      const spec = {
+        rot90, flip_h: flipH, flip_v: flipV, angle,
+        image_crop: imageCrop, dust, ir_removal: irRemoval,
+      };
+      const info = await api.workingBakedInfo(id, spec);
+      const buf = await api.workingBakedPixels(id, spec);
+      if (!renderer || currentUploadKey() !== k) return; // stale (params changed mid-fetch)
+      renderer.setSourceFloat(new Uint16Array(buf), info.w, info.h);
+      texW = info.w; texH = info.h;
+    } else {
+      const info = await api.workingInfo(id);
+      const buf = await api.workingPixels(id);
+      if (!renderer || currentUploadKey() !== k) return; // image changed mid-fetch
+      renderer.setSourceFloat(new Uint16Array(buf), info.w, info.h);
+      texW = info.w; texH = info.h;
+    }
+    uploadKey = k;
     await refreshInversion();
     applyGeometryAndDraw();
   }
@@ -184,6 +210,15 @@
   // Map orient/flip/straighten/persistent-crop into GPU geometry uniforms, then draw.
   function applyGeometryAndDraw() {
     if (!gpuEligible || !renderer) return;
+    // Bake mode: geometry is already baked into the texture → identity + baked dims.
+    if (bakeMode) {
+      renderer.setGeometry({
+        crop_off: [0, 0], crop_scale: [1, 1], angle: 0,
+        orient: [1, 0, 0, 1], raw, outW: texW, outH: texH,
+      });
+      drawGL();
+      return;
+    }
     // orient as a 2x2 on centred UV: rot90 (clockwise) + flips.
     const ang = (rot90 % 4) * Math.PI / 2;
     const s = Math.sin(ang), c = Math.cos(ang);
@@ -205,10 +240,10 @@
     drawGL();
   }
 
-  // Upload the working float texture once per image (and re-upload after the GPU
-  // path becomes eligible again, e.g. dust/IR turned off).
-  $: if (gpuEligible) { id; uploadWorking(); }
-  $: if (!gpuEligible) uploadedId = null;
+  // Upload the working float texture. Re-fires when the image changes or, in bake
+  // mode, when strokes/IR/geometry change (currentUploadKey dedupes redundant runs).
+  $: if (gpuEligible) { id; dustRev; irRemoval.enabled; irRemoval.sensitivity; imageCrop; rot90; flipH; flipV; angle; uploadWorking(); }
+  $: if (!gpuEligible) uploadKey = "";
 
   // Inversion params now drive GPU uniforms (no backend pixel fetch) when eligible.
   $: invKey = `${params.mode}|${params.stock}|${params.exposure}|${params.temp}|${params.tint}|${params.black}|${params.gamma}`;
@@ -216,7 +251,9 @@
 
   // Geometry also drives GPU uniforms (no fetch) when eligible.
   $: geomKey = `${imageCrop ? imageCrop.join(',') : 'full'}|${rot90}|${flipH}|${flipV}|${angle}`;
-  $: if (gpuEligible) { geomKey; applyGeometryAndDraw(); }
+  // Raw-mode GPU geometry only: in bake mode geometry is baked into the texture and
+  // the upload trigger handles re-draws, so this would otherwise double-draw.
+  $: if (gpuEligible && !bakeMode) { geomKey; applyGeometryAndDraw(); }
 
   // CPU fallback path: re-fetch the SOURCE from the backend only when NOT eligible
   // (dust/IR active, raw view, or no WebGL2). Reuses the existing render()/schedule.
