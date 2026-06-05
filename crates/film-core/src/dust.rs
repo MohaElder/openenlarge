@@ -176,12 +176,15 @@ pub fn ir_defect_mask(w: usize, h: usize, ir: &[f32], sensitivity: f32) -> Mask 
 }
 
 /// Detect defects from `ir` and inpaint them in place over the whole frame. No-op when
-/// `ir` length doesn't match the image or no defects are found.
+/// `ir` length doesn't match the image, or when no defects are detected.
 pub fn apply_ir(img: &mut Image, ir: &[f32], sensitivity: f32) {
     if ir.len() != img.pixels.len() {
         return;
     }
     let mask = ir_defect_mask(img.width, img.height, ir, sensitivity);
+    if !mask.bits.iter().any(|&b| b) {
+        return; // nothing flagged — skip the full-frame inpaint
+    }
     inpaint_masked(img, &mask, RADIUS);
 }
 
@@ -263,6 +266,8 @@ mod tests {
         let m = ir_defect_mask(n, n, &ir, 50.0); // sensitivity 50 → t=0.725 → thr=0.6525
         assert_eq!((m.x0, m.y0, m.w, m.h), (0, 0, n, n), "ir mask spans the whole frame");
         assert!(m.bits[5 * n + 5], "defect pixel flagged");
+        assert!(m.bits[4 * n + 5], "pixel above the defect is dilated in");
+        assert!(m.bits[5 * n + 4], "pixel left of the defect is dilated in");
         assert!(!m.bits[0], "clean corner not flagged");
     }
 
@@ -296,6 +301,16 @@ mod tests {
         ir[mid] = 0.05;
         apply_ir(&mut img, &ir, 50.0);
         assert!(img.pixels[mid][0] < 0.6, "speck healed toward field, got {:?}", img.pixels[mid]);
+    }
+
+    #[test]
+    fn apply_ir_noop_when_no_defects() {
+        let n = 8usize;
+        let mut img = Image { width: n, height: n, pixels: vec![[0.4, 0.5, 0.6]; n * n], ir: None };
+        let before = img.clone();
+        let ir = vec![0.9_f32; n * n]; // uniformly clean → no defects
+        apply_ir(&mut img, &ir, 100.0);
+        assert_eq!(img, before, "clean IR field → image untouched");
     }
 
     #[test]
