@@ -3,7 +3,7 @@ import { undevelopedIds } from "./workflow";
 import type { ImageEntry } from "./api";
 
 const mk = (id: string, developed: boolean): ImageEntry => ({
-  id, path: "", file_name: id, thumbnail: "", developed, has_ir: false,
+  id, path: "", file_name: id, thumbnail: "", developed, has_ir: false, offline: false,
   metadata: { width: 0, height: 0, file_size: 0 },
 });
 
