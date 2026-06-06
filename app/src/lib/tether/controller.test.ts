@@ -56,5 +56,6 @@ describe("processNewFile", () => {
     const { tetherLast } = await import("./store");
     await expect(processNewFile("/roll/BAD.dng")).resolves.toBeUndefined();
     expect(get(tetherLast)).toEqual({ name: "BAD.dng", ok: false, error: "Error: decode boom" });
+    expect(get((await import("../store")).images)).toHaveLength(0);
   });
 });
