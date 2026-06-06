@@ -43,4 +43,23 @@ describe("createPerImageParams", () => {
     params.update((p) => ({ ...p, exposure: 9 }));
     expect(get(editsById)).toEqual({});
   });
+
+  // `bind:value={$params.field}` mutates the live entry in place and calls
+  // set() with the SAME reference. The catalog write-through (wireRecord) only
+  // saves entries whose reference changed, so set() must store a fresh object —
+  // otherwise tint/tone slider edits never reach disk. Regression guard.
+  it("set stores a new entry reference even when the value was mutated in place", () => {
+    const activeId = writable<string | null>("A");
+    const { params, editsById } = createPerImageParams(activeId, mk);
+    params.set({ exposure: 0 } as InvertParams);
+    const before = get(editsById)["A"];
+
+    const live = get(params as unknown as Writable<InvertParams>);
+    (live as { exposure: number }).exposure = 42; // simulate in-place bind mutation
+    params.set(live);
+
+    const after = get(editsById)["A"];
+    expect(after).not.toBe(before); // reference changed → wireRecord persists it
+    expect(after.exposure).toBe(42);
+  });
 });

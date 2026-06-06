@@ -33,12 +33,17 @@ export function createPerImageParams(
 
   const params: ParamsStore = {
     subscribe: view.subscribe,
+    // Always store a fresh object. Svelte's `bind:value={$params.field}` mutates
+    // the live entry in place and calls set() with the same reference; the
+    // catalog write-through (wireRecord) persists only entries whose reference
+    // changed, so reusing the reference would silently drop those edits (tint,
+    // tone sliders) on reload. Shallow copy makes every edit a new reference.
     set: (p) => {
-      if (activeIdVal !== null) editsById.update((m) => ({ ...m, [activeIdVal as string]: p }));
+      if (activeIdVal !== null) editsById.update((m) => ({ ...m, [activeIdVal as string]: { ...p } }));
     },
     update: (fn) => {
       if (activeIdVal !== null)
-        editsById.update((m) => ({ ...m, [activeIdVal as string]: fn(entryFor(m, activeIdVal, makeDefault)) }));
+        editsById.update((m) => ({ ...m, [activeIdVal as string]: { ...fn(entryFor(m, activeIdVal, makeDefault)) } }));
     },
   };
 
