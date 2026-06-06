@@ -1,5 +1,28 @@
 //! Tethered watch-folder: watch a directory, emit an event per fully-written scan.
 
+use std::path::Path;
+use std::time::{Duration, Instant};
+
+/// Block until `path`'s size is unchanged across two consecutive reads spaced by
+/// `poll`, or until `max_wait` elapses. Returns true once stable, false on
+/// timeout or if the file never becomes readable. Cheap: just stats the file.
+pub fn wait_until_stable(path: &Path, poll: Duration, max_wait: Duration) -> bool {
+    let deadline = Instant::now() + max_wait;
+    let mut last: Option<u64> = None;
+    loop {
+        if Instant::now() >= deadline {
+            return false;
+        }
+        std::thread::sleep(poll);
+        let size = std::fs::metadata(path).map(|m| m.len()).ok();
+        match (last, size) {
+            (Some(prev), Some(cur)) if prev == cur && cur > 0 => return true,
+            _ => {}
+        }
+        last = size;
+    }
+}
+
 /// File extensions we treat as scans, lowercase, no dot. Mirrors the import
 /// dialog filter in `panels/Source.svelte`.
 const SCAN_EXTS: &[&str] = &[
@@ -27,6 +50,8 @@ pub fn is_accepted_scan(file_name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
+    use std::time::Duration;
 
     #[test]
     fn accepts_known_raw_and_image_extensions() {
@@ -50,5 +75,41 @@ mod tests {
         assert!(!is_accepted_scan(".hidden.dng"));
         assert!(!is_accepted_scan("DSCF1234.dng.tmp"));
         assert!(!is_accepted_scan("~temp.dng"));
+    }
+
+    #[test]
+    fn stable_returns_true_for_a_complete_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("done.dng");
+        std::fs::write(&p, b"already fully written").unwrap();
+        // Short cadence so the test is fast; file is already stable.
+        assert!(wait_until_stable(&p, Duration::from_millis(10), Duration::from_secs(2)));
+    }
+
+    #[test]
+    fn stable_returns_false_for_a_missing_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("nope.dng");
+        assert!(!wait_until_stable(&p, Duration::from_millis(10), Duration::from_millis(80)));
+    }
+
+    #[test]
+    fn stable_waits_out_a_growing_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join("growing.dng");
+        let mut f = std::fs::File::create(&p).unwrap();
+        f.write_all(b"chunk1").unwrap();
+        f.flush().unwrap();
+        let p2 = p.clone();
+        // Append once more after a beat, then stop growing.
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(30));
+            let mut g = std::fs::OpenOptions::new().append(true).open(&p2).unwrap();
+            g.write_all(b"chunk2").unwrap();
+            g.flush().unwrap();
+        });
+        assert!(wait_until_stable(&p, Duration::from_millis(20), Duration::from_secs(2)));
+        // Final size reflects both chunks (gate didn't fire mid-write).
+        assert_eq!(std::fs::metadata(&p).unwrap().len(), 12);
     }
 }

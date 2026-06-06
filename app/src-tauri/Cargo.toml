@@ -37,6 +37,9 @@ zstd = "0.13"
 half = "2"
 
 
+[dev-dependencies]
+tempfile = "3"
+
 # Fast `tauri dev`: optimize dependencies (RAW decode, resize, inversion live in
 # film-core/rawler/image) while keeping the app crate lightly optimized for quick
 # rebuilds. Without this, debug builds run heavy image math 5-10x slower.
