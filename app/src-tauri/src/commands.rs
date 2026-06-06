@@ -329,6 +329,17 @@ pub fn develop_image(
     session: State<Session>,
     catalog: State<crate::catalog::Catalog>,
 ) -> Result<ImageEntry, String> {
+    develop_heavy(id, &session, &catalog)
+}
+
+/// Decode the RAW, build the quality-capped working image + auto-WB thumb, sample
+/// the base, refresh the thumbnail/catalog, and write the cache sidecar. This is
+/// the expensive path shared by `develop_image` and `ensure_developed`.
+fn develop_heavy(
+    id: String,
+    session: &Session,
+    catalog: &crate::catalog::Catalog,
+) -> Result<ImageEntry, String> {
     let cap = session.quality.lock().unwrap().cap();
     let path = {
         let images = session.images.lock().unwrap();
@@ -397,6 +408,52 @@ pub fn develop_image(
 pub fn set_quality(quality: Quality, session: State<Session>) -> Result<(), String> {
     *session.quality.lock().unwrap() = quality;
     Ok(())
+}
+
+/// Idempotent, cache-aware develop. Loads the cached buffer if not resident, and
+/// re-decodes the RAW only when that buffer is too small for the current quality
+/// (Quality mode on a source larger than the cache cap). Performance switches and
+/// already-full-res buffers return without any decode.
+#[tauri::command]
+pub fn ensure_developed(
+    id: String,
+    session: State<Session>,
+    catalog: State<crate::catalog::Catalog>,
+) -> Result<ImageEntry, String> {
+    let cap = session.quality.lock().unwrap().cap();
+    // Best-effort cache rehydration; ignore "not developed" — we full-develop below.
+    let _ = ensure_resident(&session, &id);
+
+    let adequate_entry = {
+        let images = session.images.lock().unwrap();
+        let img = images.get(&id).ok_or("unknown image id")?;
+        match img.developed.as_ref() {
+            Some(dev) => {
+                let working_edge = dev.working.width.max(dev.working.height) as u32;
+                let native_edge = img.metadata.width.max(img.metadata.height);
+                if working_satisfies(working_edge, native_edge, cap) {
+                    Some(ImageEntry {
+                        id: id.clone(),
+                        path: img.path.clone(),
+                        file_name: img.file_name.clone(),
+                        thumbnail: img.thumbnail.clone(),
+                        metadata: img.metadata.clone(),
+                        developed: true,
+                        has_ir: dev.working.ir.is_some(),
+                        offline: false,
+                    })
+                } else {
+                    None
+                }
+            }
+            None => None,
+        }
+    };
+
+    if let Some(entry) = adequate_entry {
+        return Ok(entry);
+    }
+    develop_heavy(id, &session, &catalog)
 }
 
 /// Drop an image from the session. With `delete_file`, also move the original
