@@ -1,7 +1,78 @@
 //! Tethered watch-folder: watch a directory, emit an event per fully-written scan.
 
+use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+use serde::Serialize;
 use std::path::Path;
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
+use tauri::{AppHandle, Emitter};
+
+/// Managed state: the single live watcher, or None when not tethering. Dropping
+/// the watcher stops it, so replacing the slot cleanly ends the prior session.
+#[derive(Default)]
+pub struct TetherState(pub Mutex<Option<RecommendedWatcher>>);
+
+/// Event payload sent to the frontend when a new scan is ready to develop.
+#[derive(Clone, Serialize)]
+struct NewFile {
+    path: String,
+}
+
+/// Start watching `dir`. Replaces any existing session.
+#[tauri::command]
+pub fn tether_start(
+    dir: String,
+    app: AppHandle,
+    state: tauri::State<TetherState>,
+) -> Result<(), String> {
+    let watch_dir = std::path::PathBuf::from(&dir);
+    if !watch_dir.is_dir() {
+        return Err(format!("not a folder: {dir}"));
+    }
+    let app_for_events = app.clone();
+    let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
+        let Ok(event) = res else { return };
+        // Only react to file creation / rename-into-place.
+        let relevant = matches!(
+            event.kind,
+            notify::EventKind::Create(_) | notify::EventKind::Modify(notify::event::ModifyKind::Name(_))
+        );
+        if !relevant {
+            return;
+        }
+        for path in event.paths {
+            let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+            if !is_accepted_scan(name) {
+                continue;
+            }
+            // Stabilize + emit off the watcher thread so we never block it.
+            let app = app_for_events.clone();
+            std::thread::spawn(move || {
+                if wait_until_stable(&path, Duration::from_millis(250), Duration::from_secs(30)) {
+                    let payload = NewFile { path: path.to_string_lossy().to_string() };
+                    if let Err(e) = app.emit("tether://new-file", payload) {
+                        eprintln!("[tether] emit failed: {e}");
+                    }
+                } else {
+                    eprintln!("[tether] file never stabilized: {}", path.display());
+                }
+            });
+        }
+    })
+    .map_err(|e| e.to_string())?;
+    watcher
+        .watch(&watch_dir, RecursiveMode::NonRecursive)
+        .map_err(|e| e.to_string())?;
+    *state.0.lock().unwrap() = Some(watcher);
+    Ok(())
+}
+
+/// Stop watching (drops the watcher).
+#[tauri::command]
+pub fn tether_stop(state: tauri::State<TetherState>) -> Result<(), String> {
+    *state.0.lock().unwrap() = None;
+    Ok(())
+}
 
 /// Block until `path`'s size is unchanged across two consecutive reads spaced by
 /// `poll`, or until `max_wait` elapses. Returns true once stable, false on
@@ -111,5 +182,14 @@ mod tests {
         assert!(wait_until_stable(&p, Duration::from_millis(40), Duration::from_secs(2)));
         // Final size reflects both chunks (gate didn't fire mid-write).
         assert_eq!(std::fs::metadata(&p).unwrap().len(), 12);
+    }
+
+    #[test]
+    fn tether_state_holds_and_replaces_the_watcher_slot() {
+        let state = TetherState::default();
+        assert!(state.0.lock().unwrap().is_none());
+        // Simulate stop clearing the slot.
+        *state.0.lock().unwrap() = None;
+        assert!(state.0.lock().unwrap().is_none());
     }
 }

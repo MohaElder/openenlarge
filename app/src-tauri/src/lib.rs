@@ -21,6 +21,7 @@ pub mod commands_test_support {
 pub fn run() {
     tauri::Builder::default()
         .manage(session::Session::default())
+        .manage(tether::TetherState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -75,6 +76,8 @@ pub fn run() {
             commands::working_baked_pixels,
             commands::resolved_inversion,
             commands::sample_base_at,
+            tether::tether_start,
+            tether::tether_stop,
         ])
         .run(tauri::generate_context!())
         .expect("error while running OpenEnlarge");
