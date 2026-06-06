@@ -83,6 +83,7 @@ fn main() -> Result<()> {
         .to_lowercase();
     let img = match ext.as_str() {
         "tif" | "tiff" => decode_tiff(&cli.input),
+        "jpg" | "jpeg" | "png" => film_core::decode::decode_ldr(&cli.input),
         _ => film_core::decode::decode_raw(&cli.input),
     }
     .with_context(|| format!("decoding {:?}", cli.input))?;

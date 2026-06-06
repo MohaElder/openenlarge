@@ -19,6 +19,19 @@ pub enum DecodeError {
     UnsupportedColor(ColorType),
     #[error("raw decode error: {0}")]
     Raw(String),
+    #[error("image decode error: {0}")]
+    Image(#[from] ::image::ImageError),
+}
+
+/// sRGB electro-optical transfer function: gamma-encoded sRGB → linear light.
+/// Input and output are normalized to [0, 1].
+#[inline]
+fn srgb_to_linear(c: f32) -> f32 {
+    if c <= 0.04045 {
+        c / 12.92
+    } else {
+        ((c + 0.055) / 1.055).powf(2.4)
+    }
 }
 
 /// Decode an 8- or 16-bit RGB(A) TIFF / linear DNG into a normalized f32 Image.
@@ -159,4 +172,69 @@ pub fn decode_raw(path: &Path) -> Result<Image, DecodeError> {
         pixels,
         ir: None,
     })
+}
+
+/// Decode a gamma-encoded LDR image (JPEG / PNG) into a linear-light RGB `Image`.
+///
+/// Unlike camera RAW and scanner TIFFs — which the pipeline treats as already
+/// linear — JPEG/PNG are almost always **sRGB gamma-encoded**. We apply the sRGB
+/// EOTF (`srgb_to_linear`) so the decoded values land in the same linear-light
+/// domain the inversion engine expects. Any alpha channel is dropped; 16-bit PNGs
+/// are supported (decoded at full precision before normalizing).
+///
+/// Note: 8-bit JPEG is lossy and low-bit-depth, so density-domain inversion has
+/// less headroom than with a 16-bit RAW/TIFF scan — quality will be lower.
+pub fn decode_ldr(path: &Path) -> Result<Image, DecodeError> {
+    let img = ::image::open(path)?;
+    let rgb = img.to_rgb32f(); // normalized [0,1] f32, alpha dropped
+    let (w, h) = (rgb.width() as usize, rgb.height() as usize);
+    let pixels: Vec<[f32; 3]> = rgb
+        .pixels()
+        .map(|p| {
+            [
+                srgb_to_linear(p[0]),
+                srgb_to_linear(p[1]),
+                srgb_to_linear(p[2]),
+            ]
+        })
+        .collect();
+    Ok(Image {
+        width: w,
+        height: h,
+        pixels,
+        ir: None,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn srgb_to_linear_endpoints_and_midtone() {
+        assert!((srgb_to_linear(0.0) - 0.0).abs() < 1e-6);
+        assert!((srgb_to_linear(1.0) - 1.0).abs() < 1e-6);
+        // 128/255 sRGB ≈ 0.50196 encodes to ≈ 0.2159 linear.
+        let mid = srgb_to_linear(128.0 / 255.0);
+        assert!((mid - 0.2159).abs() < 1e-3, "got {mid}");
+    }
+
+    #[test]
+    fn decode_ldr_png_linearizes() {
+        // 2x1 PNG: black, white. Decoded linear values must be 0.0 and 1.0.
+        let mut buf: ::image::RgbImage = ::image::ImageBuffer::new(2, 1);
+        buf.put_pixel(0, 0, ::image::Rgb([0, 0, 0]));
+        buf.put_pixel(1, 0, ::image::Rgb([255, 255, 255]));
+        let dir = std::env::temp_dir();
+        let path = dir.join("filmrev_decode_ldr_test.png");
+        buf.save(&path).unwrap();
+
+        let img = decode_ldr(&path).unwrap();
+        assert_eq!((img.width, img.height), (2, 1));
+        assert!(img.ir.is_none());
+        assert!((img.pixels[0][0] - 0.0).abs() < 1e-6);
+        assert!((img.pixels[1][0] - 1.0).abs() < 1e-6);
+
+        let _ = std::fs::remove_file(&path);
+    }
 }

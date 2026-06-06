@@ -1310,6 +1310,7 @@ dependencies = [
 name = "film-core"
 version = "0.1.0"
 dependencies = [
+ "image",
  "inpaint",
  "nalgebra",
  "ndarray",

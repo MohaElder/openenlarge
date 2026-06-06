@@ -7,6 +7,7 @@ edition = "2021"
 nalgebra = { workspace = true }
 tiff = { workspace = true }
 rawler = { workspace = true }
+image = { workspace = true }
 thiserror = { workspace = true }
 inpaint = "0.1"
 ndarray = "0.16"

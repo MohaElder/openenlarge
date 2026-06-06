@@ -6,7 +6,7 @@ use crate::gpu_upload::{bake_geometry, bake_working, capped_dims, image_from_rgb
 use crate::metadata::extract;
 use crate::session::{CachedImage, Developed, ImageEntry, InvertParams, PreparedExport, Quality, Session};
 use film_core::calibrate::{auto_wb_gains, sample_base};
-use film_core::decode::{decode_raw, decode_tiff};
+use film_core::decode::{decode_ldr, decode_raw, decode_tiff};
 use film_core::dust::{self, Stamp};
 use film_core::engine::{invert_image, params_for_stock, InversionParams, Mode};
 use film_core::finish::{finish_image, tone_luts, ColorGrade, ColorMix, FinishParams, PcSample};
@@ -114,6 +114,7 @@ fn decode_any(path: &Path) -> Result<film_core::Image, String> {
     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
     match ext.as_str() {
         "tif" | "tiff" => decode_tiff(path).map_err(|e| format!("{e}")),
+        "jpg" | "jpeg" | "png" => decode_ldr(path).map_err(|e| format!("{e}")),
         _ => decode_raw(path).map_err(|e| format!("{e}")),
     }
 }
@@ -286,7 +287,14 @@ pub fn import_image(
     catalog: State<crate::catalog::Catalog>,
 ) -> Result<ImageEntry, String> {
     let p = Path::new(&path);
-    let thumbnail = match decode_tiff(p) {
+    // Light thumbnail: TIFF and JPEG/PNG decode cheaply (no demosaic), so render a
+    // real preview. RAW files fall back to the 1x1 placeholder until develop.
+    let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("").to_lowercase();
+    let preview = match ext.as_str() {
+        "jpg" | "jpeg" | "png" => decode_ldr(p).map_err(|e| format!("{e}")),
+        _ => decode_tiff(p).map_err(|e| format!("{e}")),
+    };
+    let thumbnail = match preview {
         Ok(prev) => to_png_b64(&proxy(&prev, THUMB_EDGE), true)?,
         Err(_) => "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==".to_string(),
     };
