@@ -77,6 +77,14 @@ const AUTOWB_EDGE: u32 = 256;
 const PREVIEW_JPEG_QUALITY: u8 = 88;
 const CACHE_WORKING_CAP: u32 = 4096;
 
+/// True when a resident working buffer is large enough for `cap`. The buffer is
+/// adequate once its long edge reaches `min(native_edge, cap)` — Performance
+/// (cap 4096) is satisfied by any cached buffer; Quality (cap u32::MAX) needs the
+/// full-res decode unless the source is already smaller than the cache cap.
+fn working_satisfies(working_edge: u32, native_edge: u32, cap: u32) -> bool {
+    working_edge >= native_edge.min(cap)
+}
+
 pub(crate) fn default_invert_params() -> InvertParams {
     InvertParams {
         mode: "b".into(), stock: "none".into(), base_override: None,
@@ -1051,5 +1059,34 @@ mod tests {
                 "ir_removal":{"enabled":true,"sensitivity":60}}"#).unwrap();
         assert!(p.ir_removal.enabled);
         assert!((p.ir_removal.sensitivity - 60.0).abs() < 1e-6);
+    }
+}
+
+#[cfg(test)]
+mod adequacy_tests {
+    use super::working_satisfies;
+
+    #[test]
+    fn performance_cache_buffer_is_always_adequate() {
+        // native 6000px, buffer capped at 4096 (cache tier), Performance cap 4096
+        assert!(working_satisfies(4096, 6000, 4096));
+    }
+
+    #[test]
+    fn quality_needs_full_res_when_native_exceeds_cache() {
+        // native 6000px, only 4096 resident, Quality cap = u32::MAX → inadequate
+        assert!(!working_satisfies(4096, 6000, u32::MAX));
+    }
+
+    #[test]
+    fn quality_satisfied_when_native_small() {
+        // native 3000px (< cache cap), buffer 3000, Quality cap = u32::MAX → adequate
+        assert!(working_satisfies(3000, 3000, u32::MAX));
+    }
+
+    #[test]
+    fn quality_satisfied_when_full_res_resident() {
+        // native 6000px, full-res 6000 resident, Quality → adequate
+        assert!(working_satisfies(6000, 6000, u32::MAX));
     }
 }
