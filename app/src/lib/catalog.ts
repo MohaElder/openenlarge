@@ -5,6 +5,7 @@ import type { DustEdits } from "./develop/dust";
 import {
   images, editsById, cropById, dustById, metaById, quality,
   selectedFolder, gridZoom, module as moduleStore, activeId, folderBaseByPath,
+  updateLastCheck, updateSkipVersion,
 } from "./store";
 import { locale } from "./i18n";
 
@@ -77,6 +78,11 @@ export function applySnapshot(snap: CatalogSnapshot): void {
   if (st.module === "library" || st.module === "develop") moduleStore.set(st.module);
   if (st.active_id && entries.some((e) => e.id === st.active_id)) activeId.set(st.active_id);
   else if (entries.length) activeId.set(entries[0].id);
+  if (st.update_skip_version !== undefined) updateSkipVersion.set(st.update_skip_version);
+  if (st.update_last_check !== undefined) {
+    const ms = Number(st.update_last_check);
+    if (Number.isFinite(ms)) updateLastCheck.set(ms);
+  }
 
   const fb: Record<string, [number, number, number]> = {};
   for (const [k, v] of Object.entries(st)) {
@@ -157,11 +163,13 @@ export function initPersistence(): () => void {
   wireRecord(dustById, dust.save);
   wireRecord(metaById, meta.save);
 
-  let first = { q: true, loc: true, sf: true, gz: true, mod: true, aid: true };
+  let first = { q: true, loc: true, sf: true, gz: true, mod: true, aid: true, usv: true, ulc: true };
   quality.subscribe((q) => { if (first.q) { first.q = false; return; } savePref("quality", q); });
   locale.subscribe((l) => { if (first.loc) { first.loc = false; return; } savePref("locale", l); });
   selectedFolder.subscribe((p) => { if (first.sf) { first.sf = false; return; } saveState("selected_folder", p ?? ""); });
   gridZoom.subscribe((z) => { if (first.gz) { first.gz = false; return; } saveState("grid_zoom", String(z)); });
+  updateSkipVersion.subscribe((v) => { if (first.usv) { first.usv = false; return; } saveState("update_skip_version", v); });
+  updateLastCheck.subscribe((v) => { if (first.ulc) { first.ulc = false; return; } saveState("update_last_check", String(v)); });
   moduleStore.subscribe((m) => { if (first.mod) { first.mod = false; return; } saveState("module", m); });
   activeId.subscribe((a) => { if (first.aid) { first.aid = false; return; } saveState("active_id", a ?? ""); });
 

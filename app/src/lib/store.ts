@@ -47,6 +47,11 @@ export const allDeveloped = derived(images, ($i) => $i.length > 0 && $i.every((x
 export const selectedFolder = writable<string | null>(null);
 export const gridZoom = writable<number>(55);
 
+/** Last in-app update check (epoch ms) and the version the user chose to skip.
+ * Both persist via app_state as `update_last_check` / `update_skip_version`. */
+export const updateLastCheck = writable<number>(0);
+export const updateSkipVersion = writable<string>("");
+
 /** Folder/roll-default film base, keyed by image directory path. Persisted via
  * app_state as `folder_base:{dir}`. A per-image base_override wins over this. */
 export const folderBaseByPath = writable<Record<string, [number, number, number]>>({});
