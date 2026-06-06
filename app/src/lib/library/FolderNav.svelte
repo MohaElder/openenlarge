@@ -6,6 +6,7 @@
   import TreeNode from "./TreeNode.svelte";
   import Icon from "../icons/Icon.svelte";
   import GlassPanel from "../glass/GlassPanel.svelte";
+  import TetherPanel from "../tether/TetherPanel.svelte";
   import { t } from "$lib/i18n";
 
   let importing = false;
@@ -46,6 +47,7 @@
     <button class="import" on:click={pickAndImport} disabled={importing}>
       <Icon name="plus" /> {importing ? $t('folderNav.importing') : $t('folderNav.import')}
     </button>
+    <TetherPanel />
   </div>
 </GlassPanel>
 
