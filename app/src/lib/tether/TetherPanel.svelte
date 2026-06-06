@@ -6,8 +6,11 @@
   import { tetherWatching, tetherDir, tetherAutoAdvance, tetherLast } from "./store";
 
   let error = "";
+  let busy = false;
 
   async function toggle() {
+    if (busy) return;
+    busy = true;
     error = "";
     try {
       if ($tetherWatching) {
@@ -19,12 +22,14 @@
       await startTether(dir);
     } catch (e) {
       error = String(e);
+    } finally {
+      busy = false;
     }
   }
 </script>
 
 <div class="tether">
-  <button class="toggle" class:on={$tetherWatching} on:click={toggle}>
+  <button class="toggle" class:on={$tetherWatching} on:click={toggle} disabled={busy}>
     {$tetherWatching ? $t("tether.stop") : $t("tether.start")}
   </button>
 
@@ -43,7 +48,7 @@
       </div>
     {/if}
   {/if}
-  {#if error}<div class="last err">{error}</div>{/if}
+  {#if error}<div class="err-msg">{error}</div>{/if}
 </div>
 
 <style>
@@ -56,4 +61,5 @@
   .hint { font-size: 11px; opacity: 0.6; }
   .last { font-size: 12px; opacity: 0.85; }
   .last.err { color: #ff8a8a; }
+  .err-msg { font-size: 12px; color: #ff8a8a; }
 </style>
