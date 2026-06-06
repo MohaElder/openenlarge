@@ -103,12 +103,12 @@ mod tests {
         let p2 = p.clone();
         // Append once more after a beat, then stop growing.
         std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(30));
+            std::thread::sleep(Duration::from_millis(60));
             let mut g = std::fs::OpenOptions::new().append(true).open(&p2).unwrap();
             g.write_all(b"chunk2").unwrap();
             g.flush().unwrap();
         });
-        assert!(wait_until_stable(&p, Duration::from_millis(20), Duration::from_secs(2)));
+        assert!(wait_until_stable(&p, Duration::from_millis(40), Duration::from_secs(2)));
         // Final size reflects both chunks (gate didn't fire mid-write).
         assert_eq!(std::fs::metadata(&p).unwrap().len(), 12);
     }
