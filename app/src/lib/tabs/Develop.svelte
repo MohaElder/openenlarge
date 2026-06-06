@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t } from "$lib/i18n";
-  import { activeId, params, images, folderImages, tool, cropById, activeCrop, dustById, activeDust, deleteTarget, dustRev, folderBaseByPath, baseSampling, sampledBase } from "../store";
+  import { activeId, params, images, folderImages, tool, cropById, activeCrop, dustById, activeDust, deleteTarget, dustRev, developRev, folderBaseByPath, baseSampling, sampledBase } from "../store";
+  import { get } from "svelte/store";
   import { imageDir } from "../library/folderScope";
   import { withEffectiveBase } from "../develop/base";
   import { api } from "../api";
@@ -33,6 +34,25 @@
   // eslint-disable-next-line @typescript-eslint/no-unused-expressions
   $: { void $folderBaseByPath; effParams = withEffectiveBase($params, dir); }
   let effParams = withEffectiveBase($params, dir);
+
+  // Lazily upgrade the selected image to the current quality. No-op on the backend
+  // when the resident buffer already satisfies it (Performance, or already full-res),
+  // so this is cheap on every navigation. The stale guard drops results when the
+  // user has already moved on (rapid arrow-key stepping in Quality mode).
+  let lastEnsured: string | null = null;
+  async function ensureActiveDeveloped(id: string | null) {
+    if (!id || id === lastEnsured) return;
+    lastEnsured = id;
+    try {
+      const updated = await api.ensureDeveloped(id);
+      if (get(activeId) !== id) return; // navigated away mid-decode
+      images.update((list) => list.map((i) => (i.id === id ? updated : i)));
+      developRev.update((n) => n + 1);
+    } catch (e) {
+      console.error("ensureDeveloped failed", id, e);
+    }
+  }
+  $: ensureActiveDeveloped($activeId);
 
   // ---- Base recalibration (armed from Basic > Film Base) ----
   // The Film Base tools live in Basic.svelte; here we only render the sampling
@@ -229,7 +249,7 @@
       {:else}
         <Viewport id={$activeId} params={effParams} imgW={effW} imgH={effH} imageCrop={imageCrop}
                   rot90={cRot} flipH={committed?.flipH ?? false} flipV={committed?.flipV ?? false} angle={committed?.angle ?? 0}
-                  eraser={$tool === "eraser"} {brush} dust={dust.strokes} irRemoval={dust.irRemoval} dustRev={$dustRev}
+                  eraser={$tool === "eraser"} {brush} dust={dust.strokes} irRemoval={dust.irRemoval} dustRev={$dustRev} developRev={$developRev}
                   pointPick={pointPicking}
                   on:stroke={(e) => commitStroke(e.detail)} on:brush={(e) => (brush = e.detail)}
                   on:pointpick={onPointPick} />
