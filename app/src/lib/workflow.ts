@@ -62,11 +62,6 @@ export async function developAll(stock?: string): Promise<void> {
   developProgress.set({ active: false, done: ids.length, total: ids.length });
 }
 
-/** Mark all images undeveloped (used when the quality setting changes). */
-export function markAllUndeveloped(): void {
-  images.update((list) => list.map((i) => ({ ...i, developed: false })));
-}
-
 /**
  * Delete an image: forget it in the backend (optionally trashing the file), then
  * drop it from every per-image store. If it was the active image, select the next
