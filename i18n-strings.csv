@@ -91,6 +91,7 @@ export.summaryPartial,"Exported {done} of {total} · {failed} failed","已导出
 export.summaryDone,"Exported {done} {imageOrImages}","已导出 {done} {imageOrImages}","src/lib/export/ExportModal.svelte","status"
 export.imageSingular,"image","张照片","src/lib/export/ExportModal.svelte","plural unit"
 export.imagePlural,"images","张照片","src/lib/export/ExportModal.svelte","plural unit"
+export.cropSelected,"Crop selected","裁剪所选","src/lib/export/ExportModal.svelte","toggle"
 viewport.fit,"Fit","适应","src/lib/viewport/Viewport.svelte","zoom label"
 viewport.zoomPercent,"{percent}%","{percent}%","src/lib/viewport/Viewport.svelte","zoom label"
 quality.menuHeading,"Preview quality","预览质量","src/lib/viewport/QualityMenu.svelte","heading"

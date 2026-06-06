@@ -94,6 +94,7 @@ export class FinishRenderer {
     crop_off: new Float32Array([0, 0]),
     crop_scale: new Float32Array([1, 1]),
     angle: 0,
+    aspect: 1,
     orient: new Float32Array([1, 0, 0, 1]),
     raw: false,
   };
@@ -148,7 +149,7 @@ export class FinishRenderer {
     this.invProg = ip;
     for (const n of [
       "u_src","u_base","u_wb","u_m_pre","u_m_post","u_exposure","u_black","u_gamma",
-      "u_mode","u_raw","u_crop_off","u_crop_scale","u_angle","u_orient",
+      "u_mode","u_raw","u_crop_off","u_crop_scale","u_angle","u_aspect","u_orient",
     ]) this.invLoc[n] = gl.getUniformLocation(ip, n);
     gl.useProgram(ip); gl.uniform1i(this.invLoc.u_src, 0);
 
@@ -241,12 +242,13 @@ export class FinishRenderer {
   /** Geometry from the host (identity-safe). out{W,H} = post-geometry canvas size. */
   setGeometry(g: {
     crop_off: [number, number]; crop_scale: [number, number];
-    angle: number; orient: [number, number, number, number];
+    angle: number; aspect: number; orient: [number, number, number, number];
     raw: boolean; outW: number; outH: number;
   }) {
     this.geom.crop_off = new Float32Array(g.crop_off);
     this.geom.crop_scale = new Float32Array(g.crop_scale);
     this.geom.angle = g.angle;
+    this.geom.aspect = g.aspect;
     this.geom.orient = new Float32Array(g.orient);
     this.geom.raw = g.raw;
     this.canvas.width = g.outW; this.canvas.height = g.outH;
@@ -278,6 +280,7 @@ export class FinishRenderer {
     gl.uniform2fv(L.u_crop_off, this.geom.crop_off);
     gl.uniform2fv(L.u_crop_scale, this.geom.crop_scale);
     gl.uniform1f(L.u_angle, this.geom.angle);
+    gl.uniform1f(L.u_aspect, this.geom.aspect);
     gl.uniformMatrix2fv(L.u_orient, false, this.geom.orient);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -349,7 +352,7 @@ export class FinishRenderer {
     // Upload the full-res source, set inversion + IDENTITY geometry + finishing.
     this.setSourceFloat(src, w, h);
     this.setInversion(inv);
-    this.setGeometry({ crop_off: [0, 0], crop_scale: [1, 1], angle: 0, orient: [1, 0, 0, 1], raw: false, outW: w, outH: h });
+    this.setGeometry({ crop_off: [0, 0], crop_scale: [1, 1], angle: 0, aspect: 1, orient: [1, 0, 0, 1], raw: false, outW: w, outH: h });
     this.setUniforms(fu); this.setLut(lut); this.setColorGrade(cg); this.setColorMix(cm);
 
     // Offscreen output texture + FBO (RGBA8 for 8-bit, RGBA16F for 16-bit).

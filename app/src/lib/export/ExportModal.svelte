@@ -19,6 +19,12 @@
   import { t } from "$lib/i18n";
   import { withEffectiveBase } from "../develop/base";
   import { imageDir } from "../library/folderScope";
+  import CropView from "../crop/CropView.svelte";
+  import CropPanel from "../crop/CropPanel.svelte";
+  import { firstSelected, seedDraft, resolveCrop, type CropDraft } from "./batchCrop";
+  import { defaultFull, conform, constrainToRotated } from "../crop/cropMath";
+  import { presetNormAspect } from "../crop/presets";
+  import { rotateRectCW, rotateRectCCW, flipRectH, flipRectV, flipOrient, orientDims } from "../crop/transforms";
 
   const dispatch = createEventDispatcher<{ close: void }>();
 
@@ -53,6 +59,63 @@
     sel = click(sel, ids, id, { meta: e.metaKey || e.ctrlKey, shift: e.shiftKey });
   }
   $: allOn = isAllSelected(sel, ids);
+
+  // ---- Batch crop state ----
+  // When on, one shared crop is applied to every selected image at export time;
+  // saved per-image crops are left untouched. Mirrors Develop's crop draft so it
+  // can drive the same CropView/CropPanel components.
+  let batchCrop = false;
+  let cropSeeded = false;
+  let draft: CropDraft = seedDraft(null, 1, 1);
+
+  // Preview the first selected image (in display order). Swapping which image is
+  // first re-targets the preview but never re-seeds the draft.
+  $: firstId = firstSelected(ids, sel.selected);
+  $: firstImg = imgs.find((i) => i.id === firstId) ?? null;
+  $: origW = firstImg?.metadata.width ?? 0;
+  $: origH = firstImg?.metadata.height ?? 0;
+  $: previewParams = firstImg
+    ? withEffectiveBase($editsById[firstImg.id] ?? defaultParams(), imageDir(firstImg))
+    : defaultParams();
+
+  // Seed once when the panel is first expanded, from the first selected crop.
+  $: if (batchCrop && !cropSeeded && firstId) {
+    draft = seedDraft($cropById[firstId] ?? null, origW, origH);
+    cropSeeded = true;
+  }
+  $: if (!batchCrop) cropSeeded = false;
+
+  // Oriented dims + locked ratio, same derivation as Develop.
+  $: [oW, oH] = orientDims(origW, origH, draft.rot90);
+  $: orientedRatio = oH > 0 ? oW / oH : 1;
+  $: lockRatio = presetNormAspect(draft.aspect, orientedRatio, draft.orientation);
+  $: if (draft.angle !== 0) draft.rect = constrainToRotated(draft.rect, draft.angle, oW, oH);
+
+  function onPreset(id: string) {
+    draft.aspect = id;
+    draft.rect = conform(draft.rect, presetNormAspect(id, orientedRatio, draft.orientation));
+  }
+  function onSwap() {
+    draft.orientation = draft.orientation === "landscape" ? "portrait" : "landscape";
+    draft.rect = conform(draft.rect, presetNormAspect(draft.aspect, orientedRatio, draft.orientation));
+  }
+  function onReset() {
+    draft.rect = defaultFull(); draft.aspect = "original";
+    draft.orientation = origW >= origH ? "landscape" : "portrait";
+    draft.rot90 = 0; draft.flipH = false; draft.flipV = false; draft.angle = 0;
+  }
+  function onRotate(dir: number) {
+    if (dir > 0) { draft.rot90 = ((draft.rot90 + 1) % 4) as 0 | 1 | 2 | 3; draft.rect = rotateRectCW(draft.rect); }
+    else { draft.rot90 = ((draft.rot90 + 3) % 4) as 0 | 1 | 2 | 3; draft.rect = rotateRectCCW(draft.rect); }
+  }
+  function onFlip(axis: "h" | "v") {
+    const o = flipOrient({ rot90: draft.rot90, flipH: draft.flipH, flipV: draft.flipV }, axis);
+    draft.rot90 = o.rot90 as 0 | 1 | 2 | 3;
+    draft.flipH = o.flipH; draft.flipV = o.flipV;
+    draft.rect = axis === "h" ? flipRectH(draft.rect) : flipRectV(draft.rect);
+    draft.angle = -draft.angle;
+  }
+  function onStraighten(v: number) { draft.angle = Math.max(-45, Math.min(45, v)); }
 
   // ---- Format panel state ----
   let kind: ExportFormat["kind"] = "jpeg";
@@ -109,7 +172,7 @@
     for (const img of chosen) {
       try {
         const p = withEffectiveBase($editsById[img.id] ?? defaultParams(), imageDir(img));
-        const crop = $cropById[img.id] ?? null;
+        const crop = resolveCrop(batchCrop, draft, $cropById[img.id] ?? null);
         const imageCrop = crop
           ? ([crop.rect.x, crop.rect.y, crop.rect.w, crop.rect.h] as [number, number, number, number])
           : null;
@@ -208,6 +271,31 @@
     </div>
 
     <div class="format" class:busy={running}>
+      <div class="field">
+        <label class="toggle">
+          <input type="checkbox" bind:checked={batchCrop} disabled={running || !firstImg} />
+          <span class="track"><span class="knob"></span></span>
+          <span class="tlabel">{$t('export.cropSelected')}</span>
+        </label>
+      </div>
+
+      {#if batchCrop && firstImg}
+        <div class="cropwrap" transition:slideFade>
+          <div class="cropview">
+            <CropView id={firstImg.id} params={previewParams} imgW={oW} imgH={oH}
+                      bind:rect={draft.rect} {lockRatio}
+                      rot90={draft.rot90} flipH={draft.flipH} flipV={draft.flipV} angle={draft.angle}
+                      on:custom={() => (draft.aspect = "custom")}
+                      on:straighten={(e) => onStraighten(e.detail)} />
+          </div>
+          <div class="cropctl">
+            <CropPanel bind:aspect={draft.aspect} bind:orientation={draft.orientation} bind:angle={draft.angle}
+                       on:preset={(e) => onPreset(e.detail)} on:swap={onSwap} on:reset={onReset}
+                       on:rotate={(e) => onRotate(e.detail)} on:flip={(e) => onFlip(e.detail)} />
+          </div>
+        </div>
+      {/if}
+
       <div class="field">
         <span class="flabel">{$t('export.formatLabel')}</span>
         <div class="seg" style="--n:3; --i:{kindIndex}">
@@ -337,6 +425,31 @@
   .format.busy { opacity: 0.5; pointer-events: none; }
   .opts { display: flex; flex-direction: column; gap: 14px; }
   .field { display: flex; flex-direction: column; gap: 7px; }
+
+  /* Crop toggle */
+  .toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .toggle input:disabled ~ .track,
+  .toggle input:disabled ~ .tlabel { opacity: 0.4; cursor: default; }
+  .track {
+    position: relative; width: 38px; height: 22px; flex: 0 0 auto;
+    border-radius: 999px; background: var(--glass-hi);
+    border: 1px solid var(--glass-brd); transition: background 0.2s, border-color 0.2s;
+  }
+  .knob {
+    position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+    border-radius: 50%; background: var(--text-dim);
+    transition: transform 0.22s cubic-bezier(0.34, 1.3, 0.5, 1), background 0.2s;
+  }
+  .toggle input:checked ~ .track { background: var(--accent); border-color: transparent; }
+  .toggle input:checked ~ .track .knob { transform: translateX(16px); background: #fff; }
+  .tlabel { font-size: 12px; font-weight: 600; color: var(--text); }
+
+  /* Expanded batch-crop area: preview on the left, controls on the right */
+  .cropwrap { display: flex; gap: 16px; align-items: stretch; }
+  .cropview { flex: 1 1 auto; min-width: 0; height: 320px;
+    border-radius: 10px; background: #000; overflow: hidden; }
+  .cropctl { flex: 0 0 220px; }
   .flabel { font-size: 11px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase;
     color: var(--text-faint); }
   .flabel b { color: var(--text); font-weight: 600; letter-spacing: 0; text-transform: none;

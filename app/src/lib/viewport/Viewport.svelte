@@ -9,6 +9,7 @@
   import { toneLutBytes, colorGrade, colorMix } from "../develop/finish";
   import { screenRadius, type DustStroke } from "../develop/dust";
   import { readCanvasPixel } from "../develop/colorPick";
+  import { orientUVMatrix } from "../crop/transforms";
   import { t } from "$lib/i18n";
 
   export let id: string | null;
@@ -218,28 +219,24 @@
     // Bake mode: geometry is already baked into the texture → identity + baked dims.
     if (bakeMode) {
       renderer.setGeometry({
-        crop_off: [0, 0], crop_scale: [1, 1], angle: 0,
+        crop_off: [0, 0], crop_scale: [1, 1], angle: 0, aspect: 1,
         orient: [1, 0, 0, 1], raw, outW: texW, outH: texH,
       });
       drawGL();
       return;
     }
-    // orient as a 2x2 on centred UV: rot90 (clockwise) + flips.
-    const ang = (rot90 % 4) * Math.PI / 2;
-    const s = Math.sin(ang), c = Math.cos(ang);
-    let o = [c, -s, s, c]; // rotation
-    const fx = flipH ? -1 : 1, fy = flipV ? -1 : 1;
-    o = [o[0] * fx, o[1] * fy, o[2] * fx, o[3] * fy];
-    // persistent crop in source UV (imageCrop is normalized [x,y,w,h] or null).
+    // u_orient: oriented-UV → source-UV (undoes rot90/flip). Crop is in oriented UV.
+    const o = orientUVMatrix(rot90, flipH, flipV);
     const [cropX, cropY, cropW, cropH] = imageCrop ?? [0, 0, 1, 1];
-    // output canvas = oriented+cropped aspect; for odd rot90, swap dims.
-    const baseW = texW * cropW, baseH = texH * cropH;
+    // Oriented (pre-crop) pixel dims; for odd rot90 the source dims swap.
     const swap = (rot90 % 2) === 1;
-    const outW = Math.max(1, Math.round(swap ? baseH : baseW));
-    const outH = Math.max(1, Math.round(swap ? baseW : baseH));
+    const oW = swap ? texH : texW, oH = swap ? texW : texH;
+    // Output canvas = the crop window of the oriented image.
+    const outW = Math.max(1, Math.round(oW * cropW));
+    const outH = Math.max(1, Math.round(oH * cropH));
     renderer.setGeometry({
       crop_off: [cropX, cropY], crop_scale: [cropW, cropH],
-      angle: (angle * Math.PI) / 180, orient: o as [number, number, number, number],
+      angle: (angle * Math.PI) / 180, aspect: oH / oW, orient: o,
       raw, outW, outH,
     });
     drawGL();

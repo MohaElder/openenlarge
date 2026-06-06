@@ -421,7 +421,7 @@ fn tone_curve(v: f32, p: &FinishParams) -> f32 {
     let mut v = v.clamp(0.0, 1.0);
     // Endpoints: strongest at the extremes.
     v += p.whites * 0.20 * v.powi(3);
-    v -= p.blacks * 0.20 * (1.0 - v).powi(3);
+    v += p.blacks * 0.20 * (1.0 - v).powi(3);
     // Regions: lift/pull, zero at both ends.
     v += p.shadows * 0.30 * (1.0 - v).powi(2) * v;
     v += p.highlights * 0.30 * v.powi(2) * (1.0 - v);
@@ -582,12 +582,12 @@ mod tests {
     }
 
     #[test]
-    fn positive_blacks_darkens_shadows() {
+    fn positive_blacks_lifts_shadows() {
         let p = FinishParams {
             blacks: 1.0,
             ..Default::default()
         };
-        assert!(tone_curve(0.1, &p) < 0.1);
+        assert!(tone_curve(0.1, &p) > 0.1);
     }
 
     #[test]

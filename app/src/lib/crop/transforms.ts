@@ -36,3 +36,20 @@ export function flipOrient(
 export function orientDims(w: number, h: number, rot90: number): [number, number] {
   return rot90 % 2 === 1 ? [h, w] : [w, h];
 }
+
+/**
+ * 2×2 matrix (column-major `[a,b,c,d]` for WebGL `uniformMatrix2fv`) that maps a
+ * centred *oriented*-image UV back to centred *source* UV — i.e. it undoes
+ * `orient` (flip_h → flip_v → rot90 CW; see convert.rs). The GPU shader samples
+ * the source by going output → crop → un-straighten → THIS, so the displayed
+ * crop lines up with the backend render for every orientation. Verified against
+ * the backend orient model in geometry.test.ts.
+ */
+export function orientUVMatrix(
+  rot90: number, flipH: boolean, flipV: boolean,
+): [number, number, number, number] {
+  const ang = (rot90 % 4) * (Math.PI / 2);
+  const s = Math.sin(ang), c = Math.cos(ang);
+  const fx = flipH ? -1 : 1, fy = flipV ? -1 : 1;
+  return [c * fx, -s * fy, s * fx, c * fy];
+}

@@ -41,7 +41,7 @@ uniform float u_pc_range[8];
 float tone(float v) {
   v = clamp(v, 0.0, 1.0);
   v += u_whites * 0.20 * v * v * v;
-  v -= u_blacks * 0.20 * pow(1.0 - v, 3.0);
+  v += u_blacks * 0.20 * pow(1.0 - v, 3.0);
   v += u_shadows * 0.30 * (1.0 - v) * (1.0 - v) * v;
   v += u_highlights * 0.30 * v * v * (1.0 - v);
   v = 0.5 + (v - 0.5) * (1.0 + u_contrast);
@@ -200,12 +200,14 @@ uniform mat3 u_m_post;
 uniform float u_exposure, u_black, u_gamma;
 uniform int u_mode;           // 0=B 1=C 2=Naive
 uniform bool u_raw;           // true → output the scan (display gamma), no inversion
-// Geometry: output→source UV mapping. crop sub-rect (in source UV) + straighten
-// rotation about the crop centre; orient handled by remapping in JS-set u_uvA/u_uvB.
-uniform vec2 u_crop_off;      // source-UV offset of the crop origin
-uniform vec2 u_crop_scale;    // source-UV size of the crop
+// Geometry: output→source UV mapping. The output is the crop sub-rect of the
+// (straightened) oriented image, so we invert the backend's source→output order
+// (orient → straighten → crop) by going crop → un-straighten → un-orient.
+uniform vec2 u_crop_off;      // crop origin in oriented-image UV
+uniform vec2 u_crop_scale;    // crop size in oriented-image UV
 uniform float u_angle;        // straighten radians (clockwise)
-uniform mat2 u_orient;        // rot90/flip as a 2x2 on centred UV
+uniform float u_aspect;       // oriented-image height/width (for pixel-space straighten)
+uniform mat2 u_orient;        // oriented-UV → source-UV (undoes rot90/flip)
 
 const float EPS = 1e-5;
 const float LOG10 = 0.30102999566; // 1/log2(10): log10(x) = log2(x)*LOG10
@@ -244,13 +246,15 @@ vec2 sourceUV(vec2 uv) {
   // (row 0 = top). Convert before geometry so crop/orient/straighten operate in
   // the image-space convention the JS-side matrices (mirroring convert.rs) assume.
   uv.y = 1.0 - uv.y;
-  // centre, apply orient (rot90/flip) and straighten rotation, then map into crop.
-  vec2 c = uv - 0.5;
-  c = u_orient * c;
+  // 1. map the output UV into the (straightened) oriented-image frame, centred.
+  vec2 c = u_crop_off + uv * u_crop_scale - 0.5;
+  // 2. un-straighten: the backend rotates in oriented PIXEL space, so scale by the
+  //    oriented aspect before/after the rotation (no-op when u_angle == 0).
   float s = sin(u_angle), co = cos(u_angle);
-  c = mat2(co, -s, s, co) * c;
-  vec2 cuv = c + 0.5;                         // back to [0,1] within the (oriented) crop
-  return u_crop_off + cuv * u_crop_scale;     // into full source UV
+  c = mat2(co, -s / u_aspect, s * u_aspect, co) * c;
+  // 3. un-orient (rot90/flip) into source UV, then back to [0,1].
+  c = u_orient * c;
+  return c + 0.5;
 }
 
 void main() {
