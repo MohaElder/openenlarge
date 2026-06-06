@@ -161,6 +161,7 @@ export const api = {
       dust: wireDust(dust), irRemoval, format, metaOverride,
     }),
   developImage: (id: string) => invoke<ImageEntry>("develop_image", { id }),
+  ensureDeveloped: (id: string) => invoke<ImageEntry>("ensure_developed", { id }),
   setQuality: (quality: Quality) => invoke<void>("set_quality", { quality }),
   /** Forget an image; when deleteFile is true also move the file to the OS trash. */
   deleteImage: (id: string, deleteFile: boolean) => invoke<void>("delete_image", { id, deleteFile }),

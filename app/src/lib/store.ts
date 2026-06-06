@@ -19,6 +19,10 @@ export const editsById = _perImage.editsById;
 
 export const quality = writable<Quality>("performance");
 
+/** Bumped whenever an image's resident working buffer is re-developed/upgraded,
+ *  so the Viewport busts its GPU/CPU render caches and re-fetches the buffer. */
+export const developRev = writable(0);
+
 /** Per-image committed crop (null = full image). */
 export const cropById = writable<Record<string, CropRect | null>>({});
 /** The active image's committed crop. */
