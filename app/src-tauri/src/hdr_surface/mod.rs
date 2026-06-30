@@ -48,6 +48,30 @@ pub struct HdrSurfaceState {
     surface: macos::SurfaceSlot,
 }
 
+/// Upload an `rgba16f` buffer to the native EDR surface and show it at `rect`,
+/// on the main thread. Shared by the `hdr_surface_show` command and the fused
+/// `commands::hdr_surface_render_show` (which renders the buffer in Rust), so
+/// the main-thread show path lives in exactly one place. The buffer is LINEAR
+/// extended-Display-P3 half-float, uploaded verbatim (no re-linearization);
+/// the surface is created lazily on first call.
+#[cfg(target_os = "macos")]
+pub(crate) fn show_buffer(
+    window: &tauri::WebviewWindow,
+    state: &HdrSurfaceState,
+    rgba16f: Vec<u16>,
+    width: u32,
+    height: u32,
+    rect: ViewportRect,
+) -> Result<(), String> {
+    let slot = state.surface.clone();
+    // The closure runs on the main thread; all native work happens there.
+    window
+        .with_webview(move |webview| {
+            macos::show_on_main(webview, slot, rgba16f, width, height, rect);
+        })
+        .map_err(|e| format!("with_webview failed: {e}"))
+}
+
 /// Upload an `rgba16f` buffer to the native EDR surface and show it at `rect`.
 /// The buffer is LINEAR extended-Display-P3 half-float (from `encode_hdr_raw`);
 /// it is uploaded verbatim (no re-linearization). Creates the surface lazily.
@@ -63,16 +87,10 @@ pub fn hdr_surface_show(
     #[cfg(target_os = "macos")]
     {
         use tauri::Manager;
-        let slot = state.surface.clone();
         let window = app
             .get_webview_window("main")
             .ok_or_else(|| "no main window".to_string())?;
-        // The closure runs on the main thread; all native work happens there.
-        window
-            .with_webview(move |webview| {
-                macos::show_on_main(webview, slot, rgba16f, width, height, rect);
-            })
-            .map_err(|e| format!("with_webview failed: {e}"))
+        show_buffer(&window, &state, rgba16f, width, height, rect)
     }
     #[cfg(not(target_os = "macos"))]
     {

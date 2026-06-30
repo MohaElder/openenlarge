@@ -136,6 +136,7 @@ pub fn run() {
             commands::render_view,
             commands::encode_hdr,
             commands::encode_hdr_raw,
+            commands::hdr_surface_render_show,
             commands::thumbnail,
             commands::save_thumbnail,
             commands::invalidate_thumbnails,

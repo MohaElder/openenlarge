@@ -1460,17 +1460,18 @@ pub fn encode_hdr(
 }
 
 /// Render the developed image (same geometry + crop + develop-param resolution
-/// as `encode_hdr`) and return the raw linearized rgba16f HDR buffer instead of
-/// a gain-map data URL — for the native EDR compositing surface, which draws
-/// real super-white pixels directly rather than decoding a gain map.
-#[tauri::command]
-pub fn encode_hdr_raw(
+/// as `encode_hdr`) into the raw linearized rgba16f HDR buffer that the native
+/// EDR surface draws directly. Shared by the `encode_hdr_raw` command (which
+/// returns the buffer to JS — kept for the future Windows/WebGPU path) and the
+/// fused `hdr_surface_render_show` command (macOS, which uploads it to the
+/// native surface in-process with no IPC pixel round-trip).
+pub(crate) fn render_hdr_buffer(
     id: String,
     params: InvertParams,
     view: ViewSpec,
-    session: State<Session>,
+    session: &Session,
 ) -> Result<crate::hdr_surface::HdrBuffer, String> {
-    ensure_resident(&session, &id)?;
+    ensure_resident(session, &id)?;
     let images = session.images.lock().unwrap();
     let img = images.get(&id).ok_or("unknown image id")?;
     let dev = img.developed.as_ref().ok_or("not developed")?;
@@ -1523,6 +1524,48 @@ pub fn encode_hdr_raw(
 
     let hdr = render_hdr_image(&scaled, &ip, mode, &finish, &stamps, &view.ir_removal);
     Ok(hdr_image_to_rgba16f(&hdr))
+}
+
+/// Render the developed image and return the raw linearized rgba16f HDR buffer
+/// instead of a gain-map data URL — for the native EDR compositing surface,
+/// which draws real super-white pixels directly rather than decoding a gain map.
+/// Kept (alongside the fused `hdr_surface_render_show`) for the future
+/// Windows/WebGPU path that uploads the buffer JS-side.
+#[tauri::command]
+pub fn encode_hdr_raw(
+    id: String,
+    params: InvertParams,
+    view: ViewSpec,
+    session: State<Session>,
+) -> Result<crate::hdr_surface::HdrBuffer, String> {
+    render_hdr_buffer(id, params, view, &session)
+}
+
+/// Fused render + upload for the macOS native EDR surface: render the HDR buffer
+/// in Rust and hand it straight to the main-thread surface-show path, so only
+/// `params`/`view`/`rect` cross IPC — never the ~tens-of-MB pixel buffer. This
+/// avoids the two IPC serializations of the two-step (`encode_hdr_raw` → JS →
+/// `hdr_surface_show`) approach. On non-macOS it is a no-op.
+#[tauri::command]
+pub fn hdr_surface_render_show(
+    id: String,
+    params: InvertParams,
+    view: ViewSpec,
+    rect: crate::hdr_surface::ViewportRect,
+    session: State<Session>,
+    state: State<crate::hdr_surface::HdrSurfaceState>,
+    window: tauri::WebviewWindow,
+) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        let buf = render_hdr_buffer(id, params, view, &session)?;
+        crate::hdr_surface::show_buffer(&window, &state, buf.rgba16f, buf.width, buf.height, rect)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (id, params, view, rect, &session, &state, &window);
+        Ok(())
+    }
 }
 
 /// The persistent per-image edits that shape a thumbnail's geometry and retouching.
