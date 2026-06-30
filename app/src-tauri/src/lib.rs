@@ -10,6 +10,7 @@ mod encode;
 mod exif_write;
 mod gpu_upload;
 mod hdr;
+mod hdr_surface;
 mod metadata;
 mod session;
 mod telemetry;
@@ -75,6 +76,13 @@ pub fn run() {
                 // run after the window is realized, hence the deferral.
                 #[cfg(target_os = "macos")]
                 {
+                    // EDR "live HDR" spike: attach a native CAMetalLayer that
+                    // draws a static extended-dynamic-range gradient behind the
+                    // (transparent) webview, to prove EDR is granted through an
+                    // embedded WKWebView. Failure is non-fatal (logged inside).
+                    if let Err(e) = hdr_surface::macos::attach_edr_spike(&win) {
+                        eprintln!("[hdr] attach_edr_spike scheduling failed: {e}");
+                    }
                     let win = win.clone();
                     std::thread::spawn(move || {
                         std::thread::sleep(std::time::Duration::from_millis(400));

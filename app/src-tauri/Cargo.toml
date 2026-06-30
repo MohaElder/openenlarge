@@ -62,6 +62,18 @@ sysinfo = { version = "0.39.5", default-features = false, features = ["system"] 
 # one target.
 [target.'cfg(target_os = "macos")'.dependencies]
 ort = { version = "=2.0.0-rc.12", default-features = false, features = ["load-dynamic", "ndarray", "api-24", "coreml"] }
+# Native EDR (extended dynamic range) compositing spike: a sibling CAMetalLayer
+# drawn behind the transparent WKWebView. Versions are pinned to the same objc2
+# 0.6 / framework-0.3 family that tauri 2.11 + wry 0.55 already resolve, so the
+# whole tree shares one objc2 (no duplicate-runtime breakage).
+raw-window-handle = "0.6"
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSGeometry", "NSString", "NSThread", "NSValue"] }
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSView", "NSWindow", "NSResponder", "NSGraphics", "objc2-core-foundation", "objc2-quartz-core"] }
+objc2-quartz-core = { version = "0.3", default-features = false, features = ["std", "CALayer", "CAMetalLayer", "objc2-metal", "objc2-core-graphics", "objc2-core-foundation"] }
+objc2-metal = { version = "0.3", default-features = false, features = ["std", "MTLDevice", "MTLCommandQueue", "MTLCommandBuffer", "MTLCommandEncoder", "MTLRenderCommandEncoder", "MTLRenderPass", "MTLRenderPipeline", "MTLLibrary", "MTLPixelFormat", "MTLDrawable", "MTLTexture", "MTLResource", "MTLTypes"] }
+objc2-core-foundation = { version = "0.3", default-features = false, features = ["std", "CFBase", "CFCGTypes"] }
+objc2-core-graphics = { version = "0.3", default-features = false, features = ["std", "CGColorSpace"] }
 
 [dev-dependencies]
 tempfile = "3"
