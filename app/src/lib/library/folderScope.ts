@@ -19,3 +19,28 @@ export function scopeToFolder<T extends { path: string }>(
 ): T[] {
   return images.filter((i) => inFolder(imageDir(i), selected));
 }
+
+/** Pick the folder to jump to after an import: the directory holding the most
+ * just-imported frames (modal). Ties break toward the latest frame — the folder
+ * whose last frame appears latest in `dirs` (input order). `null` for an empty
+ * batch (nothing imported → leave the current selection alone). A single-folder
+ * roll, the common case, simply returns that folder. */
+export function pickImportFolder(dirs: string[]): string | null {
+  const count = new Map<string, number>();
+  const lastIdx = new Map<string, number>();
+  dirs.forEach((d, i) => {
+    count.set(d, (count.get(d) ?? 0) + 1);
+    lastIdx.set(d, i);
+  });
+  let best: string | null = null;
+  for (const d of count.keys()) {
+    if (
+      best === null ||
+      count.get(d)! > count.get(best)! ||
+      (count.get(d)! === count.get(best)! && lastIdx.get(d)! > lastIdx.get(best)!)
+    ) {
+      best = d;
+    }
+  }
+  return best;
+}

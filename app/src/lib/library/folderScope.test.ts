@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { imageDir, inFolder, scopeToFolder } from "./folderScope";
+import { imageDir, inFolder, scopeToFolder, pickImportFolder } from "./folderScope";
 
 describe("imageDir", () => {
   it("returns the parent directory of a path", () => {
@@ -45,5 +45,24 @@ describe("scopeToFolder", () => {
   });
   it("null keeps everything", () => {
     expect(scopeToFolder(imgs, null).length).toBe(3);
+  });
+});
+
+describe("pickImportFolder", () => {
+  it("returns null for an empty batch", () => {
+    expect(pickImportFolder([])).toBe(null);
+  });
+  it("returns the sole folder of a single-folder batch", () => {
+    expect(pickImportFolder(["/scan/rollA", "/scan/rollA", "/scan/rollA"])).toBe("/scan/rollA");
+  });
+  it("returns the modal folder when a batch spans folders", () => {
+    // rollA has 3, rollB has 1 → rollA wins regardless of order
+    expect(pickImportFolder(["/scan/rollB", "/scan/rollA", "/scan/rollA", "/scan/rollA"]))
+      .toBe("/scan/rollA");
+  });
+  it("breaks count ties toward the latest frame's folder", () => {
+    // rollA and rollB each have 2; rollB's last frame is latest → rollB wins
+    expect(pickImportFolder(["/scan/rollA", "/scan/rollB", "/scan/rollA", "/scan/rollB"]))
+      .toBe("/scan/rollB");
   });
 });

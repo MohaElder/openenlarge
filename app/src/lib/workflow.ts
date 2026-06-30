@@ -1,5 +1,5 @@
 import { get } from "svelte/store";
-import { images, activeId, module, developProgress, editsById, cropById, dustById, folderImages, invalidatePreview, undevelopableIds } from "./store";
+import { images, activeId, module, developProgress, editsById, cropById, dustById, folderImages, invalidatePreview, undevelopableIds, selectFolder } from "./store";
 import { api, defaultParams, type ImageEntry, type InvertParams } from "./api";
 import type { CropRect } from "./crop/types";
 import { dropHistory, reseedActive } from "./develop/historyStore";
@@ -9,7 +9,7 @@ import { translate } from "./i18n";
 import { developedFolderImages } from "./export/eligible";
 import { withEffectiveBase, setFolderBase } from "./develop/base";
 import { applyAsShotWb } from "./develop/wb";
-import { imageDir } from "./library/folderScope";
+import { imageDir, pickImportFolder } from "./library/folderScope";
 import { gridThumbView, GRID_STATIC_EDGE } from "./library/gridHiRes";
 
 /** Ids of images not yet developed, in order. Pure helper (testable). */
@@ -122,9 +122,9 @@ export function mergeFolderFiles(lists: string[][]): string[] {
 const IMPORT_CONCURRENCY = 4;
 
 /** Import one path into the catalog, upserting into `images` and making it active
- * if nothing is. Failures are logged, not thrown, so one bad file doesn't abort
- * the batch. */
-async function importOne(path: string): Promise<void> {
+ * if nothing is. Returns the imported entry, or `null` on failure (logged, not
+ * thrown, so one bad file doesn't abort the batch). */
+async function importOne(path: string): Promise<ImageEntry | null> {
   try {
     const entry = await api.importImage(path);
     images.update((xs) =>
@@ -146,28 +146,41 @@ async function importOne(path: string): Promise<void> {
       cropById.update((m) => ({ ...m, [entry.id]: crop }));
       showToast(translate("toast.frameTrimmed"));
     }
-  } catch (e) { console.error("import failed", path, e); }
+    return entry;
+  } catch (e) { console.error("import failed", path, e); return null; }
 }
 
 /** Import each path into the catalog with bounded concurrency, upserting into
  * `images` and making the first import active if nothing is. Shared by the file
  * dialog and drag-drop. Store updates are race-free: JS runs them between awaits.
  * `onProgress` (optional) fires after each import completes with the running
- * done/total count — used by the folder picker's live counter. */
+ * done/total count — used by the folder picker's live counter.
+ *
+ * When the batch finishes, jumps the library to the just-imported folder
+ * (Lightroom "Last Import"): the user lands on their new frames instead of
+ * hunting the tree. See `pickImportFolder` for the multi-folder tie-break. */
 export async function importPaths(
   paths: string[],
   onProgress?: (done: number, total: number) => void,
 ): Promise<void> {
   let next = 0;
   let done = 0;
+  const results: (ImageEntry | null)[] = new Array(paths.length).fill(null);
   const worker = async (): Promise<void> => {
     for (let i = next++; i < paths.length; i = next++) {
-      await importOne(paths[i]);
+      results[i] = await importOne(paths[i]);
       onProgress?.(++done, paths.length);
     }
   };
   const lanes = Math.min(IMPORT_CONCURRENCY, paths.length);
   await Promise.all(Array.from({ length: lanes }, worker));
+
+  // Land on the just-imported batch's folder (in input order, so the tie-break
+  // is deterministic regardless of which lane finished first).
+  const target = pickImportFolder(
+    results.flatMap((e) => (e ? [imageDir(e)] : [])),
+  );
+  if (target !== null) selectFolder(target);
 }
 
 /** Resolve after the browser has had a chance to paint (two rAFs). Falls back to a
