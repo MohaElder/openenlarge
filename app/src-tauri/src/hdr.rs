@@ -108,7 +108,7 @@ pub fn encode_gain_map_jpeg(
 
 /// sRGB EOTF with a linear continuation above 1.0 (display-referred sRGB, where
 /// expanded highlights exceed 1.0, → linear light). Continuous + C1 at v=1.0.
-fn srgb_to_linear_ext(v: f32) -> f32 {
+pub(crate) fn srgb_to_linear_ext(v: f32) -> f32 {
     if v <= 0.0 {
         0.0
     } else if v <= 0.04045 {

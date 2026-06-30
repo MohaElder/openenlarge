@@ -10,3 +10,14 @@
 
 #[cfg(target_os = "macos")]
 pub mod macos;
+
+/// Raw HDR pixel buffer for the native EDR compositing surface: row-major RGBA
+/// half-float (linear extended-P3), 4 channels per pixel. Highlights brighter
+/// than SDR white (1.0) are preserved (not clamped) so a real EDR display can
+/// render them brighter than the webview's SDR canvas.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct HdrBuffer {
+    pub width: u32,
+    pub height: u32,
+    pub rgba16f: Vec<u16>,
+}

@@ -141,6 +141,7 @@ pub fn run() {
             commands::reset_all_data,
             commands::render_view,
             commands::encode_hdr,
+            commands::encode_hdr_raw,
             commands::thumbnail,
             commands::save_thumbnail,
             commands::invalidate_thumbnails,

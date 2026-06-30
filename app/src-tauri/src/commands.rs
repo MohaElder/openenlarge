@@ -1287,6 +1287,85 @@ fn render_view_compute(
     to_jpeg_b64(&out, false, PREVIEW_JPEG_QUALITY)
 }
 
+/// Run one prepared image through invert → dust → IR-retouch → finish, as the
+/// HDR rendition: `hdr=true` (the invert-side highlight expansion above the
+/// filmic knee, up to `HDR_HEADROOM`) + `finalize_body=false` (the finish-side
+/// legacy clamped tone curve, applied to an already-display-referred input).
+/// Shared by the gain-map HDR encoder (`render_and_encode_hdr`) and the raw
+/// rgba16f buffer command (`encode_hdr_raw`) so neither duplicates the
+/// invert→dust→ir→finish block.
+///
+/// `finish_image`'s tone-curve / saturation / LUT / color-grade / color-mix
+/// stages all assume (and internally clamp to) an SDR `[0,1]` domain — they
+/// were written for the plain SDR finish path and have no headroom concept.
+/// Routing an HDR-expanded body (which can reach up to `HDR_HEADROOM`, e.g.
+/// 2.5) straight through `finish_image` would therefore silently clip every
+/// super-white highlight back down to `1.0`, defeating the point of an HDR
+/// rendition. To avoid that without reaching into `finish_image`'s internals,
+/// each channel is split into its `[0,1]`-clamped SDR body (which gets the
+/// full, ordinary finish treatment — identical tone tools/LUT/grade a user
+/// dials in) and the raw super-white *excess* above `1.0`; the excess is
+/// added back, unprocessed, after finish. Below the knee (the vast majority of
+/// a typical frame) this is a no-op (excess is 0, so behavior is byte-identical
+/// to the plain SDR finish); only literal super-white highlights carry through
+/// as real linear headroom.
+fn render_hdr_image(
+    src: &film_core::Image,
+    ip: &InversionParams,
+    mode: Mode,
+    finish: &FinishParams,
+    stamps: &[Stamp],
+    ir_removal: &IrRemoval,
+) -> film_core::Image {
+    let mut ip_hdr = ip.clone();
+    ip_hdr.hdr = true;
+    let mut finish_hdr = finish.clone();
+    finish_hdr.finalize_body = false; // HDR rendition is already display-referred
+
+    let mut inv = invert_image_core(src, &ip_hdr, mode);
+    dust::apply(&mut inv, stamps);
+    if ir_removal.enabled {
+        if let Some(ir) = src.ir.as_ref() {
+            dust::apply_ir(&mut inv, ir, ir_removal.sensitivity);
+        }
+    }
+
+    let excess: Vec<[f32; 3]> = inv
+        .pixels
+        .iter()
+        .map(|px| std::array::from_fn(|c| (px[c] - 1.0).max(0.0)))
+        .collect();
+    for px in inv.pixels.iter_mut() {
+        for c in px.iter_mut() {
+            *c = c.min(1.0);
+        }
+    }
+    let mut out = finish_image(&inv, &finish_hdr);
+    for (px, ex) in out.pixels.iter_mut().zip(excess.iter()) {
+        for c in 0..3 {
+            px[c] += ex[c];
+        }
+    }
+    out
+}
+
+/// Pack a finished `film_core::Image` (display-referred sRGB, highlights may
+/// exceed 1.0) into a row-major RGBA half-float buffer in linear extended-P3:
+/// each channel is linearized via `srgb_to_linear_ext` (the same EOTF-with-
+/// linear-continuation `encode_gain_map_jpeg` uses), so super-white highlights
+/// stay > 1.0 instead of being clipped. Alpha is always opaque (1.0).
+fn hdr_image_to_rgba16f(img: &film_core::Image) -> crate::hdr_surface::HdrBuffer {
+    let (w, h) = (img.width as u32, img.height as u32);
+    let mut out = Vec::with_capacity(img.pixels.len() * 4);
+    for px in &img.pixels {
+        out.push(half::f16::from_f32(crate::hdr::srgb_to_linear_ext(px[0])).to_bits());
+        out.push(half::f16::from_f32(crate::hdr::srgb_to_linear_ext(px[1])).to_bits());
+        out.push(half::f16::from_f32(crate::hdr::srgb_to_linear_ext(px[2])).to_bits());
+        out.push(half::f16::from_f32(1.0).to_bits());
+    }
+    crate::hdr_surface::HdrBuffer { width: w, height: h, rgba16f: out }
+}
+
 /// Dual-render one prepared image (invert → dust → IR → finish) as SDR and HDR,
 /// then mux into a gain-map JPEG. Shared by the HDR preview command and HDR export.
 /// `src` carries the optional IR plane used when `ir_removal.enabled`.
@@ -1299,22 +1378,15 @@ fn render_and_encode_hdr(
     ir_removal: &IrRemoval,
     quality: u8,
 ) -> Result<Vec<u8>, String> {
-    let render = |ip: &InversionParams, fin: &FinishParams| -> film_core::Image {
-        let mut inv = invert_image_core(src, ip, mode);
-        dust::apply(&mut inv, stamps);
-        if ir_removal.enabled {
-            if let Some(ir) = src.ir.as_ref() {
-                dust::apply_ir(&mut inv, ir, ir_removal.sensitivity);
-            }
+    let mut inv = invert_image_core(src, ip, mode);
+    dust::apply(&mut inv, stamps);
+    if ir_removal.enabled {
+        if let Some(ir) = src.ir.as_ref() {
+            dust::apply_ir(&mut inv, ir, ir_removal.sensitivity);
         }
-        finish_image(&inv, fin)
-    };
-    let sdr = render(ip, finish);                       // Faithful SDR body → finalize (as given)
-    let mut ip_hdr = ip.clone();
-    ip_hdr.hdr = true;
-    let mut finish_hdr = finish.clone();
-    finish_hdr.finalize_body = false;                   // HDR rendition is already display-referred
-    let hdr = render(&ip_hdr, &finish_hdr);
+    }
+    let sdr = finish_image(&inv, finish); // Faithful SDR body → finalize (as given)
+    let hdr = render_hdr_image(src, ip, mode, finish, stamps, ir_removal);
     crate::hdr::encode_gain_map_jpeg(&sdr, &hdr, quality)
 }
 
@@ -1385,6 +1457,72 @@ pub fn encode_hdr(
     use base64::Engine;
     let b64 = base64::engine::general_purpose::STANDARD.encode(&jpeg);
     Ok(format!("data:image/jpeg;base64,{b64}"))
+}
+
+/// Render the developed image (same geometry + crop + develop-param resolution
+/// as `encode_hdr`) and return the raw linearized rgba16f HDR buffer instead of
+/// a gain-map data URL — for the native EDR compositing surface, which draws
+/// real super-white pixels directly rather than decoding a gain map.
+#[tauri::command]
+pub fn encode_hdr_raw(
+    id: String,
+    params: InvertParams,
+    view: ViewSpec,
+    session: State<Session>,
+) -> Result<crate::hdr_surface::HdrBuffer, String> {
+    ensure_resident(&session, &id)?;
+    let images = session.images.lock().unwrap();
+    let img = images.get(&id).ok_or("unknown image id")?;
+    let dev = img.developed.as_ref().ok_or("not developed")?;
+
+    // Geometry: orient (lossless) → straighten → persistent crop, then the view
+    // crop — identical to `render_view` / `encode_hdr`.
+    let oriented = orient(&dev.working, view.rot90, view.flip_h, view.flip_v);
+    let straightened = rotate(&oriented, view.angle);
+    let base_img = match view.image_crop {
+        Some(nc) => {
+            let (ix, iy, iw, ih) = crop_px(nc, straightened.width, straightened.height);
+            crop(&straightened, ix, iy, iw, ih)
+        }
+        None => straightened,
+    };
+    let (ometa_w, _) = orient_dims(
+        img.metadata.width as usize,
+        img.metadata.height as usize,
+        view.rot90,
+    );
+    let s_scale = oriented.width as f64 / ometa_w.max(1) as f64;
+    let cx = (view.crop[0] * s_scale).max(0.0).round() as usize;
+    let cy = (view.crop[1] * s_scale).max(0.0).round() as usize;
+    let cw = (view.crop[2] * s_scale).round().max(1.0) as usize;
+    let ch = (view.crop[3] * s_scale).round().max(1.0) as usize;
+    let cropped = crop(&base_img, cx, cy, cw, ch);
+    if cropped.pixels.is_empty() {
+        return Err("empty crop".into());
+    }
+    let (cw_px, ch_px) = (cropped.width, cropped.height);
+    let scaled = resize_to(&cropped, view.out_w.max(1), view.out_h.max(1));
+
+    // Develop params identical to `render_view` / `encode_hdr`'s construction.
+    let mut ip = resolve_params(&params, &dev.thumb, effective_base(&params, dev.base));
+    ip.d_max = effective_dmax(&params, dev.d_max);
+    ip.channel_balance = dev.channel_balance;
+    let mode = mode_from(&params.mode);
+    let finish = finish_from(&params);
+    let stamps = view_stamps(
+        &view.dust,
+        base_img.width,
+        base_img.height,
+        cx,
+        cy,
+        cw_px,
+        ch_px,
+        view.out_w.max(1),
+        view.out_h.max(1),
+    );
+
+    let hdr = render_hdr_image(&scaled, &ip, mode, &finish, &stamps, &view.ir_removal);
+    Ok(hdr_image_to_rgba16f(&hdr))
 }
 
 /// The persistent per-image edits that shape a thumbnail's geometry and retouching.
@@ -3134,6 +3272,48 @@ pub fn save_log(out_path: String, app: tauri::AppHandle) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use half::f16;
+
+    /// A 2x1 synthetic "developed" (pre-invert) image: pixel 0 is a dense
+    /// negative patch (scan value far below `base`, the highest-density /
+    /// brightest-after-inversion highlight a Cineon negative encodes); pixel 1
+    /// sits at the film base (zero density / scene black). Mirrors the small
+    /// inline fixtures in `engine.rs`'s `#[cfg(test)]` module.
+    fn test_developed_image_2x1_bright() -> film_core::Image {
+        let mut img = film_core::Image::new(2, 1);
+        img.pixels[0] = [1e-4, 1e-4, 1e-4]; // far below base=1.0 → dense → bright highlight
+        img.pixels[1] = [1.0, 1.0, 1.0]; // == base → zero density → scene black
+        img
+    }
+
+    fn test_inversion_params() -> InversionParams {
+        InversionParams {
+            base: [1.0, 1.0, 1.0],
+            d_max: 1.5,
+            ..Default::default()
+        }
+    }
+
+    fn test_finish_params() -> FinishParams {
+        FinishParams::default()
+    }
+
+    #[test]
+    fn hdr_raw_buffer_has_dims_and_superwhite() {
+        let src = test_developed_image_2x1_bright();
+        let ip = test_inversion_params();
+        let finish = test_finish_params();
+        let img = render_hdr_image(&src, &ip, Mode::D, &finish, &[], &IrRemoval::default());
+        let buf = hdr_image_to_rgba16f(&img);
+        assert_eq!(buf.width, 2);
+        assert_eq!(buf.height, 1);
+        assert_eq!(buf.rgba16f.len(), 2 * 1 * 4);
+        // Bright pixel must exceed SDR white (1.0) in linear space after expansion+linearize.
+        let r0 = f16::from_bits(buf.rgba16f[0]).to_f32();
+        assert!(r0 > 1.0, "expected super-white highlight, got {r0}");
+        // Alpha channel is 1.0.
+        assert_eq!(f16::from_bits(buf.rgba16f[3]).to_f32(), 1.0);
+    }
 
     #[test]
     fn blob_centroids_finds_one_blob_center() {
