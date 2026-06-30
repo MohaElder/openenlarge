@@ -7,10 +7,10 @@
 </script>
 
 <script lang="ts">
-  import { onMount, createEventDispatcher } from "svelte";
+  import { onMount, afterUpdate, createEventDispatcher } from "svelte";
   import { api, type InvertParams } from "../api";
   import type { IrRemoval } from "../api";
-  import { previewSrc, previewById, cachePreview } from "../store";
+  import { previewSrc, previewById, cachePreview, hdrMode } from "../store";
   import { FinishRenderer, webgl2Available, float16RenderTargetSupported } from "./gl/renderer";
   import { finishUniforms } from "./gl/uniforms";
   import { toInversionUniforms } from "./gl/invert";
@@ -248,6 +248,10 @@
       // WebKit stalls the app once it caps out (~16 contexts).
       renderer?.dispose();
       renderer = null;
+      // live-edr: never leave the native surface showing (or the body transparent)
+      // behind an unmounted Viewport — e.g. navigating away from Develop mid-HDR.
+      if (hdrUsesSurface) { api.hdrSurfaceHide(); hdrUsesSurface = false; }
+      if (typeof document !== "undefined") document.body.classList.remove("hdr-edr-hole");
     };
   });
 
@@ -344,14 +348,27 @@
   function schedule() { if (timer) clearTimeout(timer); timer = setTimeout(render, 80); }
   function scheduleIfReady() { if (id && vpW && imgW) { clampCenter(); schedule(); } }
 
-  // ---- HDR gain-map overlay (settle mode) ----------------------------------
-  // When params.hdr is on we render a gain-map JPEG via api.encodeHdr and crossfade
-  // it in over the live SDR canvas once an edit settles. During an active gesture
-  // (any params/geometry change) the overlay fades out so the live SDR is visible.
+  // ---- HDR overlay (settle mode) --------------------------------------------
+  // When params.hdr is on, once an edit settles we show a full-frame HDR preview
+  // over the live SDR canvas. Two backends, chosen by $hdrMode:
+  //  - "gainmap-fallback": render a gain-map JPEG via api.encodeHdr and crossfade
+  //    it in as an <img> overlay (unchanged from before live-edr existed).
+  //  - "live-edr" (macOS): render straight to the native EDR compositing surface
+  //    (hdr_surface_render_show) — no JS-side pixel buffer. The surface sits
+  //    BEHIND the webview, so the SDR canvas is hidden (`edrhole` class below)
+  //    and a transparent hole is punched through the DOM down to it (see the
+  //    `hdr-edr-hole` body class + comment in the style block below).
+  // During an active gesture (any params/geometry change) the overlay/surface
+  // hides so the live SDR is visible; it reappears once things settle.
   let hdrSrc = "";
   let hdrShown = false;
   let hdrTimer: ReturnType<typeof setTimeout> | null = null;
   let hdrPrevId: string | null = null;
+  // True once the live-edr native surface (not the gain-map <img>) is the active
+  // overlay — gates the canvas-hiding CSS class, the body transparent-hole class,
+  // and rect-sync, so a gainmap-fallback frame (or a live-edr frame that fell back
+  // because there's no GL canvas) never hides the SDR canvas under it.
+  let hdrUsesSurface = false;
 
   // Build the SAME ViewSpec the live render uses for the current frame (geometry,
   // persistent crop, dust/IR). HDR is a settled full-frame preview, so we render at
@@ -366,14 +383,35 @@
     };
   }
 
+  // The native surface is positioned at the WebGL canvas's on-screen box (CSS px,
+  // top-left origin) + devicePixelRatio; the backend Y-flips it against the
+  // content view, which the webview fills.
+  function canvasRect(): { x: number; y: number; w: number; h: number; dpr: number } {
+    if (!canvas) return { x: 0, y: 0, w: 0, h: 0, dpr: 1 };
+    const r = canvas.getBoundingClientRect();
+    return { x: r.left, y: r.top, w: r.width, h: r.height, dpr };
+  }
+
   async function encodeHdr() {
     if (!params.hdr || !id || !imgW || !vpW) return;
     const curId = id;
     try {
-      const data = await api.encodeHdr(id, params, hdrViewSpec());
-      if (id !== curId || !params.hdr) return; // image switched or toggled off mid-encode
-      hdrSrc = data;
-      hdrShown = true;
+      // Only the INTERACTIVE develop viewport drives the native surface — other
+      // Viewport instances (filmstrip/roll thumbnails) are non-interactive, never
+      // mount a WebGL canvas (`useGL` is interactive-gated), and would otherwise
+      // hijack the single shared native surface with a bogus zero-size rect.
+      if (interactive && $hdrMode === "live-edr" && canvas) {
+        await api.hdrSurfaceRenderShow(id, params, hdrViewSpec(), canvasRect());
+        if (id !== curId || !params.hdr) return; // image switched or toggled off mid-encode
+        hdrUsesSurface = true;
+        hdrShown = true; // hides the SDR canvas via the `edrhole` class below
+      } else {
+        const data = await api.encodeHdr(id, params, hdrViewSpec());
+        if (id !== curId || !params.hdr) return;
+        hdrUsesSurface = false;
+        hdrSrc = data;
+        hdrShown = true;
+      }
     } catch (e) {
       // "not developed" etc. are expected; swallow like seed()/reanalyze().
       if (!(typeof e === "string" && e === "not developed")) console.error("encodeHdr failed", e);
@@ -384,18 +422,63 @@
   // through), then debounces an encode that fades HDR back in once things settle.
   function scheduleHdr() {
     hdrShown = false; // live SDR while dragging
+    if (hdrUsesSurface) { api.hdrSurfaceHide(); hdrUsesSurface = false; } // reveal the SDR canvas for the gesture
     if (hdrTimer) clearTimeout(hdrTimer);
     if (!params.hdr || !id) return;
     hdrTimer = setTimeout(encodeHdr, 200);
   }
 
   // Clear the overlay on image switch so a stale HDR frame never shows for the wrong photo.
-  $: if (id !== hdrPrevId) { hdrPrevId = id; hdrSrc = ""; hdrShown = false; if (hdrTimer) clearTimeout(hdrTimer); }
+  $: if (id !== hdrPrevId) {
+    hdrPrevId = id; hdrSrc = ""; hdrShown = false;
+    if (hdrTimer) clearTimeout(hdrTimer);
+    if (hdrUsesSurface) { api.hdrSurfaceHide(); hdrUsesSurface = false; }
+  }
 
   // Re-run on any input that changes the rendered frame, plus the HDR toggle itself.
   $: hdrKey = `${id}|${params.hdr}|${developRev}|${invKey}|${finishKey}|${geomKey}|${dustRev}|${irRemoval.enabled}|${irRemoval.sensitivity}|${vpW > 0}`;
   $: if (params.hdr) { hdrKey; if (id && vpW && imgW) scheduleHdr(); }
   $: if (!params.hdr) { hdrShown = false; if (hdrTimer) clearTimeout(hdrTimer); }
+
+  // Keep the native surface's rect in sync with pan/zoom/resize while it's shown
+  // (settled). Diffed against `geomKey` (not a plain `$:` reactive call) so the
+  // getBoundingClientRect() read happens in `afterUpdate` — AFTER Svelte has
+  // patched the canvas's left/top/width/height style — instead of mid-flush
+  // against stale layout.
+  let lastRectGeomKey = "";
+  afterUpdate(() => {
+    if (hdrUsesSurface && hdrShown && geomKey !== lastRectGeomKey) {
+      lastRectGeomKey = geomKey;
+      api.hdrSurfaceSetRect(canvasRect());
+    }
+  });
+
+  // NOTE (Sub-project B/C): in live-edr mode the GPU-drawn clipping warning
+  // (clip.ts) and on-image dust markers are baked into the now-hidden SDR canvas,
+  // so they aren't visible over the native layer at rest. They reappear during an
+  // active gesture, when scheduleHdr() hides the surface and the live SDR canvas
+  // (with those overlays) shows through again. Not fixed here — deferred until the
+  // surface itself can render overlays.
+
+  // ---- The transparent hole (live-edr only) ---------------------------------
+  // The native CAMetalLayer is composited BEHIND the WKWebView and shows only
+  // through pixels the webview itself doesn't paint. The Rust side already turns
+  // off the webview's own background fill (`drawsBackground = false`, set once
+  // when the surface is first created) — so the only thing left painting opaque
+  // pixels over the image region is <body>'s solid theme color (#111111, see
+  // styles/theme.css); `.vp`/`.center`/`.layout` have no background of their own
+  // and the canvas itself is hidden via the `edrhole` class below. Toggling body
+  // transparent for the whole document (scoped to exactly this state) punches the
+  // hole. This is the part most likely to need Task-9 visual tuning: it also
+  // makes the ~12px `.layout` grid gaps and any outer page margin transparent,
+  // since nothing else paints those — the `.right`/`.bottom` chrome panels keep
+  // their own opaque backgrounds (GlassPanel etc.) so they should be unaffected.
+  // If a gap/margin shows an unwanted sliver through to whatever is behind the
+  // window, give that ancestor (e.g. `.layout`) its own unconditional opaque
+  // background instead of relying on body's.
+  $: if (typeof document !== "undefined") {
+    document.body.classList.toggle("hdr-edr-hole", hdrUsesSurface && hdrShown);
+  }
 
   // GPU path: WebGL2 available + non-raw. Dust/IR now stay on the GPU via a baked
   // (geometry + pre-invert heal) working texture; only raw/no-WebGL2 fall to CPU.
@@ -915,7 +998,7 @@
 >
   {#if useGL}
     <canvas
-      bind:this={canvas} class:anim={animating}
+      bind:this={canvas} class:anim={animating} class:edrhole={hdrUsesSurface && hdrShown}
       style="position:absolute; left:{vw0 ? vw0.css.left : left}px; top:{vw0 ? vw0.css.top : top}px; width:{vw0 ? vw0.css.width : dispW}px; height:{vw0 ? vw0.css.height : dispH}px;"
     ></canvas>
     {#if switchPreview}
@@ -1003,6 +1086,13 @@
      stale frame is letterboxed rather than stretched. Once the correct frame draws,
      buffer and box share the same aspect, so contain fills exactly (a no-op). */
   img, canvas { display: block; object-fit: contain; will-change: left, top, width, height; }
+  /* live-edr: the native EDR surface replaces the SDR canvas at rest — hide the
+     canvas (not unmount it, so the GL context/texture stay live for an instant
+     return on the next gesture) so it doesn't paint over the native layer. */
+  canvas.edrhole { visibility: hidden; }
+  /* See the "transparent hole" comment block in the script block above for what
+     this punches through and what to adjust if Task-9 verification finds a gap. */
+  :global(body.hdr-edr-hole) { background: transparent; }
   img.anim, canvas.anim { transition: left 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
     top 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
     width 180ms cubic-bezier(0.22, 0.61, 0.36, 1),

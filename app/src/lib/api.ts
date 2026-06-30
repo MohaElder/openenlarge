@@ -196,6 +196,21 @@ export const api = {
     invoke<string>("render_view", { id, params, view: { ...view, dust: wireDust(view.dust) } }),
   encodeHdr: (id: string, params: InvertParams, view: ViewSpec) =>
     invoke<string>("encode_hdr", { id, params, view: { ...view, dust: wireDust(view.dust) } }),
+  /** Fused render + upload for the macOS native EDR surface: renders the HDR
+   *  buffer in Rust and hands it straight to the compositing layer, so only
+   *  params/view/rect cross IPC (never the pixel buffer). `rect` is the SDR
+   *  canvas's CSS-px bounding box (top-left origin) + devicePixelRatio. No-op
+   *  on non-macOS. */
+  hdrSurfaceRenderShow: (
+    id: string, params: InvertParams, view: ViewSpec,
+    rect: { x: number; y: number; w: number; h: number; dpr: number },
+  ) =>
+    invoke<void>("hdr_surface_render_show", { id, params, view: { ...view, dust: wireDust(view.dust) }, rect }),
+  /** Hide the native EDR surface, revealing the live SDR canvas underneath. */
+  hdrSurfaceHide: () => invoke<void>("hdr_surface_hide"),
+  /** Reposition/resize the native EDR surface (pan/zoom/window resize). */
+  hdrSurfaceSetRect: (rect: { x: number; y: number; w: number; h: number; dpr: number }) =>
+    invoke<void>("hdr_surface_set_rect", { rect }),
   exportImage: (
     id: string, params: InvertParams, outPath: string,
     imageCrop: [number, number, number, number] | null = null,
