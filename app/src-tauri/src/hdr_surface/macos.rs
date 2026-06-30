@@ -20,17 +20,21 @@
 //!      shows through wherever the DOM is transparent.
 //!   5. Overrides `hitTest:` to return nil so clicks/scroll fall through to the
 //!      webview (the native view never steals input).
-//!   6. Renders a STATIC horizontal gradient ramp (0.0 -> 4.0 linear) once with
-//!      a minimal Metal pipeline (fullscreen triangle, no vertex buffers).
+//!   6. Continuously renders a STATIC horizontal gradient ramp (0.0 -> 4.0
+//!      linear) with a minimal Metal pipeline (fullscreen triangle, no vertex
+//!      buffers), re-armed each tick on the main run loop.
 //!
-//! This is intentionally a one-shot static draw — enough to verify EDR by eye.
-//! No real image data is wired here; that is downstream work.
+//! The gradient is redrawn continuously (~60Hz, via a `performSelector` re-arm
+//! on the main run loop) so it stays visible for evaluation instead of only
+//! flashing once before the DOM composites over it. It is still a STATIC test
+//! pattern — no real image data is wired here; that is downstream work.
 
 #![allow(unexpected_cfgs)]
 
 use objc2::rc::Retained;
 use objc2::runtime::{AnyObject, ProtocolObject};
-use objc2::{define_class, msg_send, MainThreadOnly};
+use objc2::rc::Allocated;
+use objc2::{define_class, msg_send, sel, DefinedClass, MainThreadOnly};
 
 use objc2_app_kit::{NSAutoresizingMaskOptions, NSView, NSWindow, NSWindowOrderingMode};
 use objc2_core_foundation::CGSize;
@@ -40,7 +44,7 @@ use objc2_metal::{
     MTLClearColor, MTLCommandBuffer, MTLCommandEncoder, MTLCommandQueue,
     MTLCreateSystemDefaultDevice, MTLDevice, MTLDrawable, MTLLibrary, MTLLoadAction,
     MTLPixelFormat, MTLPrimitiveType, MTLRenderCommandEncoder, MTLRenderPassDescriptor,
-    MTLRenderPipelineDescriptor, MTLStoreAction,
+    MTLRenderPipelineDescriptor, MTLRenderPipelineState, MTLStoreAction,
 };
 use objc2_quartz_core::{CAMetalDrawable, CAMetalLayer};
 
@@ -74,13 +78,22 @@ fragment float4 edr_fragment(VOut in [[stage_in]]) {
 }
 "#;
 
+/// Render context stored on the view so the repeating `redrawEDR` tick can
+/// re-encode the gradient without re-resolving the device/pipeline each frame.
+struct EdrIvars {
+    layer: Retained<CAMetalLayer>,
+    pipeline: Retained<ProtocolObject<dyn MTLRenderPipelineState>>,
+    queue: Retained<ProtocolObject<dyn MTLCommandQueue>>,
+}
+
 define_class!(
     // SAFETY:
     // - `NSView` is the superclass; it (and the thread-kind MainThreadOnly it
     //   carries) impose no extra subclassing requirements we violate here.
-    // - This class does not implement `Drop` and adds no instance variables.
+    // - This class does not implement `Drop`.
     #[unsafe(super(NSView))]
     #[name = "OEEdrPassthroughView"]
+    #[ivars = EdrIvars]
     struct EdrPassthroughView;
 
     impl EdrPassthroughView {
@@ -90,8 +103,60 @@ define_class!(
         fn hit_test(&self, _point: NSPoint) -> *mut NSView {
             std::ptr::null_mut()
         }
+
+        // Repeating redraw tick. Re-encodes the same static 0..4 gradient into
+        // the next drawable, then re-arms itself (~60Hz) on the main run loop so
+        // the layer stays continuously presented behind the webview — otherwise
+        // a single one-shot draw only flashes before the DOM composites over it.
+        #[unsafe(method(redrawEDR))]
+        fn redraw_edr(&self) {
+            let iv = self.ivars();
+            // A nil drawable (e.g. layer momentarily not displayable) just skips
+            // this tick; we never panic and always re-arm below.
+            let _ = render_gradient(&iv.layer, &iv.pipeline, &iv.queue);
+            // Re-arm on the main run loop. performSelector:withObject:afterDelay:
+            // retains `self` until it fires, keeping the view alive across ticks.
+            unsafe {
+                let _: () = msg_send![
+                    self,
+                    performSelector: sel!(redrawEDR),
+                    withObject: std::ptr::null::<AnyObject>(),
+                    afterDelay: 1.0 / 60.0,
+                ];
+            }
+        }
     }
 );
+
+impl EdrPassthroughView {
+    fn new(
+        mtm: MainThreadMarker,
+        frame: NSRect,
+        layer: Retained<CAMetalLayer>,
+        pipeline: Retained<ProtocolObject<dyn MTLRenderPipelineState>>,
+        queue: Retained<ProtocolObject<dyn MTLCommandQueue>>,
+    ) -> Retained<Self> {
+        let this: Allocated<Self> = Self::alloc(mtm);
+        let this = this.set_ivars(EdrIvars {
+            layer,
+            pipeline,
+            queue,
+        });
+        unsafe { msg_send![super(this), initWithFrame: frame] }
+    }
+
+    /// Kick off the continuous redraw loop on the next main-run-loop turn.
+    fn start_render_loop(&self) {
+        unsafe {
+            let _: () = msg_send![
+                self,
+                performSelector: sel!(redrawEDR),
+                withObject: std::ptr::null::<AnyObject>(),
+                afterDelay: 0.0,
+            ];
+        }
+    }
+}
 
 /// Attach the EDR spike layer behind `window`'s webview.
 ///
@@ -194,12 +259,9 @@ fn build_and_attach(
     layer.setContentsScale(scale);
 
     // --- Layer-hosting NSView, inserted behind the webview ---------------
-    let view = {
-        let alloc = EdrPassthroughView::alloc(mtm);
-        let view: Retained<EdrPassthroughView> =
-            unsafe { msg_send![alloc, initWithFrame: bounds] };
-        view
-    };
+    // The view owns the render context (layer/pipeline/queue) so its repeating
+    // redraw tick can re-encode the gradient every frame.
+    let view = EdrPassthroughView::new(mtm, bounds, layer.clone(), pipeline, queue);
     // Order matters: set the backing layer *before* enabling wantsLayer so the
     // view becomes "layer-hosting" with our CAMetalLayer as its backing store.
     view.setLayer(Some(&layer));
@@ -222,12 +284,14 @@ fn build_and_attach(
         let _: () = msg_send![wk_webview, setValue: &*no, forKey: &*key];
     }
 
-    // --- One-shot static render of the gradient --------------------------
-    render_gradient(&layer, &pipeline, &queue)?;
+    // --- Start the continuous redraw loop --------------------------------
+    // A repeating ~60Hz tick (driven by performSelector re-arm on the main run
+    // loop) keeps the gradient presented; a single one-shot draw would only
+    // flash before the DOM composites over it. The view is retained by the
+    // AppKit hierarchy AND by the pending performSelector, and the layer is its
+    // backing store — so dropping the local handles here is safe.
+    view.start_render_loop();
 
-    // Keep the layer and view alive past this function: they are now retained
-    // by the AppKit view hierarchy (addSubview / setLayer), so dropping the
-    // local Retained handles here is fine.
     let _ = view;
     let _ = layer;
     Ok(())
