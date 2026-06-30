@@ -478,7 +478,7 @@
              overlays it. Unmounting the Viewport tears down its GPU context and forces
              a full working-buffer re-fetch + re-upload on dismiss (a multi-second blank),
              so we keep it alive and just cover it. -->
-        <Viewport bind:this={vp} id={$activeId} params={effParams} imgW={effW} imgH={effH} imageCrop={imageCrop} fallbackThumb={active?.thumbnail ?? ""}
+        <Viewport bind:this={vp} allowHdrSurface={true} id={$activeId} params={effParams} imgW={effW} imgH={effH} imageCrop={imageCrop} fallbackThumb={active?.thumbnail ?? ""}
                   rot90={cRot} flipH={committed?.flipH ?? false} flipV={committed?.flipV ?? false} angle={committed?.angle ?? 0}
                   eraser={$tool === "eraser"} marquee={zoomMarquee} {brush} dust={dust.strokes} irRemoval={dust.irRemoval} dustRev={$dustRev} developRev={$developRev}
                   brushMigan={dust.brushMigan} aiApplied={dust.aiApplied}

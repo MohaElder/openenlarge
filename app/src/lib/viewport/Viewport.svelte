@@ -36,6 +36,12 @@
   export let flipV = false;
   export let angle = 0;
   export let eraser = false;
+  /** Opt-in: this mount may drive the macOS native EDR compositing surface in
+   *  live-edr mode (hide SDR canvas + punch a transparent body hole). Only the
+   *  develop viewport sets this true; other mounts (e.g. the Roll "view frame"
+   *  in FramePreview, which has its own opaque #111 overlay ancestor that would
+   *  block the layer) keep the default and fall through to the gain-map <img>. */
+  export let allowHdrSurface = false;
   /** Marquee-zoom armed: the next drag draws a zoom rectangle instead of painting. */
   export let marquee = false;
   export let pointPick = false;
@@ -250,7 +256,7 @@
       renderer = null;
       // live-edr: never leave the native surface showing (or the body transparent)
       // behind an unmounted Viewport — e.g. navigating away from Develop mid-HDR.
-      if (hdrUsesSurface) { api.hdrSurfaceHide(); hdrUsesSurface = false; }
+      if (hdrUsesSurface) { api.hdrSurfaceHide().catch(() => {}); hdrUsesSurface = false; }
       if (typeof document !== "undefined") document.body.classList.remove("hdr-edr-hole");
     };
   });
@@ -396,11 +402,12 @@
     if (!params.hdr || !id || !imgW || !vpW) return;
     const curId = id;
     try {
-      // Only the INTERACTIVE develop viewport drives the native surface — other
-      // Viewport instances (filmstrip/roll thumbnails) are non-interactive, never
-      // mount a WebGL canvas (`useGL` is interactive-gated), and would otherwise
-      // hijack the single shared native surface with a bogus zero-size rect.
-      if (interactive && $hdrMode === "live-edr" && canvas) {
+      // Only mounts that opt in via `allowHdrSurface` drive the native surface
+      // (the develop viewport). Other Viewport instances — notably the Roll
+      // "view frame" (FramePreview), which is also interactive AND mounts a
+      // WebGL canvas but sits under its own opaque #111 overlay that would block
+      // the layer — keep the default false and fall through to the gain-map path.
+      if (allowHdrSurface && $hdrMode === "live-edr" && canvas) {
         await api.hdrSurfaceRenderShow(id, params, hdrViewSpec(), canvasRect());
         if (id !== curId || !params.hdr) return; // image switched or toggled off mid-encode
         hdrUsesSurface = true;
@@ -422,7 +429,7 @@
   // through), then debounces an encode that fades HDR back in once things settle.
   function scheduleHdr() {
     hdrShown = false; // live SDR while dragging
-    if (hdrUsesSurface) { api.hdrSurfaceHide(); hdrUsesSurface = false; } // reveal the SDR canvas for the gesture
+    if (hdrUsesSurface) { api.hdrSurfaceHide().catch(() => {}); hdrUsesSurface = false; } // reveal the SDR canvas for the gesture
     if (hdrTimer) clearTimeout(hdrTimer);
     if (!params.hdr || !id) return;
     hdrTimer = setTimeout(encodeHdr, 200);
@@ -432,13 +439,18 @@
   $: if (id !== hdrPrevId) {
     hdrPrevId = id; hdrSrc = ""; hdrShown = false;
     if (hdrTimer) clearTimeout(hdrTimer);
-    if (hdrUsesSurface) { api.hdrSurfaceHide(); hdrUsesSurface = false; }
+    if (hdrUsesSurface) { api.hdrSurfaceHide().catch(() => {}); hdrUsesSurface = false; }
   }
 
   // Re-run on any input that changes the rendered frame, plus the HDR toggle itself.
   $: hdrKey = `${id}|${params.hdr}|${developRev}|${invKey}|${finishKey}|${geomKey}|${dustRev}|${irRemoval.enabled}|${irRemoval.sensitivity}|${vpW > 0}`;
   $: if (params.hdr) { hdrKey; if (id && vpW && imgW) scheduleHdr(); }
-  $: if (!params.hdr) { hdrShown = false; if (hdrTimer) clearTimeout(hdrTimer); }
+  $: if (!params.hdr) {
+    hdrShown = false; if (hdrTimer) clearTimeout(hdrTimer);
+    // CSS self-heals (canvas re-shows, body opaque) off hdrShown, but the native
+    // CAMetalLayer would stay shown with a frozen frame — hide it explicitly.
+    if (hdrUsesSurface) { api.hdrSurfaceHide().catch(() => {}); hdrUsesSurface = false; }
+  }
 
   // Keep the native surface's rect in sync with pan/zoom/resize while it's shown
   // (settled). Diffed against `geomKey` (not a plain `$:` reactive call) so the
@@ -449,7 +461,7 @@
   afterUpdate(() => {
     if (hdrUsesSurface && hdrShown && geomKey !== lastRectGeomKey) {
       lastRectGeomKey = geomKey;
-      api.hdrSurfaceSetRect(canvasRect());
+      api.hdrSurfaceSetRect(canvasRect()).catch(() => {});
     }
   });
 
