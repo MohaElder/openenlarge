@@ -1,12 +1,13 @@
 import { derived, get, writable } from "svelte/store";
 import { dict } from "./dict";
 
-export type Locale = "en" | "zh" | "ja" | "ko";
+export type Locale = "en" | "zh" | "zh-Hant" | "ja" | "ko";
 
 /** Selectable UI languages, in display order. */
 export const LOCALES: { id: Locale; label: string }[] = [
   { id: "en", label: "English" },
-  { id: "zh", label: "中文" },
+  { id: "zh", label: "简体中文" },
+  { id: "zh-Hant", label: "繁體中文" },
   { id: "ja", label: "日本語" },
   { id: "ko", label: "한국어" },
 ];

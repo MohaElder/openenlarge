@@ -1,498 +1,498 @@
-key,en,zh,ja,ko,file,note
-app.brand,OpenEnlarge,OpenEnlarge,OpenEnlarge,OpenEnlarge,src/routes/+page.svelte,button
-app.about.ariaLabel,About OpenEnlarge,关于OpenEnlarge,OpenEnlargeについて,OpenEnlarge 정보,src/routes/+page.svelte,aria-label
-app.tab.library,Library,库,ライブラリ,라이브러리,src/routes/+page.svelte,button
-app.tab.develop,Roll,整卷,ロール,롤,src/routes/+page.svelte,button
-app.tab.tune,Frame,单帧,フレーム,프레임,src/routes/+page.svelte,button
-app.tab.export,Export,导出,書き出し,내보내기,src/routes/+page.svelte,button
-app.settings.ariaLabel,Settings,设置,設定,설정,src/routes/+page.svelte,aria-label
-settings.dialogAriaLabel,Settings,设置,設定,설정,src/lib/settings/SettingsMenu.svelte,aria-label
-settings.developMode.heading,Develop mode,显影模式,現像モード,현상 모드,src/lib/settings/SettingsMenu.svelte,heading
-settings.developMode.density,B · density,B · 密度,B · 濃度,B · 농도,src/lib/settings/SettingsMenu.svelte,button
-settings.developMode.perChan,C · per-chan,C · per-chan,C · per-chan,C · per-chan,src/lib/settings/SettingsMenu.svelte,button
-settings.developMode.hint,Applies to every image.,应用到所有照片,すべての画像に適用されます。,모든 이미지에 적용됩니다.,src/lib/settings/SettingsMenu.svelte,hint
-settings.language.heading,Language,语言,言語,언어,src/lib/settings/SettingsMenu.svelte,heading
-settings.shortcuts.button,Keyboard shortcuts,键盘快捷键,キーボードショートカット,키보드 단축키,src/lib/settings/SettingsMenu.svelte,button
-settings.checkUpdates,Check for updates,检查更新,アップデートを確認,업데이트 확인,src/lib/settings/SettingsMenu.svelte,button
-update.title,Software update,软件更新,ソフトウェアアップデート,소프트웨어 업데이트,src/lib/update/UpdatePrompt.svelte,heading
-update.available,Version {version} is available.,有新版本 {version} 可用。,バージョン {version} が利用可能です。,버전 {version}을(를) 사용할 수 있습니다.,src/lib/update/UpdatePrompt.svelte,text
-update.notesLabel,What's new,更新内容,新着情報,새로운 기능,src/lib/update/UpdatePrompt.svelte,text
-update.update,Update,更新,アップデート,업데이트,src/lib/update/UpdatePrompt.svelte,button
-update.later,Later,稍后,後で,나중에,src/lib/update/UpdatePrompt.svelte,button
-update.skip,Skip this version,跳过此版本,このバージョンをスキップ,이 버전 건너뛰기,src/lib/update/UpdatePrompt.svelte,button
-update.downloading,Downloading update…,正在下载更新…,アップデートをダウンロード中…,업데이트 다운로드 중…,src/lib/update/UpdatePrompt.svelte,text
-update.restartNow,Restart now,立即重启,今すぐ再起動,지금 재시작,src/lib/update/UpdatePrompt.svelte,button
-update.upToDate,You're on the latest version.,已是最新版本。,最新バージョンを使用しています。,최신 버전을 사용 중입니다.,src/lib/update/UpdatePrompt.svelte,text
-update.error,Update check failed. Please try again later.,检查更新失败，请稍后再试。,アップデートの確認に失敗しました。後でもう一度お試しください。,업데이트 확인에 실패했습니다. 나중에 다시 시도해 주세요.,src/lib/update/UpdatePrompt.svelte,text
-update.dismiss,OK,确定,OK,확인,src/lib/update/UpdatePrompt.svelte,button
-keymap.title,Keyboard shortcuts,键盘快捷键,キーボードショートカット,키보드 단축키,src/lib/keymap/KeymapModal.svelte,heading
-keymap.subtitle,Hold an adjustment key and tap ← / → to nudge (Shift = fine). Click any shortcut to rebind it.,按住调整键并点击 ← / → 微调（Shift 为精调）。点击任意快捷键即可重新绑定。,調整キーを押しながら ← / → でナッジ（Shift = 微調整）。ショートカットをクリックして再割り当て。,조정 키를 누른 채 ← / →를 눌러 조정 (Shift = 미세 조정). 단축키를 클릭해 재설정.,src/lib/keymap/KeymapModal.svelte,hint
-keymap.reset,Reset to defaults,恢复默认,デフォルトにリセット,기본값으로 재설정,src/lib/keymap/KeymapModal.svelte,button
-keymap.listening,Press a key…,按下按键…,キーを押してください…,키를 누르세요…,src/lib/keymap/KeymapModal.svelte,prompt
-keymap.conflict,Already used by {action},已被「{action}」占用,「{action}」で使用中,{action}에서 이미 사용 중,src/lib/keymap/KeymapModal.svelte,warning
-keymap.close,Close,关闭,閉じる,닫기,src/lib/keymap/KeymapModal.svelte,button
-keymap.group.navigation,Navigation,导航,ナビゲーション,탐색,src/lib/keymap/KeymapModal.svelte,group
-keymap.group.editing,Editing,编辑,編集,편집,src/lib/keymap/KeymapModal.svelte,group
-keymap.group.crop,Crop tool,裁剪工具,クロップツール,자르기 도구,src/lib/keymap/KeymapModal.svelte,group
-keymap.nav.prev,Previous image,上一张,前の画像,이전 이미지,src/lib/keymap/KeymapModal.svelte,row
-keymap.nav.next,Next image,下一张,次の画像,다음 이미지,src/lib/keymap/KeymapModal.svelte,row
-keymap.nav.first,First image,第一张,最初の画像,첫 번째 이미지,src/lib/keymap/KeymapModal.svelte,row
-keymap.nav.last,Last image,最后一张,最後の画像,마지막 이미지,src/lib/keymap/KeymapModal.svelte,row
-keymap.nav.selectAll,Select all,全选,すべて選択,전체 선택,src/lib/keymap/KeymapModal.svelte,row
-keymap.nav.delete,Delete image,删除照片,画像を削除,이미지 삭제,src/lib/keymap/KeymapModal.svelte,row
-keymap.edit.undo,Undo,撤销,取り消し,실행 취소,src/lib/keymap/KeymapModal.svelte,row
-keymap.edit.redo,Redo,重做,やり直し,다시 실행,src/lib/keymap/KeymapModal.svelte,row
-keymap.edit.rotateCCW,Rotate counter-clockwise,逆时针旋转,反時計回りに回転,시계 반대 방향으로 회전,src/lib/keymap/KeymapModal.svelte,row
-keymap.edit.rotateCW,Rotate clockwise,顺时针旋转,時計回りに回転,시계 방향으로 회전,src/lib/keymap/KeymapModal.svelte,row
-keymap.edit.flipV,Flip vertical,垂直翻转,上下反転,수직 뒤집기,src/lib/keymap/KeymapModal.svelte,row
-keymap.edit.flipH,Flip horizontal,水平翻转,左右反転,수평 뒤집기,src/lib/keymap/KeymapModal.svelte,row
-keymap.edit.copySettings,Copy develop settings,复制显影设置,現像設定をコピー,현상 설정 복사,src/lib/keymap/KeymapModal.svelte,row
-keymap.edit.pasteSettings,Paste develop settings to selection,粘贴显影设置到所选,選択範囲に現像設定をペースト,선택 항목에 현상 설정 붙여넣기,src/lib/keymap/KeymapModal.svelte,row
-keymap.group.adjust,Adjustments,调整,調整,조정,src/lib/keymap/KeymapModal.svelte,group
-keymap.adjust.temp,Color temperature,色温,色温度,색 온도,src/lib/keymap/KeymapModal.svelte,row
-keymap.adjust.tint,Tint,色调,ティント,틴트,src/lib/keymap/KeymapModal.svelte,row
-keymap.adjust.exposure,Exposure,曝光,露出,노출,src/lib/keymap/KeymapModal.svelte,row
-keymap.adjust.contrast,Contrast,对比度,コントラスト,대비,src/lib/keymap/KeymapModal.svelte,row
-keymap.adjust.highlights,Highlights,高光,ハイライト,하이라이트,src/lib/keymap/KeymapModal.svelte,row
-keymap.adjust.shadows,Shadows,阴影,シャドウ,그림자,src/lib/keymap/KeymapModal.svelte,row
-keymap.adjust.whites,Whites,白色,白レベル,흰색,src/lib/keymap/KeymapModal.svelte,row
-keymap.adjust.blacks,Blacks,黑色,黒レベル,검정,src/lib/keymap/KeymapModal.svelte,row
-keymap.adjust.fine,Fine step (hold while nudging),精调（微调时按住）,微調整（ナッジ中に押しっぱなし）,미세 조정 (조정 중 누른 채 유지),src/lib/keymap/KeymapModal.svelte,row
-keymap.crop.commit,Commit crop,确认裁剪,クロップを確定,자르기 적용,src/lib/keymap/KeymapModal.svelte,row
-keymap.crop.discard,Discard crop,放弃裁剪,クロップを破棄,자르기 취소,src/lib/keymap/KeymapModal.svelte,row
-keymap.crop.swap,Swap orientation,切换方向,向きを切り替え,방향 전환,src/lib/keymap/KeymapModal.svelte,row
-keymap.crop.lockAspect,Lock aspect ratio while dragging,拖动时锁定纵横比,ドラッグ中にアスペクト比を固定,드래그 중 종횡비 고정,src/lib/keymap/KeymapModal.svelte,row
-about.title,OpenEnlarge,OpenEnlarge,OpenEnlarge,OpenEnlarge,src/lib/about/AboutModal.svelte,heading
-about.subtitle,Open-source film scan editor.,开源胶片扫描编辑,オープンソースのフィルムスキャンエディタ。,오픈 소스 필름 스캔 편집기.,src/lib/about/AboutModal.svelte,heading
-about.body,"OpenEnlarge is free, open-source software that brings the darkroom to your desktop. Instead of flipping a tone curve, it inverts every scan in the density domain with the Kodak Cineon model (a Beer-Lambert dye model — density is linear in dye concentration): it samples the film base once per roll to strip the orange mask and neutralize the scanner light in one step, measures the density range inside your crop, then prints each channel back to a positive — with white balance applied as a gain on the print so shadows stay neutral. From there you finish on top with full curve, color-grading, and tonal controls, all in one fast workflow.",OpenEnlarge 是一款免费、开源的软件，将暗房搬到你的桌面。它不是翻转色调曲线，而是在密度域中反相每一张扫描：采用柯达 Cineon 模型（基于 Beer-Lambert 染料模型——密度与染料浓度成线性关系），每卷采样一次片基，一步去除橙色片基并中和扫描光源；在你的裁剪范围内测量密度范围，再将每个通道打印回正片，并以增益方式对正片施加白平衡，使暗部保持中性。随后用完整的曲线、调色与色调控件进行精修，全部在一套流畅的工作流中完成。,OpenEnlargeは、暗室をデスクトップに持ち込む、無料のオープンソースソフトウェアです。トーンカーブを反転させるのではなく、コダック Cineonモデル（Beer-Lambertの染料モデル：濃度は染料濃度に線形比例）を使用して、濃度ドメインで各スキャンを反転します。ロールごとに一度フィルムベースをサンプリングしてオレンジマスクを除去し、スキャナー光源を一工程で中和します。次に、クロップ内の濃度範囲を測定し、各チャンネルをポジに焼き付け、ポジへのゲインとしてホワイトバランスを適用してシャドウを中性に保ちます。その後、完全なカーブ、カラーグレーディング、トーンコントロールで仕上げ、すべてを一つの速いワークフローで完結します。,"OpenEnlarge는 암실을 데스크탑으로 가져오는 무료 오픈 소스 소프트웨어입니다. 톤 커브를 뒤집는 대신, 코닥 Cineon 모델(Beer-Lambert 염료 모델 — 농도는 염료 농도에 선형 비례)을 사용해 농도 도메인에서 각 스캔을 반전합니다. 롤당 한 번 필름 베이스를 샘플링해 오렌지 마스크를 제거하고 스캐너 광원을 한 단계에서 중화합니다. 자르기 영역 내의 농도 범위를 측정한 후, 각 채널을 포지티브로 인화하며, 화이트 밸런스를 인화본의 게인으로 적용해 그림자를 중성으로 유지합니다. 이후 완전한 커브, 색 보정, 톤 컨트롤로 마무리하며, 모두 하나의 빠른 워크플로 안에서 완성됩니다.",src/lib/about/AboutModal.svelte,paragraph
-about.licenses,Licenses,许可证,ライセンス,라이선스,src/lib/about/AboutModal.svelte,button
-about.github,GitHub ↗,GitHub ↗,GitHub ↗,GitHub ↗,src/lib/about/AboutModal.svelte,button
-about.close,Close,关闭,閉じる,닫기,src/lib/about/AboutModal.svelte,button
-about.back,Back,返回,戻る,뒤로,src/lib/about/AboutModal.svelte,aria-label
-about.licensesTitle,Open-source licenses,开源许可证,オープンソースライセンス,오픈 소스 라이선스,src/lib/about/AboutModal.svelte,heading
-about.licensesSubtitle,OpenEnlarge is built with these projects.,OpenEnlarge 基于以下项目构建。,OpenEnlargeは以下のプロジェクトを使用して構築されています。,OpenEnlarge는 다음 프로젝트를 사용해 제작되었습니다.,src/lib/about/AboutModal.svelte,heading
-about.credits.group.applicationUi,Application & UI,应用与界面,アプリケーションとUI,애플리케이션 & UI,src/lib/about/credits.ts,group label
-about.credits.group.imagePipeline,Image pipeline,图像处理管线,画像パイプライン,이미지 파이프라인,src/lib/about/credits.ts,group label
-about.credits.group.storageSystem,Storage & system,存储与系统,ストレージとシステム,스토리지 & 시스템,src/lib/about/credits.ts,group label
-confirmDelete.title,Delete {name}?,删除 {name}？,「{name}」を削除しますか？,{name}을(를) 삭제하시겠습니까?,src/lib/overlay/ConfirmDelete.svelte,heading
-confirmDelete.titleCount,Delete {count} items?,删除 {count} 张照片？,{count}件のアイテムを削除しますか？,항목 {count}개를 삭제하시겠습니까?,src/lib/overlay/ConfirmDelete.svelte,heading
-confirmDelete.fallbackName,this image,这张照片,この画像,이 이미지,src/lib/overlay/ConfirmDelete.svelte,fallback
-confirmDelete.sub,"Remove it from OpenEnlarge, or also move the original file to the Trash.",从 OpenEnlarge 中移除，或同时将原始文件移至回收站。,OpenEnlargeから削除するか、元のファイルをゴミ箱に移動します。,"OpenEnlarge에서 제거하거나, 원본 파일을 휴지통으로 이동합니다.",src/lib/overlay/ConfirmDelete.svelte,paragraph
-confirmDelete.warn,This can't be undone.,此操作无法撤销。,この操作は元に戻せません。,이 작업은 취소할 수 없습니다.,src/lib/overlay/ConfirmDelete.svelte,paragraph
-confirmDelete.cancel,Cancel,取消,キャンセル,취소,src/lib/overlay/ConfirmDelete.svelte,button
-confirmDelete.remove,Remove from OpenEnlarge,从 OpenEnlarge 中移除,OpenEnlargeから削除,OpenEnlarge에서 제거,src/lib/overlay/ConfirmDelete.svelte,button
-confirmDelete.trash,Move file to Trash,将文件移至回收站,ファイルをゴミ箱に移動,파일을 휴지통으로 이동,src/lib/overlay/ConfirmDelete.svelte,button
-confirmFolder.title,Remove folder “{name}”?,移除文件夹“{name}”？,フォルダ「{name}」を削除しますか？,"폴더 ""{name}""을(를) 제거하시겠습니까?",src/lib/overlay/ConfirmRemoveFolder.svelte,heading
-confirmFolder.fallbackName,this folder,此文件夹,このフォルダ,이 폴더,src/lib/overlay/ConfirmRemoveFolder.svelte,fallback
-confirmFolder.sub,"Its {count} image{plural} will be removed from OpenEnlarge, or also moved to the Trash.",其中的 {count} 张照片将从 OpenEnlarge 中移除，或同时移至回收站。,フォルダ内の {count} 枚の画像をOpenEnlargeから削除するか、ゴミ箱に移動します。,폴더 내 이미지 {count}개를 OpenEnlarge에서 제거하거나 휴지통으로 이동합니다.,src/lib/overlay/ConfirmRemoveFolder.svelte,paragraph
-confirmFolder.warn,This can't be undone.,此操作无法撤销。,この操作は元に戻せません。,이 작업은 취소할 수 없습니다.,src/lib/overlay/ConfirmRemoveFolder.svelte,paragraph
-confirmFolder.cancel,Cancel,取消,キャンセル,취소,src/lib/overlay/ConfirmRemoveFolder.svelte,button
-confirmFolder.remove,Remove from OpenEnlarge,从 OpenEnlarge 中移除,OpenEnlargeから削除,OpenEnlarge에서 제거,src/lib/overlay/ConfirmRemoveFolder.svelte,button
-confirmFolder.trash,Delete files from computer,从电脑中删除文件,コンピュータからファイルを削除,컴퓨터에서 파일 삭제,src/lib/overlay/ConfirmRemoveFolder.svelte,button
-confirmDevelop.title,Develop all {count} image{plural}?,显影全部 {count} 张照片？,{count} 枚の画像をすべて現像しますか？,이미지 {count}개를 모두 현상하시겠습니까?,src/lib/overlay/ConfirmDevelop.svelte,heading
-confirmDevelop.sub,"They'll be decoded — negatives inverted, positives kept as-is — then opened in Develop.",它们将被解码——负片反相、正片保持原样——然后在显影中打开。,デコードされます。ネガは反転、ポジはそのまま——現像で開きます。,"디코딩됩니다 — 네거티브는 반전, 포지티브는 그대로 — 현상에서 열립니다.",src/lib/overlay/ConfirmDevelop.svelte,paragraph
-confirmDevelop.cancel,Cancel,取消,キャンセル,취소,src/lib/overlay/ConfirmDevelop.svelte,button
-confirmDevelop.confirm,Develop all,全部显影,すべて現像,전체 현상,src/lib/overlay/ConfirmDevelop.svelte,button
-confirmDevelop.filmStock,Film stock,胶片型号,フィルムストック,필름 종류,src/lib/overlay/ConfirmDevelop.svelte,label
-confirmDevelop.filmStockOptional,optional,可选,任意,선택 사항,src/lib/overlay/ConfirmDevelop.svelte,hint
-confirmApply.copyTitle,Copy which settings?,复制哪些设置？,どの設定をコピーしますか？,어떤 설정을 복사할까요?,src/lib/overlay/ConfirmApplySettings.svelte,heading
-confirmApply.copySub,Choose what travels when you paste these settings onto other frames.,选择粘贴到其他照片时要携带的设置。,他のフレームに貼り付けるときに引き継ぐ設定を選択してください。,다른 프레임에 붙여넣을 때 함께 적용할 설정을 선택하세요.,src/lib/overlay/ConfirmApplySettings.svelte,paragraph
-confirmApply.copyConfirm,Copy,复制,コピー,복사,src/lib/overlay/ConfirmApplySettings.svelte,button
-confirmApply.cancel,Cancel,取消,キャンセル,취소,src/lib/overlay/ConfirmApplySettings.svelte,button
-confirmApply.confirm,Apply,应用,適用,적용,src/lib/overlay/ConfirmApplySettings.svelte,button
-confirmApply.rollTitle,Apply to all {count} frames in this roll?,应用到本胶卷的全部 {count} 张？,このロールの全 {count} フレームに適用しますか？,이 롤의 {count}개 프레임 전체에 적용하시겠습니까?,src/lib/overlay/ConfirmApplySettings.svelte,heading
-confirmApply.rollSub,Choose which of this frame's settings to apply across the whole roll.,选择要应用到整卷的本张设置。,このフレームの設定のうち、ロール全体に適用するものを選択してください。,이 프레임의 설정 중 롤 전체에 적용할 항목을 선택하세요.,src/lib/overlay/ConfirmApplySettings.svelte,paragraph
-applyGroups.toneColor,Tone & Color,色调与颜色,トーン＆カラー,톤 & 색상,src/lib/overlay/ConfirmApplySettings.svelte,checkbox
-applyGroups.crop,Crop,裁切,クロップ,자르기,src/lib/overlay/ConfirmApplySettings.svelte,checkbox
-applyGroups.base,Film base,片基,フィルムベース,필름 베이스,src/lib/overlay/ConfirmApplySettings.svelte,checkbox
-applyGroups.exposure,Exposure,曝光,露出,노출,src/lib/overlay/ConfirmApplySettings.svelte,checkbox
-toast.settingsCopied,Settings copied,已复制设置,設定をコピーしました,설정이 복사되었습니다,src/lib/toast.ts,toast
-toast.copyFirst,Copy settings first,请先复制设置,先に設定をコピーしてください,먼저 설정을 복사하세요,src/lib/toast.ts,toast
-toast.settingsApplied,Settings applied,已应用设置,設定を適用しました,설정이 적용되었습니다,src/lib/toast.ts,toast
-toast.settingsAppliedN,Settings applied to {count} images,已应用设置到 {count} 张照片,{count} 枚の画像に設定を適用しました,{count}개 이미지에 설정이 적용되었습니다,src/lib/toast.ts,toast
-toast.autoBrightnessDone,Auto exp. applied to {count} images,已对 {count} 张照片应用自动亮度,{count} 枚の画像に自動露出を適用しました,{count}개 이미지에 자동 노출이 적용되었습니다,src/lib/workflow.ts,toast
-toast.autoDustRemoved,{count} dust spots removed,已去除 {count} 处污点,ほこり {count} 箇所を除去しました,먼지 {count}개가 제거되었습니다,src/lib/develop/AutoDustPanel.svelte,toast
-toast.autoDustNone,No dust detected,未检测到污点,ほこりは検出されませんでした,먼지가 감지되지 않았습니다,src/lib/develop/AutoDustPanel.svelte,toast
-contextMenu.delete,Delete…,删除…,削除…,삭제…,src/lib/overlay/ImageContextMenu.svelte,button
-contextMenu.reveal,Open in folder,打开所在文件夹,フォルダで開く,폴더에서 열기,src/lib/overlay/ImageContextMenu.svelte,button
-contextMenu.deleteCount,Delete {count} items,删除 {count} 张照片,{count} 件を削除,{count}개 항목 삭제,src/lib/overlay/ImageContextMenu.svelte,button
-contextMenu.flipH,Flip horizontal,水平翻转,左右反転,수평 뒤집기,src/lib/overlay/ImageContextMenu.svelte,button
-contextMenu.flipV,Flip vertical,垂直翻转,上下反転,수직 뒤집기,src/lib/overlay/ImageContextMenu.svelte,button
-folderMenu.remove,Remove folder…,移除文件夹…,フォルダを削除…,폴더 제거…,src/lib/overlay/FolderContextMenu.svelte,button
-progress.developing,Developing {current} of {total}…,正在显影 {current} / {total}…,現像中 {current} / {total}…,현상 중 {current} / {total}…,src/lib/overlay/ProgressOverlay.svelte,heading
-export.title,Export,导出,書き出し,내보내기,src/lib/export/ExportModal.svelte,heading
-export.close,Close,关闭,閉じる,닫기,src/lib/export/ExportModal.svelte,aria-label
-export.deselectAll,Deselect all,取消全选,すべて選択解除,전체 선택 해제,src/lib/export/ExportModal.svelte,button
-export.selectAll,Select all,全选,すべて選択,전체 선택,src/lib/export/ExportModal.svelte,button
-export.selectionCount,{selected} of {total} selected,已选择 {selected} / {total},{total} 枚中 {selected} 枚を選択,{total}개 중 {selected}개 선택됨,src/lib/export/ExportModal.svelte,label
-export.emptyState,No developed images to export.,没有可导出的已显影照片。,書き出せる現像済み画像がありません。,내보낼 현상된 이미지가 없습니다.,src/lib/export/ExportModal.svelte,paragraph
-export.formatLabel,Format,格式,フォーマット,형식,src/lib/export/ExportModal.svelte,label
-export.formatJpeg,JPEG,JPEG,JPEG,JPEG,src/lib/export/ExportModal.svelte,option
-export.formatTiff,TIFF,TIFF,TIFF,TIFF,src/lib/export/ExportModal.svelte,option
-export.formatPng,PNG,PNG,PNG,PNG,src/lib/export/ExportModal.svelte,option
-export.quality,Quality,质量,品質,품질,src/lib/export/ExportModal.svelte,label
-export.maxSize,Max size,最大文件大小,最大サイズ,최대 크기,src/lib/export/ExportModal.svelte,label
-export.unlimited,Unlimited,不限,無制限,무제한,src/lib/export/ExportModal.svelte,value
-export.maxSizeMb,{mb} MB,{mb} MB,{mb} MB,{mb} MB,src/lib/export/ExportModal.svelte,value
-export.bitDepth,Bit depth,位深度,ビット深度,비트 심도,src/lib/export/ExportModal.svelte,label
-export.bitDepth8,8-bit,8 位,8ビット,8비트,src/lib/export/ExportModal.svelte,option
-export.bitDepth16,16-bit,16 位,16ビット,16비트,src/lib/export/ExportModal.svelte,option
-export.resolution,Resolution,分辨率,解像度,해상도,src/lib/export/ExportModal.svelte,label
-export.resFull,Full,完整,フル,전체,src/lib/export/ExportModal.svelte,option
-export.resPx,{px} px,{px} px,{px} px,{px} px,src/lib/export/ExportModal.svelte,value
-export.resCustom,Custom,自定义,カスタム,사용자 지정,src/lib/export/ExportModal.svelte,option
-export.resHint,longest side,最长边,長辺,긴 변,src/lib/export/ExportModal.svelte,hint
-export.resPxUnit,px (longest side),px（最长边）,px（長辺）,px (긴 변),src/lib/export/ExportModal.svelte,unit
-export.exportingProgress,Exporting {done} of {total}…,正在导出 {done} / {total}…,書き出し中 {done} / {total}…,내보내는 중 {done} / {total}…,src/lib/export/ExportModal.svelte,status
-export.openFolder,Open folder,打开文件夹,フォルダを開く,폴더 열기,src/lib/export/ExportModal.svelte,button
-export.exporting,Exporting…,导出中…,書き出し中…,내보내는 중…,src/lib/export/ExportModal.svelte,button
-export.exportCount,Export {count},导出 {count},{count} 枚を書き出し,{count}개 내보내기,src/lib/export/ExportModal.svelte,button
-export.summaryPartial,Exported {done} of {total} · {failed} failed,已导出 {done} / {total} · {failed} 失败,{total} 枚中 {done} 枚を書き出し · {failed} 枚失敗,{total}개 중 {done}개 내보냄 · {failed}개 실패,src/lib/export/ExportModal.svelte,status
-export.summaryDone,Exported {done} {imageOrImages},已导出 {done} {imageOrImages},{done} {imageOrImages}を書き出しました,{done} {imageOrImages} 내보내기 완료,src/lib/export/ExportModal.svelte,status
-export.imageSingular,image,张照片,枚,장,src/lib/export/ExportModal.svelte,plural unit
-export.imagePlural,images,张照片,枚,장,src/lib/export/ExportModal.svelte,plural unit
-roll.empty,No developed frames in this folder yet.,此文件夹中还没有已显影的胶片。,このフォルダにはまだ現像済みのフレームがありません。,이 폴더에는 아직 현상된 프레임이 없습니다.,src/lib/tabs/Roll.svelte,hint
-roll.filmEdge,Film edge,片边,フィルムエッジ,필름 엣지,src/lib/tabs/Roll.svelte,toggle
-roll.export.button,Export contact sheet,导出印样,コンタクトシートを書き出し,콘택트 시트 내보내기,src/lib/tabs/Roll.svelte,button
-roll.export.title,Export contact sheet,导出印样,コンタクトシートを書き出し,콘택트 시트 내보내기,src/lib/overlay/ExportSheetDialog.svelte,heading
-roll.export.resolution,Resolution,分辨率,解像度,해상도,src/lib/overlay/ExportSheetDialog.svelte,label
-roll.export.resStandard,Standard,标准,標準,표준,src/lib/overlay/ExportSheetDialog.svelte,option
-roll.export.resHigh,High,高清,高画質,고화질,src/lib/overlay/ExportSheetDialog.svelte,option
-roll.export.resPrint,Print,打印,印刷,인쇄,src/lib/overlay/ExportSheetDialog.svelte,option
-roll.export.format,Format,格式,形式,형식,src/lib/overlay/ExportSheetDialog.svelte,label
-roll.export.formatJpeg,JPEG,JPEG,JPEG,JPEG,src/lib/overlay/ExportSheetDialog.svelte,option
-roll.export.formatPng,PNG,PNG,PNG,PNG,src/lib/overlay/ExportSheetDialog.svelte,option
-roll.export.quality,Quality,质量,画質,품질,src/lib/overlay/ExportSheetDialog.svelte,label
-roll.export.confirm,Export,导出,書き出し,내보내기,src/lib/overlay/ExportSheetDialog.svelte,button
-roll.edgeText,Edge text,片边文字,エッジテキスト,엣지 텍스트,src/lib/tabs/Roll.svelte,label
-roll.edgeTextPlaceholder,Film edge marking,片边标记文字,フィルムエッジの文字,필름 엣지 표시 문자,src/lib/tabs/Roll.svelte,placeholder
-roll.close,Close,关闭,閉じる,닫기,src/lib/roll/FramePreview.svelte,button
-roll.crop.tool,Crop,裁剪,クロップ,자르기,src/lib/roll/FramePreview.svelte,button
-roll.base.sample,Sample film base,采样片基,フィルムベースをサンプル,필름 베이스 샘플링,src/lib/roll/FramePreview.svelte,button
-roll.base.auto,Auto film base,自动片基,フィルムベース自動検出,필름 베이스 자동 설정,src/lib/roll/FramePreview.svelte,button
-roll.base.heading,Film base,片基,フィルムベース,필름 베이스,src/lib/tabs/Roll.svelte,heading
-export.cropSelected,Crop selected,裁剪所选,選択範囲をクロップ,선택 영역 자르기,src/lib/export/ExportModal.svelte,toggle
-viewport.fit,Fit,适应,フィット,맞춤,src/lib/viewport/Viewport.svelte,zoom label
-viewport.zoomPercent,{percent}%,{percent}%,{percent}%,{percent}%,src/lib/viewport/Viewport.svelte,zoom label
-viewport.rgbReadout,sRGB 8-bit at cursor,光标处 sRGB 8 位强度,カーソル位置の sRGB 8ビット値,커서 위치의 sRGB 8비트 값,src/lib/viewport/Viewport.svelte,densitometer tooltip
-viewport.rendering,Rendering…,渲染中…,レンダリング中…,렌더링 중…,src/lib/viewport/Viewport.svelte,render-in-flight spinner label
-quality.deleteImage,Delete image…,删除照片…,画像を削除…,이미지 삭제…,src/lib/viewport/QualityMenu.svelte,button
-folderNav.imported,Imported,已导入,読み込み済み,가져온 항목,src/lib/library/FolderNav.svelte,heading
-folderNav.noImages,No images yet,还没有照片,画像がありません,이미지 없음,src/lib/library/FolderNav.svelte,emptyState
-folderNav.importing,Importing…,导入中…,読み込み中…,가져오는 중…,src/lib/library/FolderNav.svelte,button
-folderNav.importingCount,Importing {done}/{total}…,导入中 {done}/{total}…,読み込み中 {done}/{total}…,가져오는 중 {done}/{total}…,src/lib/library/FolderNav.svelte,button
-folderNav.import,Import,导入,読み込む,가져오기,src/lib/library/FolderNav.svelte,button
-folderNav.importFiles,Import Files…,导入文件…,ファイルを読み込む…,파일 가져오기…,src/lib/library/FolderNav.svelte,menuItem
-folderNav.importFolder,Import Folder…,导入文件夹…,フォルダを読み込む…,폴더 가져오기…,src/lib/library/FolderNav.svelte,menuItem
-folderNav.filterFilmScans,Film scans,胶片扫描,フィルムスキャン,필름 스캔,src/lib/library/FolderNav.svelte,label
-folderNav.omitPreviewJpgs,Omit preview JPGs,忽略预览 JPG,プレビュー JPG を除外,프리뷰 JPG 제외,src/lib/library/FolderNav.svelte,checkbox
-folderNav.omitPreviewJpgsHelp,"Skips JPGs that sit beside a raw file of the same name (camera or scanner previews), so only the master file is imported.",忽略与同名 raw 文件并存的 JPG（相机或扫描仪预览），只导入主文件。,同名の RAW ファイルと並存する JPG（カメラやスキャナーのプレビュー）をスキップし、マスターファイルのみを読み込みます。,같은 이름의 RAW 파일과 함께 있는 JPG(카메라 또는 스캐너 프리뷰)를 건너뛰고 마스터 파일만 가져옵니다.,src/lib/library/FolderNav.svelte,tooltip
-grid.imageCount,{count} image{plural},{count} 张照片,{count} 枚,{count}개,src/lib/library/Grid.svelte,label
-grid.thumbSize,Thumb size,缩略图大小,サムネイルサイズ,썸네일 크기,src/lib/library/Grid.svelte,label
-grid.folderImagesAria,Folder images,文件夹中的照片,フォルダ内の画像,폴더 이미지,src/lib/library/Grid.svelte,aria-label
-grid.selectFolder,Select a folder with images,选择一个包含照片的文件夹,画像を含むフォルダを選択,이미지가 있는 폴더를 선택하세요,src/lib/library/Grid.svelte,emptyState
-library.import,Import,导入,読み込む,가져오기,src/lib/tabs/Library.svelte,button
-library.importing,Importing…,导入中…,読み込み中…,가져오는 중…,src/lib/tabs/Library.svelte,button
-library.developed,developed,已显影,現像済み,현상됨,src/lib/tabs/Library.svelte,title
-library.developAll,Develop all,全部显影,すべて現像,전체 현상,src/lib/tabs/Library.svelte,button
-library.filterFilmScans,Film scans,胶片扫描,フィルムスキャン,필름 스캔,src/lib/tabs/Library.svelte,label
-library.dropToImport,Drop to import,拖放以导入,ドロップして読み込む,드롭하여 가져오기,src/lib/tabs/Library.svelte,heading
-library.dropFormats,"JPEG, PNG, TIFF & RAW",JPEG、PNG、TIFF 与 RAW,JPEG・PNG・TIFF・RAW,"JPEG, PNG, TIFF & RAW",src/lib/tabs/Library.svelte,hint
-library.dropImporting,Importing…,导入中…,読み込み中…,가져오는 중…,src/lib/tabs/Library.svelte,heading
-filmstrip.importedImagesAria,Imported images,已导入的照片,読み込み済みの画像,가져온 이미지,src/lib/panels/Filmstrip.svelte,aria-label
-metadata.reset,Reset,重置,リセット,재설정,src/lib/panels/Metadata.svelte,button
-metadata.resetTitle,Revert all metadata to the original EXIF,将所有元数据还原为原始 EXIF,すべてのメタデータを元の EXIF に戻す,모든 메타데이터를 원본 EXIF로 되돌립니다,src/lib/panels/Metadata.svelte,title
-metadata.camera,Camera,相机,カメラ,카메라,src/lib/panels/Metadata.svelte,label
-metadata.lens,Lens,镜头,レンズ,렌즈,src/lib/panels/Metadata.svelte,label
-metadata.iso,ISO,ISO,ISO,ISO,src/lib/panels/Metadata.svelte,label
-metadata.shutter,Shutter,快门,シャッタースピード,셔터 속도,src/lib/panels/Metadata.svelte,label
-metadata.aperture,Aperture,光圈,絞り,조리개,src/lib/panels/Metadata.svelte,label
-metadata.date,Date,日期,日付,날짜,src/lib/panels/Metadata.svelte,label
-metadata.note,Note,备注,メモ,메모,src/lib/panels/Metadata.svelte,label
-metadata.notePlaceholder,Add a note…,添加备注…,メモを追加…,메모 추가…,src/lib/panels/Metadata.svelte,placeholder
-metadata.dimensions,Dimensions,尺寸,サイズ,크기,src/lib/panels/Metadata.svelte,label
-metadata.size,Size,大小,ファイルサイズ,파일 크기,src/lib/panels/Metadata.svelte,label
-metadata.noImageSelected,No image selected,未选择照片,画像が選択されていません,선택된 이미지 없음,src/lib/panels/Metadata.svelte,emptyState
-source.import,Import,导入,読み込む,가져오기,src/lib/panels/Source.svelte,button
-source.importing,Importing…,导入中…,読み込み中…,가져오는 중…,src/lib/panels/Source.svelte,button
-source.developed,developed,已显影,現像済み,현상됨,src/lib/panels/Source.svelte,title
-source.developAll,Develop all,全部显影,すべて現像,전체 현상,src/lib/panels/Source.svelte,button
-source.filterFilmScans,Film scans,胶片扫描,フィルムスキャン,필름 스캔,src/lib/panels/Source.svelte,label
-develop.notDevelopedYet,Not developed yet,尚未显影,まだ現像されていません,아직 현상되지 않음,src/lib/tabs/Develop.svelte,hint
-toolbar.edit,Edit,编辑,編集,편집,src/lib/develop/Toolbar.svelte,title
-toolbar.crop,Crop,裁剪,クロップ,자르기,src/lib/develop/Toolbar.svelte,title
-toolbar.eraser,Eraser,橡皮擦,消しゴム,지우개,src/lib/develop/Toolbar.svelte,title
-toolbar.basePicker,Base,基准,ベース,베이스,src/lib/develop/Toolbar.svelte,title
-base.title,Film-Edge Color,片边颜色,フィルムエッジカラー,필름 엣지 색상,src/lib/develop/Basic.svelte,heading
-base.recalibrate,Pick the film-edge color,拾取片边颜色,フィルムエッジの色を選択,필름 엣지 색상 선택,src/lib/develop/Basic.svelte,swatch tooltip
-base.lowConfidence,⚠ Low-confidence film-edge color — tap the swatch to repoint,⚠ 片边颜色置信度低 — 点按色块重新取样,⚠ フィルムエッジカラーの信頼度が低い — スウォッチをタップして再取得,⚠ 필름 엣지 색상 신뢰도 낮음 — 스워치를 탭하여 재지정,src/lib/develop/Basic.svelte,hint
-basic.title,Basic,基本,基本,기본,src/lib/develop/Basic.svelte,heading
-basic.reset,Reset,重置,リセット,재설정,src/lib/develop/Basic.svelte,button
-basic.applyToRoll,Apply to whole roll…,应用到整卷…,ロール全体に適用…,롤 전체에 적용…,src/lib/develop/Basic.svelte,button
-basic.hdr,HDR,HDR,HDR,HDR,src/lib/develop/Basic.svelte,toggle
-basic.hdrTitle,Preview in HDR (toggle),以 HDR 预览（切换）,HDRでプレビュー（トグル）,HDR로 미리 보기 (토글),src/lib/develop/Basic.svelte,tooltip
-basic.meterBorder,Metering,测光,測光,측광,src/lib/develop/Basic.svelte,label
-basic.meterBorder.exclude,Exclude border,排除边框,枠を除外,테두리 제외,src/lib/develop/Basic.svelte,option
-basic.meterBorder.include,Whole crop,整个裁剪,クロップ全体,전체 크롭,src/lib/develop/Basic.svelte,option
-basic.meterBorderTitle,How auto-exposure / WB meter when the crop includes film spokes,当裁剪包含片孔时自动曝光/白平衡的测光方式,クロップにフィルムの送り穴が含まれる場合の自動露出/WBの測光方法,크롭에 필름 스프로킷이 포함될 때 자동 노출/화이트 밸런스 측광 방식,src/lib/develop/Basic.svelte,tooltip
-basic.filmProfile,Film Profile,胶片配置文件,フィルムプロファイル,필름 프로파일,src/lib/develop/Basic.svelte,label
-basic.noFilmProfile,No film profile,无胶片配置文件,フィルムプロファイルなし,필름 프로파일 없음,src/lib/develop/Basic.svelte,option
-basic.stock.portra400,Kodak Portra 400,柯达 Portra 400,Kodak Portra 400,Kodak Portra 400,src/lib/develop/Basic.svelte,option
-basic.stock.fujic200,Fuji C200,富士 C200,Fuji C200,Fuji C200,src/lib/develop/Basic.svelte,option
-basic.stock.portra160,Kodak Portra 160,柯达 Portra 160,Kodak Portra 160,Kodak Portra 160,src/lib/develop/Basic.svelte,option
-basic.stock.portra800,Kodak Portra 800,柯达 Portra 800,Kodak Portra 800,Kodak Portra 800,src/lib/develop/Basic.svelte,option
-basic.stock.ektar100,Kodak Ektar 100,柯达 Ektar 100,Kodak Ektar 100,Kodak Ektar 100,src/lib/develop/Basic.svelte,option
-basic.stock.gold200,Kodak Gold 200,柯达 Gold 200,Kodak Gold 200,Kodak Gold 200,src/lib/develop/Basic.svelte,option
-basic.stock.ultramax400,Kodak UltraMax 400,柯达 UltraMax 400,Kodak UltraMax 400,Kodak UltraMax 400,src/lib/develop/Basic.svelte,option
-basic.stock.fujipro400h,Fujifilm Pro 400H,富士 Pro 400H,Fujifilm Pro 400H,Fujifilm Pro 400H,src/lib/develop/Basic.svelte,option
-basic.stock.fujixtra400,Fujifilm Superia X-tra 400,富士 Superia X-tra 400,Fujifilm Superia X-tra 400,Fujifilm Superia X-tra 400,src/lib/develop/Basic.svelte,option
-basic.stock.vision350d,Kodak Vision3 50D,柯达 Vision3 50D,Kodak Vision3 50D,Kodak Vision3 50D,src/lib/develop/Basic.svelte,option
-basic.stock.vision3200t,Kodak Vision3 200T,柯达 Vision3 200T,Kodak Vision3 200T,Kodak Vision3 200T,src/lib/develop/Basic.svelte,option
-basic.stock.vision3250d,Kodak Vision3 250D,柯达 Vision3 250D,Kodak Vision3 250D,Kodak Vision3 250D,src/lib/develop/Basic.svelte,option
-basic.stock.vision3500t,Kodak Vision3 500T,柯达 Vision3 500T,Kodak Vision3 500T,Kodak Vision3 500T,src/lib/develop/Basic.svelte,option
-basic.whiteBalance,White Balance,白平衡,ホワイトバランス,화이트 밸런스,src/lib/develop/Basic.svelte,label
-basic.tempTint,Temp / Tint,色温 / 色调,色温度 / ティント,색온도 / 틴트,src/lib/develop/Basic.svelte,label
-basic.auto,Auto,自动,オート,자동,src/lib/develop/Basic.svelte,button
-basic.autoWbTitle,Auto white balance,自动白平衡,自動ホワイトバランス,자동 화이트 밸런스,src/lib/develop/Basic.svelte,button tooltip
-basic.autoExp,Auto,自动,オート,자동,src/lib/develop/Basic.svelte,button
-basic.autoExpTitle,Auto-exposure (re-estimate brightness),自动曝光（重新估算亮度）,自動露出（明るさを再推定）,자동 노출 (밝기 재추정),src/lib/develop/Basic.svelte,button tooltip
-basic.grayPick,Pick a neutral gray,拾取中性灰,ニュートラルグレーを選択,중성 회색 선택,src/lib/develop/Basic.svelte,button tooltip
-basic.grayPickHelp,Sets white balance. Click something that should be neutral gray in the final photo.,设置白平衡。点击最终照片中应为中性灰的区域。,ホワイトバランスを設定します。最終的な写真でニュートラルグレーになるべき箇所をクリックしてください。,화이트 밸런스를 설정합니다. 최종 사진에서 중성 회색이어야 할 부분을 클릭하세요.,src/lib/develop/Basic.svelte,help tooltip
-basic.temp,Temp,色温,色温度,색온도,src/lib/develop/Basic.svelte,label
-basic.tint,Tint,色调,ティント,틴트,src/lib/develop/Basic.svelte,label
-basic.perZone,Color Drift Correction,色偏校正,カラードリフト補正,색상 드리프트 보정,src/lib/develop/Basic.svelte,label
-basic.perZoneStrength,Correction strength,校正强度,補正強度,보정 강도,src/lib/develop/Basic.svelte,label
-basic.tone,Tone,影调,トーン,톤,src/lib/develop/Basic.svelte,label
-basic.exposure,Exposure,曝光,露出,노출,src/lib/develop/Basic.svelte,label
-basic.brightness,Brightness,亮度,明るさ,밝기,src/lib/develop/Basic.svelte,label
-basic.contrast,Contrast,对比度,コントラスト,대비,src/lib/develop/Basic.svelte,label
-basic.highlights,Highlights,高光,ハイライト,하이라이트,src/lib/develop/Basic.svelte,label
-basic.shadows,Shadows,阴影,シャドウ,그림자,src/lib/develop/Basic.svelte,label
-basic.whites,Whites,白色,白,흰색,src/lib/develop/Basic.svelte,label
-basic.blacks,Blacks,黑色,黒,검정,src/lib/develop/Basic.svelte,label
-basic.presence,Presence,鲜明度,プレゼンス,선명감,src/lib/develop/Basic.svelte,label
-basic.texture,Texture,纹理,テクスチャ,텍스처,src/lib/develop/Basic.svelte,label
-basic.textureViewActual,100%,100%,100%,100%,src/lib/develop/Basic.svelte,button
-basic.textureHint,Texture is a fine-detail effect — view at 100% to preview the real result (it can't be judged at fit).,纹理是细节锐化效果——请在 100% 下预览实际效果（适应窗口时无法准确判断）。,テクスチャは精細な効果です — 実際の結果を確認するには100%で表示してください（フィット表示では正確に判断できません）。,텍스처는 세밀한 효과입니다 — 실제 결과를 확인하려면 100%로 보세요 (맞춤 보기에서는 정확히 판단하기 어렵습니다).,src/lib/develop/Basic.svelte,help tooltip
-basic.vibrance,Vibrance,鲜艳度,バイブランス,활기,src/lib/develop/Basic.svelte,label
-basic.saturation,Saturation,饱和度,彩度,채도,src/lib/develop/Basic.svelte,label
-colorGrading.title,Color Grading,颜色分级,カラーグレーディング,색상 그레이딩,src/lib/develop/ColorGrading.svelte,heading
-colorGrading.reset,Reset,重置,リセット,재설정,src/lib/develop/ColorGrading.svelte,button
-colorGrading.mode.threeWay,3-way,三向,3ウェイ,3방향,src/lib/develop/ColorGrading.svelte,button
-colorGrading.mode.shadows,Shadows,阴影,シャドウ,그림자,src/lib/develop/ColorGrading.svelte,button
-colorGrading.mode.midtones,Midtones,中间调,ミッドトーン,중간 톤,src/lib/develop/ColorGrading.svelte,button
-colorGrading.mode.highlights,Highlights,高光,ハイライト,하이라이트,src/lib/develop/ColorGrading.svelte,button
-colorGrading.mode.global,Global,全局,グローバル,전체,src/lib/develop/ColorGrading.svelte,button
-colorGrading.wheel.midtones,Midtones,中间调,ミッドトーン,중간 톤,src/lib/develop/ColorGrading.svelte,label
-colorGrading.wheel.shadows,Shadows,阴影,シャドウ,그림자,src/lib/develop/ColorGrading.svelte,label
-colorGrading.wheel.highlights,Highlights,高光,ハイライト,하이라이트,src/lib/develop/ColorGrading.svelte,label
-colorGrading.wheel.global,Global,全局,グローバル,전체,src/lib/develop/ColorGrading.svelte,label
-colorGrading.blending,Blending,混合,ブレンディング,혼합,src/lib/develop/ColorGrading.svelte,label
-colorGrading.balance,Balance,平衡,バランス,균형,src/lib/develop/ColorGrading.svelte,label
-colorMixer.title,Color Mixer,颜色混合器,カラーミキサー,색상 믹서,src/lib/develop/ColorMixer.svelte,heading
-colorMixer.reset,Reset,重置,リセット,재설정,src/lib/develop/ColorMixer.svelte,button
-colorMixer.tab.mixer,Mixer,混合器,ミキサー,믹서,src/lib/develop/ColorMixer.svelte,button
-colorMixer.tab.point,Point Color,点颜色,ポイントカラー,포인트 색상,src/lib/develop/ColorMixer.svelte,button
-colorMixer.adjust.hue,Hue,色相,色相,색조,src/lib/develop/ColorMixer.svelte,button
-colorMixer.adjust.saturation,Saturation,饱和度,彩度,채도,src/lib/develop/ColorMixer.svelte,button
-colorMixer.adjust.luminance,Luminance,明亮度,輝度,휘도,src/lib/develop/ColorMixer.svelte,button
-colorMixer.adjust.all,All,全部,すべて,전체,src/lib/develop/ColorMixer.svelte,button
-colorMixer.band.red,Red,红色,レッド,빨강,src/lib/develop/ColorMixer.svelte,label
-colorMixer.band.orange,Orange,橙色,オレンジ,주황,src/lib/develop/ColorMixer.svelte,label
-colorMixer.band.yellow,Yellow,黄色,イエロー,노랑,src/lib/develop/ColorMixer.svelte,label
-colorMixer.band.green,Green,绿色,グリーン,초록,src/lib/develop/ColorMixer.svelte,label
-colorMixer.band.aqua,Aqua,青色,アクア,아쿠아,src/lib/develop/ColorMixer.svelte,label
-colorMixer.band.blue,Blue,蓝色,ブルー,파랑,src/lib/develop/ColorMixer.svelte,label
-colorMixer.band.purple,Purple,紫色,パープル,보라,src/lib/develop/ColorMixer.svelte,label
-colorMixer.band.magenta,Magenta,洋红色,マゼンタ,마젠타,src/lib/develop/ColorMixer.svelte,label
-colorMixer.point.hint,Use the Point Color dropper to add samples.,使用点颜色吸管添加样本。,ポイントカラースポイトを使ってサンプルを追加してください。,포인트 컬러 스포이트를 사용해 샘플을 추가하세요.,src/lib/develop/ColorMixer.svelte,hint
-colorMixer.point.hueShift,Hue Shift,色相偏移,色相シフト,색조 이동,src/lib/develop/ColorMixer.svelte,label
-colorMixer.point.satShift,Sat. Shift,饱和度偏移,彩度シフト,채도 이동,src/lib/develop/ColorMixer.svelte,label
-colorMixer.point.lumShift,Lum. Shift,明亮度偏移,輝度シフト,명도 이동,src/lib/develop/ColorMixer.svelte,label
-colorMixer.point.variance,Variance,扩散,分散,분산,src/lib/develop/ColorMixer.svelte,label
-colorMixer.point.range,Range,范围,範囲,범위,src/lib/develop/ColorMixer.svelte,label
-colorMixer.point.dropper,Pick color,拾取颜色,カラーを選択,색상 선택,src/lib/develop/ColorMixer.svelte,button
-colorMixer.point.delete,Remove sample,移除样本,サンプルを削除,샘플 제거,src/lib/develop/ColorMixer.svelte,button
-eraser.title,Eraser,橡皮擦,消去ツール,지우개,src/lib/develop/EraserPanel.svelte,heading
-eraser.removeDustIr,Remove dust (IR),去除灰尘（红外）,ほこりを除去（IR）,먼지 제거 (IR),src/lib/develop/EraserPanel.svelte,button
-eraser.on,On,开,オン,켜기,src/lib/develop/EraserPanel.svelte,label
-eraser.off,Off,关,オフ,끄기,src/lib/develop/EraserPanel.svelte,label
-eraser.sensitivity,Sensitivity,灵敏度,感度,감도,src/lib/develop/EraserPanel.svelte,label
-eraser.requiresIrChannel,Requires an infrared scan channel,需要红外扫描通道,赤外線スキャンチャンネルが必要です,적외선 스캔 채널이 필요합니다,src/lib/develop/EraserPanel.svelte,title
-eraser.soon,soon,即将推出,近日公開,곧 출시,src/lib/develop/EraserPanel.svelte,label
-eraser.brushSize,Brush size,笔刷大小,ブラシサイズ,브러시 크기,src/lib/develop/EraserPanel.svelte,label
-eraser.brushAi,AI fill (MI-GAN),AI 填充 (MI-GAN),AI 塗りつぶし (MI-GAN),AI 채우기 (MI-GAN),src/lib/develop/EraserPanel.svelte,label
-eraser.brushAiHelp,Paint over dust/scratches — your strokes show as a red mask instead of healing live. Click ‘AI erase’ to reconstruct them all at once with the MI-GAN model.,在灰尘/划痕上涂抹——笔迹会显示为红色蒙版而不是实时修复。点击“AI 擦除”用 MI-GAN 模型一次性重建。,ほこりや傷の上をペイントすると、リアルタイム修復ではなく赤いマスクとして表示されます。「AI 消去」をクリックすると、MI-GAN モデルで一括再構成します。,먼지/흠집 위를 칠하면 실시간 복구 대신 빨간 마스크로 표시됩니다. 'AI 지우기'를 클릭하면 MI-GAN 모델로 한 번에 복원합니다.,src/lib/develop/EraserPanel.svelte,tooltip
-eraser.aiErase,AI erase,AI 擦除,AI 消去,AI 지우기,src/lib/develop/EraserPanel.svelte,button
-eraser.aiErasing,Erasing…,擦除中…,消去中…,지우는 중…,src/lib/develop/EraserPanel.svelte,button
-eraser.aiMaskHint,Paint the spots to remove — they show as a red mask. Then click AI erase.,涂抹要去除的斑点——它们会显示为红色蒙版。然后点击 AI 擦除。,除去したい箇所をペイントすると赤いマスクで表示されます。次に「AI 消去」をクリックしてください。,제거할 부분을 칠하면 빨간 마스크로 표시됩니다. 그런 다음 AI 지우기를 클릭하세요.,src/lib/develop/EraserPanel.svelte,hint
-eraser.reset,Reset,重置,リセット,재설정,src/lib/develop/EraserPanel.svelte,button
-eraser.hint,Scroll to resize · click or drag to erase dust · ⌘Z to undo,滚动调整大小 · 点击或拖动以擦除灰尘 · ⌘Z 撤销,スクロールでサイズ変更 · クリックまたはドラッグでほこりを消去 · ⌘Z で元に戻す,스크롤로 크기 조절 · 클릭 또는 드래그로 먼지 지우기 · ⌘Z 실행 취소,src/lib/develop/EraserPanel.svelte,hint
-eraser.autoTitle,AI Dust & Hair Removal,AI 灰尘与毛发去除,AI ほこり・毛髪除去,AI 먼지 & 머리카락 제거,src/lib/develop/EraserPanel.svelte,heading
-eraser.autoSensitivityHelp,Higher sensitivity flags more (and smaller) spots as defects. Lower it if real detail is being removed.,灵敏度越高，标记的瑕疵越多（也越小）。如果真实细节被去除，请调低。,感度を高くするほど、より多くの（より小さな）スポットが欠陥として検出されます。本来の細部まで削除される場合は感度を下げてください。,감도가 높을수록 더 많은 (더 작은) 점을 결함으로 감지합니다. 실제 디테일이 제거되면 감도를 낮추세요.,src/lib/develop/EraserPanel.svelte,tooltip
-eraser.autoChecking,Checking AI models…,正在检查 AI 模型…,AI モデルを確認中…,AI 모델 확인 중…,src/lib/develop/EraserPanel.svelte,text
-eraser.autoDownloadPrompt,Download the local AI models (~{mb} MB) to auto-detect and remove dust & hairs on-device.,下载本地 AI 模型（约 {mb} MB），在设备端自动检测并去除灰尘和毛发。,ローカル AI モデル（約 {mb} MB）をダウンロードして、デバイス上でほこりや毛髪を自動検出・除去します。,로컬 AI 모델(약 {mb} MB)을 다운로드하면 기기에서 먼지와 머리카락을 자동으로 감지하고 제거합니다.,src/lib/develop/EraserPanel.svelte,text
-eraser.autoDownload,Download AI models,下载 AI 模型,AI モデルをダウンロード,AI 모델 다운로드,src/lib/develop/EraserPanel.svelte,button
-eraser.autoButton,Detect & remove,检测并去除,検出して除去,감지 및 제거,src/lib/develop/EraserPanel.svelte,button
-eraser.autoHint,Runs local AI models on your device (no upload). Use the sensitivity slider if it removes too much or too little.,在本地设备上运行 AI 模型（不上传）。如果去除过多或过少，请使用灵敏度滑块。,デバイス上のローカル AI モデルを使用します（アップロード不要）。除去が多すぎる・少なすぎる場合は感度スライダーをご利用ください。,기기의 로컬 AI 모델을 실행합니다(업로드 없음). 너무 많거나 적게 제거되면 감도 슬라이더를 사용하세요.,src/lib/develop/EraserPanel.svelte,hint
-eraser.showSpots,Show heal spots,显示修复点,修復スポットを表示,복구 스팟 표시,src/lib/develop/EraserPanel.svelte,label
-curve.editorAriaLabel,Tone curve editor,色调曲线编辑器,トーンカーブエディター,톤 커브 편집기,src/lib/develop/CurveEditor.svelte,aria-label
-curve.pointAriaLabel,curve point,曲线点,カーブポイント,커브 포인트,src/lib/develop/CurveEditor.svelte,aria-label
-curve.histLabel,Histogram,直方图,ヒストグラム,히스토그램,src/lib/develop/CurveEditor.svelte,toggle label
-curve.histLive,Live,实时,ライブ,실시간,src/lib/develop/CurveEditor.svelte,toggle state
-curve.histFrozen,Frozen,冻结,固定,고정,src/lib/develop/CurveEditor.svelte,toggle state
-curve.histOff,Off,关闭,オフ,끄기,src/lib/develop/CurveEditor.svelte,toggle state
-curve.histToggleAria,"Cycle background histogram: live, frozen, off",切换背景直方图：实时、冻结、关闭,背景ヒストグラムを切り替え：ライブ、固定、オフ,"배경 히스토그램 전환: 실시간, 고정, 끄기",src/lib/develop/CurveEditor.svelte,aria-label
-curve.readIn,in,输入,入力,입력,src/lib/develop/CurveEditor.svelte,readout label
-curve.readOut,out,输出,出力,출력,src/lib/develop/CurveEditor.svelte,readout label
-curve.title,Tone Curve,色调曲线,トーンカーブ,톤 커브,src/lib/develop/TonalCurve.svelte,heading
-curve.reset,Reset,重置,リセット,재설정,src/lib/develop/TonalCurve.svelte,button
-curve.adjust,Adjust,调整,調整,조정,src/lib/develop/TonalCurve.svelte,label
-curve.master.title,Master,主,マスター,마스터,src/lib/develop/TonalCurve.svelte,title
-curve.master.ariaLabel,Master curve,主曲线,マスターカーブ,마스터 커브,src/lib/develop/TonalCurve.svelte,aria-label
-curve.red.title,Red,红,レッド,빨강,src/lib/develop/TonalCurve.svelte,title
-curve.red.ariaLabel,Red curve,红色曲线,レッドカーブ,빨강 커브,src/lib/develop/TonalCurve.svelte,aria-label
-curve.green.title,Green,绿,グリーン,초록,src/lib/develop/TonalCurve.svelte,title
-curve.green.ariaLabel,Green curve,绿色曲线,グリーンカーブ,초록 커브,src/lib/develop/TonalCurve.svelte,aria-label
-curve.blue.title,Blue,蓝,ブルー,파랑,src/lib/develop/TonalCurve.svelte,title
-curve.blue.ariaLabel,Blue curve,蓝色曲线,ブルーカーブ,파랑 커브,src/lib/develop/TonalCurve.svelte,aria-label
-curve.region,Region,区域,領域,영역,src/lib/develop/TonalCurve.svelte,label
-curve.highlights,Highlights,高光,ハイライト,하이라이트,src/lib/develop/TonalCurve.svelte,label
-curve.lights,Lights,亮部,ライト,밝은 영역,src/lib/develop/TonalCurve.svelte,label
-curve.darks,Darks,暗部,ダーク,어두운 영역,src/lib/develop/TonalCurve.svelte,label
-curve.shadows,Shadows,阴影,シャドウ,그림자,src/lib/develop/TonalCurve.svelte,label
-colorWheel.hueSatAriaLabel,"{label} hue and saturation: hue {hue}, saturation {sat}",{label} 色相与饱和度：色相 {hue}，饱和度 {sat},{label} 色相と彩度：色相 {hue}、彩度 {sat},"{label} 색조 및 채도: 색조 {hue}, 채도 {sat}",src/lib/develop/ColorWheel.svelte,aria-label
-colorWheel.luminanceAriaLabel,{label} luminance,{label} 明度,{label} 輝度,{label} 밝기,src/lib/develop/ColorWheel.svelte,aria-label
-crop.title,Crop,裁剪,クロップ,자르기,src/lib/crop/CropPanel.svelte,heading
-crop.aspectRatio,Aspect ratio,长宽比,アスペクト比,종횡비,src/lib/crop/CropPanel.svelte,label
-crop.custom,Custom,自定义,カスタム,사용자 지정,src/lib/crop/CropPanel.svelte,option
-crop.orientation,Orientation,方向,向き,방향,src/lib/crop/CropPanel.svelte,label
-crop.toggleOrientation,Toggle orientation (X),切换方向 (X),向きを切り替え (X),방향 전환 (X),src/lib/crop/CropPanel.svelte,title
-crop.orientationAriaLabel,Orientation,方向,向き,방향,src/lib/crop/CropPanel.svelte,aria-label
-crop.transform,Transform,变换,変形,변환,src/lib/crop/CropPanel.svelte,label
-crop.rotateLeft,Rotate left (⌘/Ctrl + [),向左旋转 (⌘/Ctrl + [),左に回転 (⌘/Ctrl + [),왼쪽으로 회전 (⌘/Ctrl + [),src/lib/crop/CropPanel.svelte,title
-crop.rotateRight,Rotate right (⌘/Ctrl + ]),向右旋转 (⌘/Ctrl + ]),右に回転 (⌘/Ctrl + ]),오른쪽으로 회전 (⌘/Ctrl + ]),src/lib/crop/CropPanel.svelte,title
-crop.flipHorizontal,Flip horizontal,水平翻转,水平反転,수평 뒤집기,src/lib/crop/CropPanel.svelte,title
-crop.flipVertical,Flip vertical,垂直翻转,垂直反転,수직 뒤집기,src/lib/crop/CropPanel.svelte,title
-crop.straighten,Straighten,拉直,水平補正,수평 맞추기,src/lib/crop/CropPanel.svelte,label
-crop.reset,Reset,重置,リセット,재설정,src/lib/crop/CropPanel.svelte,button
-crop.hint,Enter to apply · Esc to discard · Shift locks the ratio,回车应用 · Esc 取消 · Shift 锁定比例,Enter で適用 · Esc で破棄 · Shift で比率を固定,Enter로 적용 · Esc로 취소 · Shift로 비율 고정,src/lib/crop/CropPanel.svelte,hint
-crop.aspect.original,Original,原始,オリジナル,원본,src/lib/crop/presets.ts,option
-crop.aspectGroup.135,135,135,135,135,src/lib/crop/presets.ts,optgroup
-crop.aspectGroup.120,120,120,120,120,src/lib/crop/presets.ts,optgroup
-crop.aspectGroup.large,Large format,大画幅,大判,대형 포맷,src/lib/crop/presets.ts,optgroup
-crop.aspectGroup.screen,Screen · Print,屏幕 · 打印,スクリーン · 印刷,화면 · 인쇄,src/lib/crop/presets.ts,optgroup
-crop.aspect.36x24,36 × 24  (3:2),36 × 24  (3:2),36 × 24  (3:2),36 × 24  (3:2),src/lib/crop/presets.ts,option
-crop.aspect.6x4_5,6 × 4.5  (4:3),6 × 4.5  (4:3),6 × 4.5  (4:3),6 × 4.5  (4:3),src/lib/crop/presets.ts,option
-crop.aspect.6x6,6 × 6  (1:1),6 × 6  (1:1),6 × 6  (1:1),6 × 6  (1:1),src/lib/crop/presets.ts,option
-crop.aspect.6x7,6 × 7  (7:6),6 × 7  (7:6),6 × 7  (7:6),6 × 7  (7:6),src/lib/crop/presets.ts,option
-crop.aspect.6x8,6 × 8  (4:3),6 × 8  (4:3),6 × 8  (4:3),6 × 8  (4:3),src/lib/crop/presets.ts,option
-crop.aspect.6x9,6 × 9  (3:2),6 × 9  (3:2),6 × 9  (3:2),6 × 9  (3:2),src/lib/crop/presets.ts,option
-crop.aspect.4x5,4 × 5,4 × 5,4 × 5,4 × 5,src/lib/crop/presets.ts,option
-crop.aspect.5x7,5 × 7,5 × 7,5 × 7,5 × 7,src/lib/crop/presets.ts,option
-crop.aspect.8x10,8 × 10,8 × 10,8 × 10,8 × 10,src/lib/crop/presets.ts,option
-crop.aspect.1x1,1 × 1,1 × 1,1 × 1,1 × 1,src/lib/crop/presets.ts,option
-crop.aspect.16x9,16 × 9,16 × 9,16 × 9,16 × 9,src/lib/crop/presets.ts,option
-crop.aspect.16x10,16 × 10,16 × 10,16 × 10,16 × 10,src/lib/crop/presets.ts,option
-crop.aspect.8_5x11,8.5 × 11,8.5 × 11,8.5 × 11,8.5 × 11,src/lib/crop/presets.ts,option
-tether.start,Tether,联机拍摄,テザー撮影,테더,src/lib/tether/TetherPanel.svelte,button
-tether.stop,Stop tethering,停止联机拍摄,テザー停止,테더링 중지,src/lib/tether/TetherPanel.svelte,button
-tether.watching,Watching {dir},正在监视 {dir},{dir} を監視中,{dir} 감시 중,src/lib/tether/TetherPanel.svelte,status
-tether.hint,Point your camera's tether app at this folder.,将相机的联机拍摄软件指向此文件夹。,カメラのテザーアプリをこのフォルダに向けてください。,카메라 테더 앱을 이 폴더로 지정하세요.,src/lib/tether/TetherPanel.svelte,hint
-tether.autoAdvance,Jump to newest shot,跳到最新拍摄,最新ショットへジャンプ,최신 촬영으로 이동,src/lib/tether/TetherPanel.svelte,label
-tether.lastOk,Last: {name},最近：{name},最終：{name},마지막: {name},src/lib/tether/TetherPanel.svelte,status
-tether.lastErr,Failed: {name},失败：{name},失敗：{name},실패: {name},src/lib/tether/TetherPanel.svelte,status
-toolbar.enhance,AI Enhance,AI 增强,AI 強調,AI 향상,src/lib/develop/Toolbar.svelte,title
-settings.ai.heading,OpenAI API key,OpenAI API 密钥,OpenAI API キー,OpenAI API 키,src/lib/settings/SettingsMenu.svelte,link
-settings.ai.keyPlaceholder,OpenAI API key,OpenAI API 密钥,OpenAI API キー,OpenAI API 키,src/lib/settings/SettingsMenu.svelte,placeholder
-settings.ai.hint,Stored locally. Used only for the AI Enhance tool.,仅本地保存，仅用于 AI 增强工具。,ローカルに保存されます。AI 強調ツールにのみ使用されます。,로컬에 저장됩니다. AI 향상 도구에만 사용됩니다.,src/lib/settings/SettingsMenu.svelte,hint
-aiEnhance.title,AI Enhance,AI 增强,AI 強調,AI 향상,src/lib/develop/AiEnhancePanel.svelte,heading
-aiEnhance.experimental,experimental,实验性,試験的,실험적,src/lib/develop/AiEnhancePanel.svelte,label
-aiEnhance.button,Enhance,增强,強調,향상,src/lib/develop/AiEnhancePanel.svelte,button
-aiEnhance.working,Enhancing…,增强中…,強調中…,향상 중…,src/lib/develop/AiEnhancePanel.svelte,button
-aiEnhance.noKey,Add your OpenAI API key in Settings.,请在设置中添加 OpenAI API 密钥。,設定で OpenAI API キーを追加してください。,설정에서 OpenAI API 키를 추가하세요.,src/lib/develop/AiEnhancePanel.svelte,text
-aiEnhance.noImage,No preview to enhance yet.,暂无可增强的预览。,強調できるプレビューがありません。,향상할 미리보기가 없습니다.,src/lib/develop/AiEnhancePanel.svelte,text
-aiEnhance.holdBefore,Hold to compare original,按住对比原图,押し続けてオリジナルと比較,길게 눌러 원본 비교,src/lib/develop/AiEnhancePanel.svelte,button
-aiEnhance.enlarge,Click to enlarge,点击放大,クリックで拡大,클릭하여 확대,src/lib/develop/AiEnhancePanel.svelte,title
-aiEnhance.hint,"Re-imagines the preview to reduce noise, dust and scratches. Result is a creative interpretation, not a faithful restoration, and is preview-only.",重新生成预览以减少噪点、灰尘和划痕。结果为创意性再生成，并非忠实修复，且仅用于预览。,プレビューを再生成してノイズ・ほこり・傷を軽減します。結果はクリエイティブな解釈であり、忠実な復元ではなく、プレビュー専用です。,"프리뷰를 재생성하여 노이즈, 먼지, 스크래치를 줄입니다. 결과는 창의적인 해석이며 충실한 복원이 아닌 미리보기 전용입니다.",src/lib/develop/AiEnhancePanel.svelte,hint
-aiEnhance.save,Download enhanced image…,下载增强后的图像…,強調済み画像をダウンロード…,향상된 이미지 다운로드…,src/lib/develop/AiEnhancePanel.svelte,button
-aiEnhance.saving,Saving…,保存中…,保存中…,저장 중…,src/lib/develop/AiEnhancePanel.svelte,button
-colorMatch.title,Tone Matching,色调匹配,トーンマッチング,톤 매칭,src/lib/develop/AiEnhancePanel.svelte,heading
-colorMatch.import,Import reference image,导入参考图像,参照画像を読み込む,참조 이미지 가져오기,src/lib/develop/AiEnhancePanel.svelte,button
-colorMatch.match,Match,匹配,マッチ,매칭,src/lib/develop/AiEnhancePanel.svelte,button
-colorMatch.matching,Matching…,匹配中…,マッチ中…,매칭 중…,src/lib/develop/AiEnhancePanel.svelte,button
-colorMatch.strength,Strength,强度,強度,강도,src/lib/develop/AiEnhancePanel.svelte,label
-colorMatch.reset,Reset match,重置匹配,マッチをリセット,매칭 초기화,src/lib/develop/AiEnhancePanel.svelte,button
-colorMatch.changeRef,Change reference,更换参考,参照を変更,참조 변경,src/lib/develop/AiEnhancePanel.svelte,title
-colorMatch.noRef,Import a reference image first.,请先导入参考图像。,先に参照画像を読み込んでください。,먼저 참조 이미지를 가져오세요.,src/lib/develop/AiEnhancePanel.svelte,text
-colorMatch.hint,"Matches white balance, contrast and saturation to the reference's color toning. Drag Strength to taste. Fully local — fine-tune any slider afterward, or undo (Ctrl+Z) to revert.",将白平衡、对比度和饱和度匹配到参考图像的色调。拖动“强度”调整程度。完全本地处理——之后可微调任意滑块，或撤销（Ctrl+Z）还原。,ホワイトバランス・コントラスト・彩度を参照画像のカラートーンに合わせます。「強度」をドラッグして調整してください。完全ローカル処理——その後スライダーで微調整するか、元に戻す（Ctrl+Z）で取り消せます。,"화이트 밸런스, 대비, 채도를 참조 이미지의 색조에 맞춥니다. 강도를 드래그하여 조절하세요. 완전 로컬 처리 — 이후 슬라이더로 미세 조정하거나 실행 취소(Ctrl+Z)로 되돌릴 수 있습니다.",src/lib/develop/AiEnhancePanel.svelte,hint
-toolbar.upscale,Upscale,放大,アップスケール,업스케일,src/lib/develop/Toolbar.svelte,title
-upscale.title,Upscale,放大,アップスケール,업스케일,src/lib/develop/UpscalePanel.svelte,heading
-upscale.local,local,本地,ローカル,로컬,src/lib/develop/UpscalePanel.svelte,label
-upscale.checking,Checking upscaler…,正在检查放大器…,アップスケーラーを確認中…,업스케일러 확인 중…,src/lib/develop/UpscalePanel.svelte,text
-upscale.downloadPrompt,Download the local upscaler (~{mb} MB) to enable on-device super-resolution.,下载本地放大器（约 {mb} MB）以启用设备端超分辨率。,ローカルアップスケーラー（約 {mb} MB）をダウンロードして、デバイス上の超解像を有効にします。,로컬 업스케일러(약 {mb} MB)를 다운로드하여 기기 내 초해상도를 활성화하세요.,src/lib/develop/UpscalePanel.svelte,text
-upscale.download,Download upscaler,下载放大器,アップスケーラーをダウンロード,업스케일러 다운로드,src/lib/develop/UpscalePanel.svelte,button
-upscale.button,Upscale,放大,アップスケール,업스케일,src/lib/develop/UpscalePanel.svelte,button
-upscale.working,Upscaling…,放大中…,アップスケール中…,업스케일 중…,src/lib/develop/UpscalePanel.svelte,button
-upscale.already8k,"This image is already 8K or larger on its longest side, so upscaling won't add detail.",该图像最长边已达到或超过 8K，放大不会增加细节。,この画像は長辺がすでに 8K 以上のため、アップスケールしても細部は増えません。,이 이미지는 긴 쪽이 이미 8K 이상이므로 업스케일해도 디테일이 추가되지 않습니다.,src/lib/develop/UpscalePanel.svelte,text
-upscale.save,Save upscaled image…,保存放大后的图像…,アップスケール済み画像を保存…,업스케일된 이미지 저장…,src/lib/develop/UpscalePanel.svelte,button
-upscale.hint,Runs a local AI model on your device (no upload). Output is capped at 8K on the longest side; best results come from smaller sources.,在本地设备上运行 AI 模型（不上传）。输出最长边上限为 8K；较小的原图效果最佳。,デバイス上でローカル AI モデルを実行します（アップロードなし）。出力は長辺 8K まで。小さい素材ほど良い結果が得られます。,"기기에서 로컬 AI 모델을 실행합니다(업로드 없음). 출력은 긴 쪽 최대 8K이며, 작은 원본일수록 좋은 결과를 얻습니다.",src/lib/develop/UpscalePanel.svelte,hint
-upscale.res4k,4K,4K,4K,4K,src/lib/develop/UpscaleControls.svelte,button
-upscale.res8k,8K,8K,8K,8K,src/lib/develop/UpscaleControls.svelte,button
-upscale.enhancedLabel,Upscale this result,放大此结果,この結果をアップスケール,이 결과 업스케일,src/lib/develop/AiEnhancePanel.svelte,label
-upscale.saving,Saving…,保存中…,保存中…,저장 중…,src/lib/develop/UpscaleControls.svelte,button
-telemetry.title,Help improve OpenEnlarge?,帮助改进 OpenEnlarge？,OpenEnlarge の改善に協力しますか？,OpenEnlarge 개선에 참여하시겠습니까?,src/lib/settings/TelemetryPrompt.svelte,title
-telemetry.body,"Share anonymous usage data — no images, no personal information, just which features are used and your app version. You can change this anytime in Settings.",分享匿名使用数据——不含图像、不含个人信息，仅包括所用功能和应用版本。你可以随时在设置中更改。,匿名の使用状況データを共有します——画像や個人情報は含まず、使用機能とアプリバージョンのみです。設定でいつでも変更できます。,익명 사용 데이터를 공유합니다 — 이미지나 개인 정보 없이 사용된 기능과 앱 버전만 포함됩니다. 언제든지 설정에서 변경할 수 있습니다.,src/lib/settings/TelemetryPrompt.svelte,body
-telemetry.learnMore,What we collect,我们收集的内容,収集内容を確認,수집 항목 보기,src/lib/settings/TelemetryPrompt.svelte,link
-telemetry.decline,No thanks,不用了,いいえ,괜찮습니다,src/lib/settings/TelemetryPrompt.svelte,button
-telemetry.accept,"Yes, share",好的，分享,はい、共有する,"네, 공유합니다",src/lib/settings/TelemetryPrompt.svelte,button
-settings.telemetry.heading,Anonymous analytics,匿名分析,匿名分析,익명 분석,src/lib/settings/SettingsMenu.svelte,heading
-settings.telemetry.on,On,开启,オン,켜기,src/lib/settings/SettingsMenu.svelte,button
-settings.telemetry.off,Off,关闭,オフ,끄기,src/lib/settings/SettingsMenu.svelte,button
-settings.telemetry.hint,Anonymous usage data only. No images or personal information are ever sent.,仅匿名使用数据。绝不发送任何图像或个人信息。,匿名の使用状況データのみです。画像や個人情報は送信されません。,익명 사용 데이터만 포함됩니다. 이미지나 개인 정보는 전송되지 않습니다.,src/lib/settings/SettingsMenu.svelte,hint
-settings.telemetry.requestAccess,Request dashboard access,申请仪表板访问权限,ダッシュボードアクセスを申請,대시보드 접근 권한 요청,src/lib/settings/SettingsMenu.svelte,link
-basic.negative,Neg,负,ネガ,네거,src/lib/develop/Basic.svelte,option
-basic.positive,Pos,正,ポジ,포지,src/lib/develop/Basic.svelte,option
-eraser.zoomArea,Zoom to area,缩放到区域,エリアにズーム,영역으로 확대,src/lib/develop/EraserPanel.svelte,button
-eraser.resetView,Reset view,重置视图,ビューをリセット,보기 초기화,src/lib/develop/EraserPanel.svelte,button
-eraser.marqueeHint,Drag a rectangle on the image to zoom in.,在图像上拖动矩形以放大。,画像上で矩形をドラッグして拡大します。,이미지 위에서 사각형을 드래그하여 확대하세요.,src/lib/develop/EraserPanel.svelte,hint
-histogram.clipHigh,Highlight clipping (right-click: 253),高光裁切（右键：253）,ハイライトクリッピング（右クリック：253）,하이라이트 클리핑 (우클릭: 253),src/lib/viewport/Histogram.svelte,tooltip
-histogram.clipLow,Shadow clipping (right-click: 2),暗部裁切（右键：2）,シャドウクリッピング（右クリック：2）,섀도 클리핑 (우클릭: 2),src/lib/viewport/Histogram.svelte,tooltip
-histogram.clipStrictHint,Strict 253/2 threshold,严格 253/2 阈值,厳密な 253/2 しきい値,엄격한 253/2 임계값,src/lib/viewport/Histogram.svelte,tooltip
-roll.adjust.heading,Roll look,整卷色调,ロールの色調,롤 톤,src/lib/roll/RollAdjust.svelte,heading
-roll.adjust.whitePoint,White point,白点,ホワイトポイント,화이트 포인트,src/lib/roll/RollAdjust.svelte,label
-toast.developFailed,Develop failed for {count} image(s) — {detail},显影失败 {count} 张 — {detail},{count} 枚の現像に失敗しました — {detail},{count}개 이미지 현상 실패 — {detail},src/lib/workflow.ts,toast
-toast.undo,Undo: {what},撤销：{what},元に戻す：{what},실행 취소: {what},src/lib/develop/historyStore.ts,toast
-toast.redo,Redo: {what},重做：{what},やり直し：{what},다시 실행: {what},src/lib/develop/historyStore.ts,toast
-label.dustRemoval,Dust removal,去除污点,ほこり除去,먼지 제거,src/lib/develop/history.ts,undo label
-label.metadata,Metadata,元数据,メタデータ,메타데이터,src/lib/develop/history.ts,undo label
-label.positive,Positive,正片,ポジ,포지티브,src/lib/develop/history.ts,undo label
-label.multiple,Multiple adjustments,多项调整,複数の調整,여러 조정,src/lib/develop/history.ts,undo label
-label.edit,Edit,编辑,編集,편집,src/lib/develop/history.ts,undo label
-basic.off,Off,关闭,オフ,끄기,src/lib/develop/Basic.svelte,label
-export.overwriteTitle,File already exists,文件已存在,ファイルが既に存在します,파일이 이미 존재합니다,src/lib/export/ExportModal.svelte,heading
-export.overwriteBody,“{name}” already exists in this folder.,“{name}” 已存在于此文件夹中。,「{name}」はこのフォルダに既に存在します。,“{name}”이(가) 이 폴더에 이미 있습니다.,src/lib/export/ExportModal.svelte,paragraph
-export.overwriteProgress,Conflict {index} of {count},冲突 {index} / {count},競合 {index} / {count},충돌 {index} / {count},src/lib/export/ExportModal.svelte,label
-export.overwriteApplyAll,Apply to all remaining,应用于其余所有冲突,残りすべてに適用,나머지 모두에 적용,src/lib/export/ExportModal.svelte,checkbox
-export.overwriteOverwrite,Overwrite,覆盖,上書き,덮어쓰기,src/lib/export/ExportModal.svelte,button
-export.overwriteSkip,Skip,跳过,スキップ,건너뛰기,src/lib/export/ExportModal.svelte,button
-export.overwriteKeepBoth,Keep both,两者都保留,両方保持,모두 유지,src/lib/export/ExportModal.svelte,button
-export.overwriteCancel,Cancel,取消,キャンセル,취소,src/lib/export/ExportModal.svelte,button
-export.summarySkipped,{done} of {total} exported · {skipped} skipped,已导出 {done} / {total} · 跳过 {skipped},{total} 中 {done} 件を書き出し完了 · {skipped} 件スキップ,{total}개 중 {done}개 내보내기 완료 · {skipped}개 건너뜀,src/lib/export/ExportModal.svelte,status
-settings.storage.heading,Storage,存储,ストレージ,저장소,src/lib/settings/SettingsMenu.svelte,heading
-settings.storage.cacheLabel,Image cache,图像缓存,画像キャッシュ,이미지 캐시,src/lib/settings/SettingsMenu.svelte,label
-settings.storage.clearCache,Clear image cache,清除图像缓存,画像キャッシュをクリア,이미지 캐시 지우기,src/lib/settings/SettingsMenu.svelte,button
-settings.storage.clearCacheHint,Frees disk space. Images re-develop the next time you open them.,释放磁盘空间。下次打开照片时会重新显影。,ディスク容量を解放します。次回開いたときに画像を再現像します。,디스크 공간을 확보합니다. 다음에 열 때 이미지를 다시 현상합니다.,src/lib/settings/SettingsMenu.svelte,hint
-settings.storage.clearCacheConfirm,Clear the image cache? This frees disk space; your photos and edits are kept and re-develop the next time you open them.,清除图像缓存？这会释放磁盘空间；你的照片和编辑会保留，下次打开时重新显影。,画像キャッシュをクリアしますか？ディスク容量が解放されます。写真と編集内容は保持され、次回開いたときに再現像されます。,이미지 캐시를 지우시겠습니까? 디스크 공간이 확보됩니다. 사진과 편집 내용은 유지되며 다음에 열 때 다시 현상됩니다.,src/lib/settings/SettingsMenu.svelte,dialog
-settings.storage.reset,Reset all data,重置所有数据,すべてのデータをリセット,모든 데이터 초기화,src/lib/settings/SettingsMenu.svelte,button
-settings.storage.resetHint,"Removes all rolls, folders, and edits. Your preferences are kept.",移除所有胶卷、文件夹和编辑。你的偏好设置会保留。,すべてのロール・フォルダ・編集を削除します。設定は保持されます。,"모든 롤, 폴더, 편집을 삭제합니다. 환경설정은 유지됩니다.",src/lib/settings/SettingsMenu.svelte,hint
-settings.storage.resetConfirm,"Reset all data? This permanently removes every roll, folder, edit, and the image cache. Your preferences (language, API key, shortcuts) are kept. The app will restart.",重置所有数据？这会永久移除所有胶卷、文件夹、编辑和图像缓存。你的偏好设置（语言、API 密钥、快捷键）会保留。应用将重启。,すべてのデータをリセットしますか？すべてのロール・フォルダ・編集・画像キャッシュが完全に削除されます。設定（言語・API キー・ショートカット）は保持されます。アプリが再起動します。,"모든 데이터를 초기화하시겠습니까? 모든 롤, 폴더, 편집, 이미지 캐시가 영구 삭제됩니다. 환경설정(언어, API 키, 단축키)은 유지됩니다. 앱이 재시작됩니다.",src/lib/settings/SettingsMenu.svelte,dialog
-toast.frameTrimmed,"Film frame detected, auto-cropping","检测到画幅，自动裁切","フレームを検出、自動でトリミングしました","필름 프레임 감지됨, 자동으로 자르기",src/lib/workflow.ts,toast
-settings.debug.heading,Debug mode,调试模式,デバッグモード,디버그 모드,src/lib/settings/SettingsMenu.svelte,heading
-settings.debug.on,On,开启,オン,켜기,src/lib/settings/SettingsMenu.svelte,button
-settings.debug.off,Off,关闭,オフ,끄기,src/lib/settings/SettingsMenu.svelte,button
-settings.debug.hint,Records logs and performance timings to a file you can export to help diagnose problems. Restart and reproduce the issue to also capture startup timing.,将日志和性能计时记录到可导出的文件中以帮助诊断问题。重启并复现问题还可捕获启动计时。,問題の診断に役立つログとパフォーマンス計測をエクスポート可能なファイルに記録します。起動時の計測も取得するには、再起動して問題を再現してください。,문제 진단에 도움이 되도록 로그와 성능 측정을 내보낼 수 있는 파일에 기록합니다. 시작 시간도 캡처하려면 앱을 다시 시작하고 문제를 재현하세요.,src/lib/settings/SettingsMenu.svelte,hint
-settings.debug.clearLogConfirm,Turn off debug mode and clear the existing log file?,关闭调试模式并清除现有日志文件吗？,デバッグモードをオフにして既存のログファイルを消去しますか？,디버그 모드를 끄고 기존 로그 파일을 지우시겠습니까?,src/lib/settings/SettingsMenu.svelte,confirm
-app.debug.exportAriaLabel,Export debug log,导出调试日志,デバッグログをエクスポート,디버그 로그 내보내기,src/routes/+page.svelte,aria-label
-app.debug.exported,Debug log exported,已导出调试日志,デバッグログをエクスポートしました,디버그 로그를 내보냈습니다,src/routes/+page.svelte,toast
-app.debug.exportFailed,Could not export debug log,无法导出调试日志,デバッグログをエクスポートできませんでした,디버그 로그를 내보낼 수 없습니다,src/routes/+page.svelte,toast
+key,en,zh,zh-Hant,ja,ko,file,note
+app.brand,OpenEnlarge,OpenEnlarge,OpenEnlarge,OpenEnlarge,OpenEnlarge,src/routes/+page.svelte,button
+app.about.ariaLabel,About OpenEnlarge,关于OpenEnlarge,關於 OpenEnlarge,OpenEnlargeについて,OpenEnlarge 정보,src/routes/+page.svelte,aria-label
+app.tab.library,Library,库,圖庫,ライブラリ,라이브러리,src/routes/+page.svelte,button
+app.tab.develop,Roll,整卷,整卷,ロール,롤,src/routes/+page.svelte,button
+app.tab.tune,Frame,单帧,單格,フレーム,프레임,src/routes/+page.svelte,button
+app.tab.export,Export,导出,匯出,書き出し,내보내기,src/routes/+page.svelte,button
+app.settings.ariaLabel,Settings,设置,設定,設定,설정,src/routes/+page.svelte,aria-label
+settings.dialogAriaLabel,Settings,设置,設定,設定,설정,src/lib/settings/SettingsMenu.svelte,aria-label
+settings.developMode.heading,Develop mode,显影模式,顯影模式,現像モード,현상 모드,src/lib/settings/SettingsMenu.svelte,heading
+settings.developMode.density,B · density,B · 密度,B · 密度,B · 濃度,B · 농도,src/lib/settings/SettingsMenu.svelte,button
+settings.developMode.perChan,C · per-chan,C · per-chan,C · per-chan,C · per-chan,C · per-chan,src/lib/settings/SettingsMenu.svelte,button
+settings.developMode.hint,Applies to every image.,应用到所有照片,套用至所有照片,すべての画像に適用されます。,모든 이미지에 적용됩니다.,src/lib/settings/SettingsMenu.svelte,hint
+settings.language.heading,Language,语言,語言,言語,언어,src/lib/settings/SettingsMenu.svelte,heading
+settings.shortcuts.button,Keyboard shortcuts,键盘快捷键,鍵盤快速鍵,キーボードショートカット,키보드 단축키,src/lib/settings/SettingsMenu.svelte,button
+settings.checkUpdates,Check for updates,检查更新,檢查更新,アップデートを確認,업데이트 확인,src/lib/settings/SettingsMenu.svelte,button
+update.title,Software update,软件更新,軟體更新,ソフトウェアアップデート,소프트웨어 업데이트,src/lib/update/UpdatePrompt.svelte,heading
+update.available,Version {version} is available.,有新版本 {version} 可用。,有新版本 {version} 可用。,バージョン {version} が利用可能です。,버전 {version}을(를) 사용할 수 있습니다.,src/lib/update/UpdatePrompt.svelte,text
+update.notesLabel,What's new,更新内容,更新內容,新着情報,새로운 기능,src/lib/update/UpdatePrompt.svelte,text
+update.update,Update,更新,更新,アップデート,업데이트,src/lib/update/UpdatePrompt.svelte,button
+update.later,Later,稍后,稍後,後で,나중에,src/lib/update/UpdatePrompt.svelte,button
+update.skip,Skip this version,跳过此版本,略過此版本,このバージョンをスキップ,이 버전 건너뛰기,src/lib/update/UpdatePrompt.svelte,button
+update.downloading,Downloading update…,正在下载更新…,正在下載更新…,アップデートをダウンロード中…,업데이트 다운로드 중…,src/lib/update/UpdatePrompt.svelte,text
+update.restartNow,Restart now,立即重启,立即重新啟動,今すぐ再起動,지금 재시작,src/lib/update/UpdatePrompt.svelte,button
+update.upToDate,You're on the latest version.,已是最新版本。,已是最新版本。,最新バージョンを使用しています。,최신 버전을 사용 중입니다.,src/lib/update/UpdatePrompt.svelte,text
+update.error,Update check failed. Please try again later.,检查更新失败，请稍后再试。,檢查更新失敗，請稍後再試。,アップデートの確認に失敗しました。後でもう一度お試しください。,업데이트 확인에 실패했습니다. 나중에 다시 시도해 주세요.,src/lib/update/UpdatePrompt.svelte,text
+update.dismiss,OK,确定,確定,OK,확인,src/lib/update/UpdatePrompt.svelte,button
+keymap.title,Keyboard shortcuts,键盘快捷键,鍵盤快速鍵,キーボードショートカット,키보드 단축키,src/lib/keymap/KeymapModal.svelte,heading
+keymap.subtitle,Hold an adjustment key and tap ← / → to nudge (Shift = fine). Click any shortcut to rebind it.,按住调整键并点击 ← / → 微调（Shift 为精调）。点击任意快捷键即可重新绑定。,按住調整鍵並點擊 ← / → 微調（Shift 為精調）。點擊任意快速鍵即可重新綁定。,調整キーを押しながら ← / → でナッジ（Shift = 微調整）。ショートカットをクリックして再割り当て。,조정 키를 누른 채 ← / →를 눌러 조정 (Shift = 미세 조정). 단축키를 클릭해 재설정.,src/lib/keymap/KeymapModal.svelte,hint
+keymap.reset,Reset to defaults,恢复默认,恢復預設,デフォルトにリセット,기본값으로 재설정,src/lib/keymap/KeymapModal.svelte,button
+keymap.listening,Press a key…,按下按键…,按下按鍵…,キーを押してください…,키를 누르세요…,src/lib/keymap/KeymapModal.svelte,prompt
+keymap.conflict,Already used by {action},已被「{action}」占用,已被「{action}」佔用,「{action}」で使用中,{action}에서 이미 사용 중,src/lib/keymap/KeymapModal.svelte,warning
+keymap.close,Close,关闭,關閉,閉じる,닫기,src/lib/keymap/KeymapModal.svelte,button
+keymap.group.navigation,Navigation,导航,導覽,ナビゲーション,탐색,src/lib/keymap/KeymapModal.svelte,group
+keymap.group.editing,Editing,编辑,編輯,編集,편집,src/lib/keymap/KeymapModal.svelte,group
+keymap.group.crop,Crop tool,裁剪工具,裁切工具,クロップツール,자르기 도구,src/lib/keymap/KeymapModal.svelte,group
+keymap.nav.prev,Previous image,上一张,上一張,前の画像,이전 이미지,src/lib/keymap/KeymapModal.svelte,row
+keymap.nav.next,Next image,下一张,下一張,次の画像,다음 이미지,src/lib/keymap/KeymapModal.svelte,row
+keymap.nav.first,First image,第一张,第一張,最初の画像,첫 번째 이미지,src/lib/keymap/KeymapModal.svelte,row
+keymap.nav.last,Last image,最后一张,最後一張,最後の画像,마지막 이미지,src/lib/keymap/KeymapModal.svelte,row
+keymap.nav.selectAll,Select all,全选,全選,すべて選択,전체 선택,src/lib/keymap/KeymapModal.svelte,row
+keymap.nav.delete,Delete image,删除照片,刪除照片,画像を削除,이미지 삭제,src/lib/keymap/KeymapModal.svelte,row
+keymap.edit.undo,Undo,撤销,復原,取り消し,실행 취소,src/lib/keymap/KeymapModal.svelte,row
+keymap.edit.redo,Redo,重做,重做,やり直し,다시 실행,src/lib/keymap/KeymapModal.svelte,row
+keymap.edit.rotateCCW,Rotate counter-clockwise,逆时针旋转,逆時針旋轉,反時計回りに回転,시계 반대 방향으로 회전,src/lib/keymap/KeymapModal.svelte,row
+keymap.edit.rotateCW,Rotate clockwise,顺时针旋转,順時針旋轉,時計回りに回転,시계 방향으로 회전,src/lib/keymap/KeymapModal.svelte,row
+keymap.edit.flipV,Flip vertical,垂直翻转,垂直翻轉,上下反転,수직 뒤집기,src/lib/keymap/KeymapModal.svelte,row
+keymap.edit.flipH,Flip horizontal,水平翻转,水平翻轉,左右反転,수평 뒤집기,src/lib/keymap/KeymapModal.svelte,row
+keymap.edit.copySettings,Copy develop settings,复制显影设置,複製顯影設定,現像設定をコピー,현상 설정 복사,src/lib/keymap/KeymapModal.svelte,row
+keymap.edit.pasteSettings,Paste develop settings to selection,粘贴显影设置到所选,貼上顯影設定至所選,選択範囲に現像設定をペースト,선택 항목에 현상 설정 붙여넣기,src/lib/keymap/KeymapModal.svelte,row
+keymap.group.adjust,Adjustments,调整,調整,調整,조정,src/lib/keymap/KeymapModal.svelte,group
+keymap.adjust.temp,Color temperature,色温,色溫,色温度,색 온도,src/lib/keymap/KeymapModal.svelte,row
+keymap.adjust.tint,Tint,色调,色調,ティント,틴트,src/lib/keymap/KeymapModal.svelte,row
+keymap.adjust.exposure,Exposure,曝光,曝光,露出,노출,src/lib/keymap/KeymapModal.svelte,row
+keymap.adjust.contrast,Contrast,对比度,對比度,コントラスト,대비,src/lib/keymap/KeymapModal.svelte,row
+keymap.adjust.highlights,Highlights,高光,高光,ハイライト,하이라이트,src/lib/keymap/KeymapModal.svelte,row
+keymap.adjust.shadows,Shadows,阴影,陰影,シャドウ,그림자,src/lib/keymap/KeymapModal.svelte,row
+keymap.adjust.whites,Whites,白色,白色,白レベル,흰색,src/lib/keymap/KeymapModal.svelte,row
+keymap.adjust.blacks,Blacks,黑色,黑色,黒レベル,검정,src/lib/keymap/KeymapModal.svelte,row
+keymap.adjust.fine,Fine step (hold while nudging),精调（微调时按住）,精調（微調時按住）,微調整（ナッジ中に押しっぱなし）,미세 조정 (조정 중 누른 채 유지),src/lib/keymap/KeymapModal.svelte,row
+keymap.crop.commit,Commit crop,确认裁剪,確認裁切,クロップを確定,자르기 적용,src/lib/keymap/KeymapModal.svelte,row
+keymap.crop.discard,Discard crop,放弃裁剪,放棄裁切,クロップを破棄,자르기 취소,src/lib/keymap/KeymapModal.svelte,row
+keymap.crop.swap,Swap orientation,切换方向,切換方向,向きを切り替え,방향 전환,src/lib/keymap/KeymapModal.svelte,row
+keymap.crop.lockAspect,Lock aspect ratio while dragging,拖动时锁定纵横比,拖曳時鎖定長寬比,ドラッグ中にアスペクト比を固定,드래그 중 종횡비 고정,src/lib/keymap/KeymapModal.svelte,row
+about.title,OpenEnlarge,OpenEnlarge,OpenEnlarge,OpenEnlarge,OpenEnlarge,src/lib/about/AboutModal.svelte,heading
+about.subtitle,Open-source film scan editor.,开源胶片扫描编辑,開源底片掃描編輯器。,オープンソースのフィルムスキャンエディタ。,오픈 소스 필름 스캔 편집기.,src/lib/about/AboutModal.svelte,heading
+about.body,"OpenEnlarge is free, open-source software that brings the darkroom to your desktop. Instead of flipping a tone curve, it inverts every scan in the density domain with the Kodak Cineon model (a Beer-Lambert dye model — density is linear in dye concentration): it samples the film base once per roll to strip the orange mask and neutralize the scanner light in one step, measures the density range inside your crop, then prints each channel back to a positive — with white balance applied as a gain on the print so shadows stay neutral. From there you finish on top with full curve, color-grading, and tonal controls, all in one fast workflow.",OpenEnlarge 是一款免费、开源的软件，将暗房搬到你的桌面。它不是翻转色调曲线，而是在密度域中反相每一张扫描：采用柯达 Cineon 模型（基于 Beer-Lambert 染料模型——密度与染料浓度成线性关系），每卷采样一次片基，一步去除橙色片基并中和扫描光源；在你的裁剪范围内测量密度范围，再将每个通道打印回正片，并以增益方式对正片施加白平衡，使暗部保持中性。随后用完整的曲线、调色与色调控件进行精修，全部在一套流畅的工作流中完成。,OpenEnlarge 是一款免費、開源的軟體，將暗房搬到你的桌面。它不是翻轉色調曲線，而是在密度域中反相每一張掃描：採用柯達 Cineon 模型（基於 Beer-Lambert 染料模型——密度與染料濃度成線性關係），每卷取樣一次片基，一步去除橙色片基並中和掃描光源；在你的裁切範圍內測量密度範圍，再將每個通道列印回正片，並以增益方式對正片套用白平衡，使暗部保持中性。隨後用完整的曲線、調色與色調控制項進行精修，全部在一套流暢的工作流程中完成。,OpenEnlargeは、暗室をデスクトップに持ち込む、無料のオープンソースソフトウェアです。トーンカーブを反転させるのではなく、コダック Cineonモデル（Beer-Lambertの染料モデル：濃度は染料濃度に線形比例）を使用して、濃度ドメインで各スキャンを反転します。ロールごとに一度フィルムベースをサンプリングしてオレンジマスクを除去し、スキャナー光源を一工程で中和します。次に、クロップ内の濃度範囲を測定し、各チャンネルをポジに焼き付け、ポジへのゲインとしてホワイトバランスを適用してシャドウを中性に保ちます。その後、完全なカーブ、カラーグレーディング、トーンコントロールで仕上げ、すべてを一つの速いワークフローで完結します。,"OpenEnlarge는 암실을 데스크탑으로 가져오는 무료 오픈 소스 소프트웨어입니다. 톤 커브를 뒤집는 대신, 코닥 Cineon 모델(Beer-Lambert 염료 모델 — 농도는 염료 농도에 선형 비례)을 사용해 농도 도메인에서 각 스캔을 반전합니다. 롤당 한 번 필름 베이스를 샘플링해 오렌지 마스크를 제거하고 스캐너 광원을 한 단계에서 중화합니다. 자르기 영역 내의 농도 범위를 측정한 후, 각 채널을 포지티브로 인화하며, 화이트 밸런스를 인화본의 게인으로 적용해 그림자를 중성으로 유지합니다. 이후 완전한 커브, 색 보정, 톤 컨트롤로 마무리하며, 모두 하나의 빠른 워크플로 안에서 완성됩니다.",src/lib/about/AboutModal.svelte,paragraph
+about.licenses,Licenses,许可证,授權,ライセンス,라이선스,src/lib/about/AboutModal.svelte,button
+about.github,GitHub ↗,GitHub ↗,GitHub ↗,GitHub ↗,GitHub ↗,src/lib/about/AboutModal.svelte,button
+about.close,Close,关闭,關閉,閉じる,닫기,src/lib/about/AboutModal.svelte,button
+about.back,Back,返回,返回,戻る,뒤로,src/lib/about/AboutModal.svelte,aria-label
+about.licensesTitle,Open-source licenses,开源许可证,開源授權,オープンソースライセンス,오픈 소스 라이선스,src/lib/about/AboutModal.svelte,heading
+about.licensesSubtitle,OpenEnlarge is built with these projects.,OpenEnlarge 基于以下项目构建。,OpenEnlarge 以下列專案建構而成。,OpenEnlargeは以下のプロジェクトを使用して構築されています。,OpenEnlarge는 다음 프로젝트를 사용해 제작되었습니다.,src/lib/about/AboutModal.svelte,heading
+about.credits.group.applicationUi,Application & UI,应用与界面,應用程式與介面,アプリケーションとUI,애플리케이션 & UI,src/lib/about/credits.ts,group label
+about.credits.group.imagePipeline,Image pipeline,图像处理管线,影像處理管線,画像パイプライン,이미지 파이프라인,src/lib/about/credits.ts,group label
+about.credits.group.storageSystem,Storage & system,存储与系统,儲存與系統,ストレージとシステム,스토리지 & 시스템,src/lib/about/credits.ts,group label
+confirmDelete.title,Delete {name}?,删除 {name}？,刪除 {name}？,「{name}」を削除しますか？,{name}을(를) 삭제하시겠습니까?,src/lib/overlay/ConfirmDelete.svelte,heading
+confirmDelete.titleCount,Delete {count} items?,删除 {count} 张照片？,刪除 {count} 張照片？,{count}件のアイテムを削除しますか？,항목 {count}개를 삭제하시겠습니까?,src/lib/overlay/ConfirmDelete.svelte,heading
+confirmDelete.fallbackName,this image,这张照片,這張照片,この画像,이 이미지,src/lib/overlay/ConfirmDelete.svelte,fallback
+confirmDelete.sub,"Remove it from OpenEnlarge, or also move the original file to the Trash.",从 OpenEnlarge 中移除，或同时将原始文件移至回收站。,從 OpenEnlarge 中移除，或同時將原始檔案移至垃圾桶。,OpenEnlargeから削除するか、元のファイルをゴミ箱に移動します。,"OpenEnlarge에서 제거하거나, 원본 파일을 휴지통으로 이동합니다.",src/lib/overlay/ConfirmDelete.svelte,paragraph
+confirmDelete.warn,This can't be undone.,此操作无法撤销。,此操作無法復原。,この操作は元に戻せません。,이 작업은 취소할 수 없습니다.,src/lib/overlay/ConfirmDelete.svelte,paragraph
+confirmDelete.cancel,Cancel,取消,取消,キャンセル,취소,src/lib/overlay/ConfirmDelete.svelte,button
+confirmDelete.remove,Remove from OpenEnlarge,从 OpenEnlarge 中移除,從 OpenEnlarge 中移除,OpenEnlargeから削除,OpenEnlarge에서 제거,src/lib/overlay/ConfirmDelete.svelte,button
+confirmDelete.trash,Move file to Trash,将文件移至回收站,將檔案移至垃圾桶,ファイルをゴミ箱に移動,파일을 휴지통으로 이동,src/lib/overlay/ConfirmDelete.svelte,button
+confirmFolder.title,Remove folder “{name}”?,移除文件夹“{name}”？,移除資料夾「{name}」？,フォルダ「{name}」を削除しますか？,"폴더 ""{name}""을(를) 제거하시겠습니까?",src/lib/overlay/ConfirmRemoveFolder.svelte,heading
+confirmFolder.fallbackName,this folder,此文件夹,此資料夾,このフォルダ,이 폴더,src/lib/overlay/ConfirmRemoveFolder.svelte,fallback
+confirmFolder.sub,"Its {count} image{plural} will be removed from OpenEnlarge, or also moved to the Trash.",其中的 {count} 张照片将从 OpenEnlarge 中移除，或同时移至回收站。,其中的 {count} 張照片將從 OpenEnlarge 中移除，或同時移至垃圾桶。,フォルダ内の {count} 枚の画像をOpenEnlargeから削除するか、ゴミ箱に移動します。,폴더 내 이미지 {count}개를 OpenEnlarge에서 제거하거나 휴지통으로 이동합니다.,src/lib/overlay/ConfirmRemoveFolder.svelte,paragraph
+confirmFolder.warn,This can't be undone.,此操作无法撤销。,此操作無法復原。,この操作は元に戻せません。,이 작업은 취소할 수 없습니다.,src/lib/overlay/ConfirmRemoveFolder.svelte,paragraph
+confirmFolder.cancel,Cancel,取消,取消,キャンセル,취소,src/lib/overlay/ConfirmRemoveFolder.svelte,button
+confirmFolder.remove,Remove from OpenEnlarge,从 OpenEnlarge 中移除,從 OpenEnlarge 中移除,OpenEnlargeから削除,OpenEnlarge에서 제거,src/lib/overlay/ConfirmRemoveFolder.svelte,button
+confirmFolder.trash,Delete files from computer,从电脑中删除文件,從電腦中刪除檔案,コンピュータからファイルを削除,컴퓨터에서 파일 삭제,src/lib/overlay/ConfirmRemoveFolder.svelte,button
+confirmDevelop.title,Develop all {count} image{plural}?,显影全部 {count} 张照片？,顯影全部 {count} 張照片？,{count} 枚の画像をすべて現像しますか？,이미지 {count}개를 모두 현상하시겠습니까?,src/lib/overlay/ConfirmDevelop.svelte,heading
+confirmDevelop.sub,"They'll be decoded — negatives inverted, positives kept as-is — then opened in Develop.",它们将被解码——负片反相、正片保持原样——然后在显影中打开。,它們將被解碼——負片反相、正片保持原樣——然後在顯影中開啟。,デコードされます。ネガは反転、ポジはそのまま——現像で開きます。,"디코딩됩니다 — 네거티브는 반전, 포지티브는 그대로 — 현상에서 열립니다.",src/lib/overlay/ConfirmDevelop.svelte,paragraph
+confirmDevelop.cancel,Cancel,取消,取消,キャンセル,취소,src/lib/overlay/ConfirmDevelop.svelte,button
+confirmDevelop.confirm,Develop all,全部显影,全部顯影,すべて現像,전체 현상,src/lib/overlay/ConfirmDevelop.svelte,button
+confirmDevelop.filmStock,Film stock,胶片型号,底片型號,フィルムストック,필름 종류,src/lib/overlay/ConfirmDevelop.svelte,label
+confirmDevelop.filmStockOptional,optional,可选,可選,任意,선택 사항,src/lib/overlay/ConfirmDevelop.svelte,hint
+confirmApply.copyTitle,Copy which settings?,复制哪些设置？,複製哪些設定？,どの設定をコピーしますか？,어떤 설정을 복사할까요?,src/lib/overlay/ConfirmApplySettings.svelte,heading
+confirmApply.copySub,Choose what travels when you paste these settings onto other frames.,选择粘贴到其他照片时要携带的设置。,選擇貼上至其他照片時要帶上的設定。,他のフレームに貼り付けるときに引き継ぐ設定を選択してください。,다른 프레임에 붙여넣을 때 함께 적용할 설정을 선택하세요.,src/lib/overlay/ConfirmApplySettings.svelte,paragraph
+confirmApply.copyConfirm,Copy,复制,複製,コピー,복사,src/lib/overlay/ConfirmApplySettings.svelte,button
+confirmApply.cancel,Cancel,取消,取消,キャンセル,취소,src/lib/overlay/ConfirmApplySettings.svelte,button
+confirmApply.confirm,Apply,应用,套用,適用,적용,src/lib/overlay/ConfirmApplySettings.svelte,button
+confirmApply.rollTitle,Apply to all {count} frames in this roll?,应用到本胶卷的全部 {count} 张？,套用至本卷的全部 {count} 張？,このロールの全 {count} フレームに適用しますか？,이 롤의 {count}개 프레임 전체에 적용하시겠습니까?,src/lib/overlay/ConfirmApplySettings.svelte,heading
+confirmApply.rollSub,Choose which of this frame's settings to apply across the whole roll.,选择要应用到整卷的本张设置。,選擇要套用至整卷的本張設定。,このフレームの設定のうち、ロール全体に適用するものを選択してください。,이 프레임의 설정 중 롤 전체에 적용할 항목을 선택하세요.,src/lib/overlay/ConfirmApplySettings.svelte,paragraph
+applyGroups.toneColor,Tone & Color,色调与颜色,色調與色彩,トーン＆カラー,톤 & 색상,src/lib/overlay/ConfirmApplySettings.svelte,checkbox
+applyGroups.crop,Crop,裁切,裁切,クロップ,자르기,src/lib/overlay/ConfirmApplySettings.svelte,checkbox
+applyGroups.base,Film base,片基,片基,フィルムベース,필름 베이스,src/lib/overlay/ConfirmApplySettings.svelte,checkbox
+applyGroups.exposure,Exposure,曝光,曝光,露出,노출,src/lib/overlay/ConfirmApplySettings.svelte,checkbox
+toast.settingsCopied,Settings copied,已复制设置,已複製設定,設定をコピーしました,설정이 복사되었습니다,src/lib/toast.ts,toast
+toast.copyFirst,Copy settings first,请先复制设置,請先複製設定,先に設定をコピーしてください,먼저 설정을 복사하세요,src/lib/toast.ts,toast
+toast.settingsApplied,Settings applied,已应用设置,已套用設定,設定を適用しました,설정이 적용되었습니다,src/lib/toast.ts,toast
+toast.settingsAppliedN,Settings applied to {count} images,已应用设置到 {count} 张照片,已套用設定至 {count} 張照片,{count} 枚の画像に設定を適用しました,{count}개 이미지에 설정이 적용되었습니다,src/lib/toast.ts,toast
+toast.autoBrightnessDone,Auto exp. applied to {count} images,已对 {count} 张照片应用自动亮度,已對 {count} 張照片套用自動曝光,{count} 枚の画像に自動露出を適用しました,{count}개 이미지에 자동 노출이 적용되었습니다,src/lib/workflow.ts,toast
+toast.autoDustRemoved,{count} dust spots removed,已去除 {count} 处污点,已移除 {count} 處污點,ほこり {count} 箇所を除去しました,먼지 {count}개가 제거되었습니다,src/lib/develop/AutoDustPanel.svelte,toast
+toast.autoDustNone,No dust detected,未检测到污点,未偵測到污點,ほこりは検出されませんでした,먼지가 감지되지 않았습니다,src/lib/develop/AutoDustPanel.svelte,toast
+contextMenu.delete,Delete…,删除…,刪除…,削除…,삭제…,src/lib/overlay/ImageContextMenu.svelte,button
+contextMenu.reveal,Open in folder,打开所在文件夹,開啟所在資料夾,フォルダで開く,폴더에서 열기,src/lib/overlay/ImageContextMenu.svelte,button
+contextMenu.deleteCount,Delete {count} items,删除 {count} 张照片,刪除 {count} 張照片,{count} 件を削除,{count}개 항목 삭제,src/lib/overlay/ImageContextMenu.svelte,button
+contextMenu.flipH,Flip horizontal,水平翻转,水平翻轉,左右反転,수평 뒤집기,src/lib/overlay/ImageContextMenu.svelte,button
+contextMenu.flipV,Flip vertical,垂直翻转,垂直翻轉,上下反転,수직 뒤집기,src/lib/overlay/ImageContextMenu.svelte,button
+folderMenu.remove,Remove folder…,移除文件夹…,移除資料夾…,フォルダを削除…,폴더 제거…,src/lib/overlay/FolderContextMenu.svelte,button
+progress.developing,Developing {current} of {total}…,正在显影 {current} / {total}…,正在顯影 {current} / {total}…,現像中 {current} / {total}…,현상 중 {current} / {total}…,src/lib/overlay/ProgressOverlay.svelte,heading
+export.title,Export,导出,匯出,書き出し,내보내기,src/lib/export/ExportModal.svelte,heading
+export.close,Close,关闭,關閉,閉じる,닫기,src/lib/export/ExportModal.svelte,aria-label
+export.deselectAll,Deselect all,取消全选,取消全選,すべて選択解除,전체 선택 해제,src/lib/export/ExportModal.svelte,button
+export.selectAll,Select all,全选,全選,すべて選択,전체 선택,src/lib/export/ExportModal.svelte,button
+export.selectionCount,{selected} of {total} selected,已选择 {selected} / {total},已選擇 {selected} / {total},{total} 枚中 {selected} 枚を選択,{total}개 중 {selected}개 선택됨,src/lib/export/ExportModal.svelte,label
+export.emptyState,No developed images to export.,没有可导出的已显影照片。,沒有可匯出的已顯影照片。,書き出せる現像済み画像がありません。,내보낼 현상된 이미지가 없습니다.,src/lib/export/ExportModal.svelte,paragraph
+export.formatLabel,Format,格式,格式,フォーマット,형식,src/lib/export/ExportModal.svelte,label
+export.formatJpeg,JPEG,JPEG,JPEG,JPEG,JPEG,src/lib/export/ExportModal.svelte,option
+export.formatTiff,TIFF,TIFF,TIFF,TIFF,TIFF,src/lib/export/ExportModal.svelte,option
+export.formatPng,PNG,PNG,PNG,PNG,PNG,src/lib/export/ExportModal.svelte,option
+export.quality,Quality,质量,品質,品質,품질,src/lib/export/ExportModal.svelte,label
+export.maxSize,Max size,最大文件大小,最大檔案大小,最大サイズ,최대 크기,src/lib/export/ExportModal.svelte,label
+export.unlimited,Unlimited,不限,不限,無制限,무제한,src/lib/export/ExportModal.svelte,value
+export.maxSizeMb,{mb} MB,{mb} MB,{mb} MB,{mb} MB,{mb} MB,src/lib/export/ExportModal.svelte,value
+export.bitDepth,Bit depth,位深度,位元深度,ビット深度,비트 심도,src/lib/export/ExportModal.svelte,label
+export.bitDepth8,8-bit,8 位,8 位元,8ビット,8비트,src/lib/export/ExportModal.svelte,option
+export.bitDepth16,16-bit,16 位,16 位元,16ビット,16비트,src/lib/export/ExportModal.svelte,option
+export.resolution,Resolution,分辨率,解析度,解像度,해상도,src/lib/export/ExportModal.svelte,label
+export.resFull,Full,完整,完整,フル,전체,src/lib/export/ExportModal.svelte,option
+export.resPx,{px} px,{px} px,{px} px,{px} px,{px} px,src/lib/export/ExportModal.svelte,value
+export.resCustom,Custom,自定义,自訂,カスタム,사용자 지정,src/lib/export/ExportModal.svelte,option
+export.resHint,longest side,最长边,最長邊,長辺,긴 변,src/lib/export/ExportModal.svelte,hint
+export.resPxUnit,px (longest side),px（最长边）,px（最長邊）,px（長辺）,px (긴 변),src/lib/export/ExportModal.svelte,unit
+export.exportingProgress,Exporting {done} of {total}…,正在导出 {done} / {total}…,正在匯出 {done} / {total}…,書き出し中 {done} / {total}…,내보내는 중 {done} / {total}…,src/lib/export/ExportModal.svelte,status
+export.openFolder,Open folder,打开文件夹,開啟資料夾,フォルダを開く,폴더 열기,src/lib/export/ExportModal.svelte,button
+export.exporting,Exporting…,导出中…,匯出中…,書き出し中…,내보내는 중…,src/lib/export/ExportModal.svelte,button
+export.exportCount,Export {count},导出 {count},匯出 {count},{count} 枚を書き出し,{count}개 내보내기,src/lib/export/ExportModal.svelte,button
+export.summaryPartial,Exported {done} of {total} · {failed} failed,已导出 {done} / {total} · {failed} 失败,已匯出 {done} / {total} · {failed} 失敗,{total} 枚中 {done} 枚を書き出し · {failed} 枚失敗,{total}개 중 {done}개 내보냄 · {failed}개 실패,src/lib/export/ExportModal.svelte,status
+export.summaryDone,Exported {done} {imageOrImages},已导出 {done} {imageOrImages},已匯出 {done} {imageOrImages},{done} {imageOrImages}を書き出しました,{done} {imageOrImages} 내보내기 완료,src/lib/export/ExportModal.svelte,status
+export.imageSingular,image,张照片,張,枚,장,src/lib/export/ExportModal.svelte,plural unit
+export.imagePlural,images,张照片,張,枚,장,src/lib/export/ExportModal.svelte,plural unit
+roll.empty,No developed frames in this folder yet.,此文件夹中还没有已显影的胶片。,此資料夾中還沒有已顯影的底片。,このフォルダにはまだ現像済みのフレームがありません。,이 폴더에는 아직 현상된 프레임이 없습니다.,src/lib/tabs/Roll.svelte,hint
+roll.filmEdge,Film edge,片边,片邊,フィルムエッジ,필름 엣지,src/lib/tabs/Roll.svelte,toggle
+roll.export.button,Export contact sheet,导出印样,匯出印樣,コンタクトシートを書き出し,콘택트 시트 내보내기,src/lib/tabs/Roll.svelte,button
+roll.export.title,Export contact sheet,导出印样,匯出印樣,コンタクトシートを書き出し,콘택트 시트 내보내기,src/lib/overlay/ExportSheetDialog.svelte,heading
+roll.export.resolution,Resolution,分辨率,解析度,解像度,해상도,src/lib/overlay/ExportSheetDialog.svelte,label
+roll.export.resStandard,Standard,标准,標準,標準,표준,src/lib/overlay/ExportSheetDialog.svelte,option
+roll.export.resHigh,High,高清,高畫質,高画質,고화질,src/lib/overlay/ExportSheetDialog.svelte,option
+roll.export.resPrint,Print,打印,印刷,印刷,인쇄,src/lib/overlay/ExportSheetDialog.svelte,option
+roll.export.format,Format,格式,格式,形式,형식,src/lib/overlay/ExportSheetDialog.svelte,label
+roll.export.formatJpeg,JPEG,JPEG,JPEG,JPEG,JPEG,src/lib/overlay/ExportSheetDialog.svelte,option
+roll.export.formatPng,PNG,PNG,PNG,PNG,PNG,src/lib/overlay/ExportSheetDialog.svelte,option
+roll.export.quality,Quality,质量,品質,画質,품질,src/lib/overlay/ExportSheetDialog.svelte,label
+roll.export.confirm,Export,导出,匯出,書き出し,내보내기,src/lib/overlay/ExportSheetDialog.svelte,button
+roll.edgeText,Edge text,片边文字,片邊文字,エッジテキスト,엣지 텍스트,src/lib/tabs/Roll.svelte,label
+roll.edgeTextPlaceholder,Film edge marking,片边标记文字,片邊標記文字,フィルムエッジの文字,필름 엣지 표시 문자,src/lib/tabs/Roll.svelte,placeholder
+roll.close,Close,关闭,關閉,閉じる,닫기,src/lib/roll/FramePreview.svelte,button
+roll.crop.tool,Crop,裁剪,裁切,クロップ,자르기,src/lib/roll/FramePreview.svelte,button
+roll.base.sample,Sample film base,采样片基,取樣片基,フィルムベースをサンプル,필름 베이스 샘플링,src/lib/roll/FramePreview.svelte,button
+roll.base.auto,Auto film base,自动片基,自動片基,フィルムベース自動検出,필름 베이스 자동 설정,src/lib/roll/FramePreview.svelte,button
+roll.base.heading,Film base,片基,片基,フィルムベース,필름 베이스,src/lib/tabs/Roll.svelte,heading
+export.cropSelected,Crop selected,裁剪所选,裁切所選,選択範囲をクロップ,선택 영역 자르기,src/lib/export/ExportModal.svelte,toggle
+viewport.fit,Fit,适应,符合,フィット,맞춤,src/lib/viewport/Viewport.svelte,zoom label
+viewport.zoomPercent,{percent}%,{percent}%,{percent}%,{percent}%,{percent}%,src/lib/viewport/Viewport.svelte,zoom label
+viewport.rgbReadout,sRGB 8-bit at cursor,光标处 sRGB 8 位强度,游標處 sRGB 8 位元強度,カーソル位置の sRGB 8ビット値,커서 위치의 sRGB 8비트 값,src/lib/viewport/Viewport.svelte,densitometer tooltip
+viewport.rendering,Rendering…,渲染中…,算繪中…,レンダリング中…,렌더링 중…,src/lib/viewport/Viewport.svelte,render-in-flight spinner label
+quality.deleteImage,Delete image…,删除照片…,刪除照片…,画像を削除…,이미지 삭제…,src/lib/viewport/QualityMenu.svelte,button
+folderNav.imported,Imported,已导入,已匯入,読み込み済み,가져온 항목,src/lib/library/FolderNav.svelte,heading
+folderNav.noImages,No images yet,还没有照片,還沒有照片,画像がありません,이미지 없음,src/lib/library/FolderNav.svelte,emptyState
+folderNav.importing,Importing…,导入中…,匯入中…,読み込み中…,가져오는 중…,src/lib/library/FolderNav.svelte,button
+folderNav.importingCount,Importing {done}/{total}…,导入中 {done}/{total}…,匯入中 {done}/{total}…,読み込み中 {done}/{total}…,가져오는 중 {done}/{total}…,src/lib/library/FolderNav.svelte,button
+folderNav.import,Import,导入,匯入,読み込む,가져오기,src/lib/library/FolderNav.svelte,button
+folderNav.importFiles,Import Files…,导入文件…,匯入檔案…,ファイルを読み込む…,파일 가져오기…,src/lib/library/FolderNav.svelte,menuItem
+folderNav.importFolder,Import Folder…,导入文件夹…,匯入資料夾…,フォルダを読み込む…,폴더 가져오기…,src/lib/library/FolderNav.svelte,menuItem
+folderNav.filterFilmScans,Film scans,胶片扫描,底片掃描,フィルムスキャン,필름 스캔,src/lib/library/FolderNav.svelte,label
+folderNav.omitPreviewJpgs,Omit preview JPGs,忽略预览 JPG,省略預覽 JPG,プレビュー JPG を除外,프리뷰 JPG 제외,src/lib/library/FolderNav.svelte,checkbox
+folderNav.omitPreviewJpgsHelp,"Skips JPGs that sit beside a raw file of the same name (camera or scanner previews), so only the master file is imported.",忽略与同名 raw 文件并存的 JPG（相机或扫描仪预览），只导入主文件。,略過與同名 RAW 檔案並存的 JPG（相機或掃描器預覽），只匯入主檔案。,同名の RAW ファイルと並存する JPG（カメラやスキャナーのプレビュー）をスキップし、マスターファイルのみを読み込みます。,같은 이름의 RAW 파일과 함께 있는 JPG(카메라 또는 스캐너 프리뷰)를 건너뛰고 마스터 파일만 가져옵니다.,src/lib/library/FolderNav.svelte,tooltip
+grid.imageCount,{count} image{plural},{count} 张照片,{count} 張照片,{count} 枚,{count}개,src/lib/library/Grid.svelte,label
+grid.thumbSize,Thumb size,缩略图大小,縮圖大小,サムネイルサイズ,썸네일 크기,src/lib/library/Grid.svelte,label
+grid.folderImagesAria,Folder images,文件夹中的照片,資料夾中的照片,フォルダ内の画像,폴더 이미지,src/lib/library/Grid.svelte,aria-label
+grid.selectFolder,Select a folder with images,选择一个包含照片的文件夹,選擇一個包含照片的資料夾,画像を含むフォルダを選択,이미지가 있는 폴더를 선택하세요,src/lib/library/Grid.svelte,emptyState
+library.import,Import,导入,匯入,読み込む,가져오기,src/lib/tabs/Library.svelte,button
+library.importing,Importing…,导入中…,匯入中…,読み込み中…,가져오는 중…,src/lib/tabs/Library.svelte,button
+library.developed,developed,已显影,已顯影,現像済み,현상됨,src/lib/tabs/Library.svelte,title
+library.developAll,Develop all,全部显影,全部顯影,すべて現像,전체 현상,src/lib/tabs/Library.svelte,button
+library.filterFilmScans,Film scans,胶片扫描,底片掃描,フィルムスキャン,필름 스캔,src/lib/tabs/Library.svelte,label
+library.dropToImport,Drop to import,拖放以导入,拖放以匯入,ドロップして読み込む,드롭하여 가져오기,src/lib/tabs/Library.svelte,heading
+library.dropFormats,"JPEG, PNG, TIFF & RAW",JPEG、PNG、TIFF 与 RAW,JPEG、PNG、TIFF 與 RAW,JPEG・PNG・TIFF・RAW,"JPEG, PNG, TIFF & RAW",src/lib/tabs/Library.svelte,hint
+library.dropImporting,Importing…,导入中…,匯入中…,読み込み中…,가져오는 중…,src/lib/tabs/Library.svelte,heading
+filmstrip.importedImagesAria,Imported images,已导入的照片,已匯入的照片,読み込み済みの画像,가져온 이미지,src/lib/panels/Filmstrip.svelte,aria-label
+metadata.reset,Reset,重置,重設,リセット,재설정,src/lib/panels/Metadata.svelte,button
+metadata.resetTitle,Revert all metadata to the original EXIF,将所有元数据还原为原始 EXIF,將所有中繼資料還原為原始 EXIF,すべてのメタデータを元の EXIF に戻す,모든 메타데이터를 원본 EXIF로 되돌립니다,src/lib/panels/Metadata.svelte,title
+metadata.camera,Camera,相机,相機,カメラ,카메라,src/lib/panels/Metadata.svelte,label
+metadata.lens,Lens,镜头,鏡頭,レンズ,렌즈,src/lib/panels/Metadata.svelte,label
+metadata.iso,ISO,ISO,ISO,ISO,ISO,src/lib/panels/Metadata.svelte,label
+metadata.shutter,Shutter,快门,快門,シャッタースピード,셔터 속도,src/lib/panels/Metadata.svelte,label
+metadata.aperture,Aperture,光圈,光圈,絞り,조리개,src/lib/panels/Metadata.svelte,label
+metadata.date,Date,日期,日期,日付,날짜,src/lib/panels/Metadata.svelte,label
+metadata.note,Note,备注,備註,メモ,메모,src/lib/panels/Metadata.svelte,label
+metadata.notePlaceholder,Add a note…,添加备注…,新增備註…,メモを追加…,메모 추가…,src/lib/panels/Metadata.svelte,placeholder
+metadata.dimensions,Dimensions,尺寸,尺寸,サイズ,크기,src/lib/panels/Metadata.svelte,label
+metadata.size,Size,大小,大小,ファイルサイズ,파일 크기,src/lib/panels/Metadata.svelte,label
+metadata.noImageSelected,No image selected,未选择照片,未選擇照片,画像が選択されていません,선택된 이미지 없음,src/lib/panels/Metadata.svelte,emptyState
+source.import,Import,导入,匯入,読み込む,가져오기,src/lib/panels/Source.svelte,button
+source.importing,Importing…,导入中…,匯入中…,読み込み中…,가져오는 중…,src/lib/panels/Source.svelte,button
+source.developed,developed,已显影,已顯影,現像済み,현상됨,src/lib/panels/Source.svelte,title
+source.developAll,Develop all,全部显影,全部顯影,すべて現像,전체 현상,src/lib/panels/Source.svelte,button
+source.filterFilmScans,Film scans,胶片扫描,底片掃描,フィルムスキャン,필름 스캔,src/lib/panels/Source.svelte,label
+develop.notDevelopedYet,Not developed yet,尚未显影,尚未顯影,まだ現像されていません,아직 현상되지 않음,src/lib/tabs/Develop.svelte,hint
+toolbar.edit,Edit,编辑,編輯,編集,편집,src/lib/develop/Toolbar.svelte,title
+toolbar.crop,Crop,裁剪,裁切,クロップ,자르기,src/lib/develop/Toolbar.svelte,title
+toolbar.eraser,Eraser,橡皮擦,橡皮擦,消しゴム,지우개,src/lib/develop/Toolbar.svelte,title
+toolbar.basePicker,Base,基准,基準,ベース,베이스,src/lib/develop/Toolbar.svelte,title
+base.title,Film-Edge Color,片边颜色,片邊顏色,フィルムエッジカラー,필름 엣지 색상,src/lib/develop/Basic.svelte,heading
+base.recalibrate,Pick the film-edge color,拾取片边颜色,選取片邊顏色,フィルムエッジの色を選択,필름 엣지 색상 선택,src/lib/develop/Basic.svelte,swatch tooltip
+base.lowConfidence,⚠ Low-confidence film-edge color — tap the swatch to repoint,⚠ 片边颜色置信度低 — 点按色块重新取样,⚠ 片邊顏色信賴度低 — 點按色塊重新取樣,⚠ フィルムエッジカラーの信頼度が低い — スウォッチをタップして再取得,⚠ 필름 엣지 색상 신뢰도 낮음 — 스워치를 탭하여 재지정,src/lib/develop/Basic.svelte,hint
+basic.title,Basic,基本,基本,基本,기본,src/lib/develop/Basic.svelte,heading
+basic.reset,Reset,重置,重設,リセット,재설정,src/lib/develop/Basic.svelte,button
+basic.applyToRoll,Apply to whole roll…,应用到整卷…,套用至整卷…,ロール全体に適用…,롤 전체에 적용…,src/lib/develop/Basic.svelte,button
+basic.hdr,HDR,HDR,HDR,HDR,HDR,src/lib/develop/Basic.svelte,toggle
+basic.hdrTitle,Preview in HDR (toggle),以 HDR 预览（切换）,以 HDR 預覽（切換）,HDRでプレビュー（トグル）,HDR로 미리 보기 (토글),src/lib/develop/Basic.svelte,tooltip
+basic.meterBorder,Metering,测光,測光,測光,측광,src/lib/develop/Basic.svelte,label
+basic.meterBorder.exclude,Exclude border,排除边框,排除邊框,枠を除外,테두리 제외,src/lib/develop/Basic.svelte,option
+basic.meterBorder.include,Whole crop,整个裁剪,整個裁切,クロップ全体,전체 크롭,src/lib/develop/Basic.svelte,option
+basic.meterBorderTitle,How auto-exposure / WB meter when the crop includes film spokes,当裁剪包含片孔时自动曝光/白平衡的测光方式,當裁切包含底片齒孔時自動曝光/白平衡的測光方式,クロップにフィルムの送り穴が含まれる場合の自動露出/WBの測光方法,크롭에 필름 스프로킷이 포함될 때 자동 노출/화이트 밸런스 측광 방식,src/lib/develop/Basic.svelte,tooltip
+basic.filmProfile,Film Profile,胶片配置文件,底片設定檔,フィルムプロファイル,필름 프로파일,src/lib/develop/Basic.svelte,label
+basic.noFilmProfile,No film profile,无胶片配置文件,無底片設定檔,フィルムプロファイルなし,필름 프로파일 없음,src/lib/develop/Basic.svelte,option
+basic.stock.portra400,Kodak Portra 400,柯达 Portra 400,柯達 Portra 400,Kodak Portra 400,Kodak Portra 400,src/lib/develop/Basic.svelte,option
+basic.stock.fujic200,Fuji C200,富士 C200,富士 C200,Fuji C200,Fuji C200,src/lib/develop/Basic.svelte,option
+basic.stock.portra160,Kodak Portra 160,柯达 Portra 160,柯達 Portra 160,Kodak Portra 160,Kodak Portra 160,src/lib/develop/Basic.svelte,option
+basic.stock.portra800,Kodak Portra 800,柯达 Portra 800,柯達 Portra 800,Kodak Portra 800,Kodak Portra 800,src/lib/develop/Basic.svelte,option
+basic.stock.ektar100,Kodak Ektar 100,柯达 Ektar 100,柯達 Ektar 100,Kodak Ektar 100,Kodak Ektar 100,src/lib/develop/Basic.svelte,option
+basic.stock.gold200,Kodak Gold 200,柯达 Gold 200,柯達 Gold 200,Kodak Gold 200,Kodak Gold 200,src/lib/develop/Basic.svelte,option
+basic.stock.ultramax400,Kodak UltraMax 400,柯达 UltraMax 400,柯達 UltraMax 400,Kodak UltraMax 400,Kodak UltraMax 400,src/lib/develop/Basic.svelte,option
+basic.stock.fujipro400h,Fujifilm Pro 400H,富士 Pro 400H,富士 Pro 400H,Fujifilm Pro 400H,Fujifilm Pro 400H,src/lib/develop/Basic.svelte,option
+basic.stock.fujixtra400,Fujifilm Superia X-tra 400,富士 Superia X-tra 400,富士 Superia X-tra 400,Fujifilm Superia X-tra 400,Fujifilm Superia X-tra 400,src/lib/develop/Basic.svelte,option
+basic.stock.vision350d,Kodak Vision3 50D,柯达 Vision3 50D,柯達 Vision3 50D,Kodak Vision3 50D,Kodak Vision3 50D,src/lib/develop/Basic.svelte,option
+basic.stock.vision3200t,Kodak Vision3 200T,柯达 Vision3 200T,柯達 Vision3 200T,Kodak Vision3 200T,Kodak Vision3 200T,src/lib/develop/Basic.svelte,option
+basic.stock.vision3250d,Kodak Vision3 250D,柯达 Vision3 250D,柯達 Vision3 250D,Kodak Vision3 250D,Kodak Vision3 250D,src/lib/develop/Basic.svelte,option
+basic.stock.vision3500t,Kodak Vision3 500T,柯达 Vision3 500T,柯達 Vision3 500T,Kodak Vision3 500T,Kodak Vision3 500T,src/lib/develop/Basic.svelte,option
+basic.whiteBalance,White Balance,白平衡,白平衡,ホワイトバランス,화이트 밸런스,src/lib/develop/Basic.svelte,label
+basic.tempTint,Temp / Tint,色温 / 色调,色溫 / 色調,色温度 / ティント,색온도 / 틴트,src/lib/develop/Basic.svelte,label
+basic.auto,Auto,自动,自動,オート,자동,src/lib/develop/Basic.svelte,button
+basic.autoWbTitle,Auto white balance,自动白平衡,自動白平衡,自動ホワイトバランス,자동 화이트 밸런스,src/lib/develop/Basic.svelte,button tooltip
+basic.autoExp,Auto,自动,自動,オート,자동,src/lib/develop/Basic.svelte,button
+basic.autoExpTitle,Auto-exposure (re-estimate brightness),自动曝光（重新估算亮度）,自動曝光（重新估算亮度）,自動露出（明るさを再推定）,자동 노출 (밝기 재추정),src/lib/develop/Basic.svelte,button tooltip
+basic.grayPick,Pick a neutral gray,拾取中性灰,選取中性灰,ニュートラルグレーを選択,중성 회색 선택,src/lib/develop/Basic.svelte,button tooltip
+basic.grayPickHelp,Sets white balance. Click something that should be neutral gray in the final photo.,设置白平衡。点击最终照片中应为中性灰的区域。,設定白平衡。點擊最終照片中應為中性灰的區域。,ホワイトバランスを設定します。最終的な写真でニュートラルグレーになるべき箇所をクリックしてください。,화이트 밸런스를 설정합니다. 최종 사진에서 중성 회색이어야 할 부분을 클릭하세요.,src/lib/develop/Basic.svelte,help tooltip
+basic.temp,Temp,色温,色溫,色温度,색온도,src/lib/develop/Basic.svelte,label
+basic.tint,Tint,色调,色調,ティント,틴트,src/lib/develop/Basic.svelte,label
+basic.perZone,Color Drift Correction,色偏校正,色偏校正,カラードリフト補正,색상 드리프트 보정,src/lib/develop/Basic.svelte,label
+basic.perZoneStrength,Correction strength,校正强度,校正強度,補正強度,보정 강도,src/lib/develop/Basic.svelte,label
+basic.tone,Tone,影调,影調,トーン,톤,src/lib/develop/Basic.svelte,label
+basic.exposure,Exposure,曝光,曝光,露出,노출,src/lib/develop/Basic.svelte,label
+basic.brightness,Brightness,亮度,亮度,明るさ,밝기,src/lib/develop/Basic.svelte,label
+basic.contrast,Contrast,对比度,對比度,コントラスト,대비,src/lib/develop/Basic.svelte,label
+basic.highlights,Highlights,高光,高光,ハイライト,하이라이트,src/lib/develop/Basic.svelte,label
+basic.shadows,Shadows,阴影,陰影,シャドウ,그림자,src/lib/develop/Basic.svelte,label
+basic.whites,Whites,白色,白色,白,흰색,src/lib/develop/Basic.svelte,label
+basic.blacks,Blacks,黑色,黑色,黒,검정,src/lib/develop/Basic.svelte,label
+basic.presence,Presence,鲜明度,鮮明度,プレゼンス,선명감,src/lib/develop/Basic.svelte,label
+basic.texture,Texture,纹理,紋理,テクスチャ,텍스처,src/lib/develop/Basic.svelte,label
+basic.textureViewActual,100%,100%,100%,100%,100%,src/lib/develop/Basic.svelte,button
+basic.textureHint,Texture is a fine-detail effect — view at 100% to preview the real result (it can't be judged at fit).,纹理是细节锐化效果——请在 100% 下预览实际效果（适应窗口时无法准确判断）。,紋理是細節銳化效果——請在 100% 下預覽實際效果（符合視窗時無法準確判斷）。,テクスチャは精細な効果です — 実際の結果を確認するには100%で表示してください（フィット表示では正確に判断できません）。,텍스처는 세밀한 효과입니다 — 실제 결과를 확인하려면 100%로 보세요 (맞춤 보기에서는 정확히 판단하기 어렵습니다).,src/lib/develop/Basic.svelte,help tooltip
+basic.vibrance,Vibrance,鲜艳度,鮮豔度,バイブランス,활기,src/lib/develop/Basic.svelte,label
+basic.saturation,Saturation,饱和度,飽和度,彩度,채도,src/lib/develop/Basic.svelte,label
+colorGrading.title,Color Grading,颜色分级,色彩分級,カラーグレーディング,색상 그레이딩,src/lib/develop/ColorGrading.svelte,heading
+colorGrading.reset,Reset,重置,重設,リセット,재설정,src/lib/develop/ColorGrading.svelte,button
+colorGrading.mode.threeWay,3-way,三向,三向,3ウェイ,3방향,src/lib/develop/ColorGrading.svelte,button
+colorGrading.mode.shadows,Shadows,阴影,陰影,シャドウ,그림자,src/lib/develop/ColorGrading.svelte,button
+colorGrading.mode.midtones,Midtones,中间调,中間調,ミッドトーン,중간 톤,src/lib/develop/ColorGrading.svelte,button
+colorGrading.mode.highlights,Highlights,高光,高光,ハイライト,하이라이트,src/lib/develop/ColorGrading.svelte,button
+colorGrading.mode.global,Global,全局,全域,グローバル,전체,src/lib/develop/ColorGrading.svelte,button
+colorGrading.wheel.midtones,Midtones,中间调,中間調,ミッドトーン,중간 톤,src/lib/develop/ColorGrading.svelte,label
+colorGrading.wheel.shadows,Shadows,阴影,陰影,シャドウ,그림자,src/lib/develop/ColorGrading.svelte,label
+colorGrading.wheel.highlights,Highlights,高光,高光,ハイライト,하이라이트,src/lib/develop/ColorGrading.svelte,label
+colorGrading.wheel.global,Global,全局,全域,グローバル,전체,src/lib/develop/ColorGrading.svelte,label
+colorGrading.blending,Blending,混合,混合,ブレンディング,혼합,src/lib/develop/ColorGrading.svelte,label
+colorGrading.balance,Balance,平衡,平衡,バランス,균형,src/lib/develop/ColorGrading.svelte,label
+colorMixer.title,Color Mixer,颜色混合器,色彩混合器,カラーミキサー,색상 믹서,src/lib/develop/ColorMixer.svelte,heading
+colorMixer.reset,Reset,重置,重設,リセット,재설정,src/lib/develop/ColorMixer.svelte,button
+colorMixer.tab.mixer,Mixer,混合器,混合器,ミキサー,믹서,src/lib/develop/ColorMixer.svelte,button
+colorMixer.tab.point,Point Color,点颜色,點顏色,ポイントカラー,포인트 색상,src/lib/develop/ColorMixer.svelte,button
+colorMixer.adjust.hue,Hue,色相,色相,色相,색조,src/lib/develop/ColorMixer.svelte,button
+colorMixer.adjust.saturation,Saturation,饱和度,飽和度,彩度,채도,src/lib/develop/ColorMixer.svelte,button
+colorMixer.adjust.luminance,Luminance,明亮度,明亮度,輝度,휘도,src/lib/develop/ColorMixer.svelte,button
+colorMixer.adjust.all,All,全部,全部,すべて,전체,src/lib/develop/ColorMixer.svelte,button
+colorMixer.band.red,Red,红色,紅色,レッド,빨강,src/lib/develop/ColorMixer.svelte,label
+colorMixer.band.orange,Orange,橙色,橙色,オレンジ,주황,src/lib/develop/ColorMixer.svelte,label
+colorMixer.band.yellow,Yellow,黄色,黃色,イエロー,노랑,src/lib/develop/ColorMixer.svelte,label
+colorMixer.band.green,Green,绿色,綠色,グリーン,초록,src/lib/develop/ColorMixer.svelte,label
+colorMixer.band.aqua,Aqua,青色,青色,アクア,아쿠아,src/lib/develop/ColorMixer.svelte,label
+colorMixer.band.blue,Blue,蓝色,藍色,ブルー,파랑,src/lib/develop/ColorMixer.svelte,label
+colorMixer.band.purple,Purple,紫色,紫色,パープル,보라,src/lib/develop/ColorMixer.svelte,label
+colorMixer.band.magenta,Magenta,洋红色,洋紅色,マゼンタ,마젠타,src/lib/develop/ColorMixer.svelte,label
+colorMixer.point.hint,Use the Point Color dropper to add samples.,使用点颜色吸管添加样本。,使用點顏色滴管新增樣本。,ポイントカラースポイトを使ってサンプルを追加してください。,포인트 컬러 스포이트를 사용해 샘플을 추가하세요.,src/lib/develop/ColorMixer.svelte,hint
+colorMixer.point.hueShift,Hue Shift,色相偏移,色相偏移,色相シフト,색조 이동,src/lib/develop/ColorMixer.svelte,label
+colorMixer.point.satShift,Sat. Shift,饱和度偏移,飽和度偏移,彩度シフト,채도 이동,src/lib/develop/ColorMixer.svelte,label
+colorMixer.point.lumShift,Lum. Shift,明亮度偏移,明亮度偏移,輝度シフト,명도 이동,src/lib/develop/ColorMixer.svelte,label
+colorMixer.point.variance,Variance,扩散,擴散,分散,분산,src/lib/develop/ColorMixer.svelte,label
+colorMixer.point.range,Range,范围,範圍,範囲,범위,src/lib/develop/ColorMixer.svelte,label
+colorMixer.point.dropper,Pick color,拾取颜色,選取顏色,カラーを選択,색상 선택,src/lib/develop/ColorMixer.svelte,button
+colorMixer.point.delete,Remove sample,移除样本,移除樣本,サンプルを削除,샘플 제거,src/lib/develop/ColorMixer.svelte,button
+eraser.title,Eraser,橡皮擦,橡皮擦,消去ツール,지우개,src/lib/develop/EraserPanel.svelte,heading
+eraser.removeDustIr,Remove dust (IR),去除灰尘（红外）,移除灰塵（紅外線）,ほこりを除去（IR）,먼지 제거 (IR),src/lib/develop/EraserPanel.svelte,button
+eraser.on,On,开,開,オン,켜기,src/lib/develop/EraserPanel.svelte,label
+eraser.off,Off,关,關,オフ,끄기,src/lib/develop/EraserPanel.svelte,label
+eraser.sensitivity,Sensitivity,灵敏度,靈敏度,感度,감도,src/lib/develop/EraserPanel.svelte,label
+eraser.requiresIrChannel,Requires an infrared scan channel,需要红外扫描通道,需要紅外線掃描通道,赤外線スキャンチャンネルが必要です,적외선 스캔 채널이 필요합니다,src/lib/develop/EraserPanel.svelte,title
+eraser.soon,soon,即将推出,即將推出,近日公開,곧 출시,src/lib/develop/EraserPanel.svelte,label
+eraser.brushSize,Brush size,笔刷大小,筆刷大小,ブラシサイズ,브러시 크기,src/lib/develop/EraserPanel.svelte,label
+eraser.brushAi,AI fill (MI-GAN),AI 填充 (MI-GAN),AI 填充 (MI-GAN),AI 塗りつぶし (MI-GAN),AI 채우기 (MI-GAN),src/lib/develop/EraserPanel.svelte,label
+eraser.brushAiHelp,Paint over dust/scratches — your strokes show as a red mask instead of healing live. Click ‘AI erase’ to reconstruct them all at once with the MI-GAN model.,在灰尘/划痕上涂抹——笔迹会显示为红色蒙版而不是实时修复。点击“AI 擦除”用 MI-GAN 模型一次性重建。,在灰塵/刮痕上塗抹——筆跡會顯示為紅色遮罩而非即時修復。點擊「AI 擦除」用 MI-GAN 模型一次重建。,ほこりや傷の上をペイントすると、リアルタイム修復ではなく赤いマスクとして表示されます。「AI 消去」をクリックすると、MI-GAN モデルで一括再構成します。,먼지/흠집 위를 칠하면 실시간 복구 대신 빨간 마스크로 표시됩니다. 'AI 지우기'를 클릭하면 MI-GAN 모델로 한 번에 복원합니다.,src/lib/develop/EraserPanel.svelte,tooltip
+eraser.aiErase,AI erase,AI 擦除,AI 擦除,AI 消去,AI 지우기,src/lib/develop/EraserPanel.svelte,button
+eraser.aiErasing,Erasing…,擦除中…,擦除中…,消去中…,지우는 중…,src/lib/develop/EraserPanel.svelte,button
+eraser.aiMaskHint,Paint the spots to remove — they show as a red mask. Then click AI erase.,涂抹要去除的斑点——它们会显示为红色蒙版。然后点击 AI 擦除。,塗抹要移除的斑點——它們會顯示為紅色遮罩。然後點擊 AI 擦除。,除去したい箇所をペイントすると赤いマスクで表示されます。次に「AI 消去」をクリックしてください。,제거할 부분을 칠하면 빨간 마스크로 표시됩니다. 그런 다음 AI 지우기를 클릭하세요.,src/lib/develop/EraserPanel.svelte,hint
+eraser.reset,Reset,重置,重設,リセット,재설정,src/lib/develop/EraserPanel.svelte,button
+eraser.hint,Scroll to resize · click or drag to erase dust · ⌘Z to undo,滚动调整大小 · 点击或拖动以擦除灰尘 · ⌘Z 撤销,捲動調整大小 · 點擊或拖曳以擦除灰塵 · ⌘Z 復原,スクロールでサイズ変更 · クリックまたはドラッグでほこりを消去 · ⌘Z で元に戻す,스크롤로 크기 조절 · 클릭 또는 드래그로 먼지 지우기 · ⌘Z 실행 취소,src/lib/develop/EraserPanel.svelte,hint
+eraser.autoTitle,AI Dust & Hair Removal,AI 灰尘与毛发去除,AI 灰塵與毛髮移除,AI ほこり・毛髪除去,AI 먼지 & 머리카락 제거,src/lib/develop/EraserPanel.svelte,heading
+eraser.autoSensitivityHelp,Higher sensitivity flags more (and smaller) spots as defects. Lower it if real detail is being removed.,灵敏度越高，标记的瑕疵越多（也越小）。如果真实细节被去除，请调低。,靈敏度越高，標記的瑕疵越多（也越小）。如果真實細節被移除，請調低。,感度を高くするほど、より多くの（より小さな）スポットが欠陥として検出されます。本来の細部まで削除される場合は感度を下げてください。,감도가 높을수록 더 많은 (더 작은) 점을 결함으로 감지합니다. 실제 디테일이 제거되면 감도를 낮추세요.,src/lib/develop/EraserPanel.svelte,tooltip
+eraser.autoChecking,Checking AI models…,正在检查 AI 模型…,正在檢查 AI 模型…,AI モデルを確認中…,AI 모델 확인 중…,src/lib/develop/EraserPanel.svelte,text
+eraser.autoDownloadPrompt,Download the local AI models (~{mb} MB) to auto-detect and remove dust & hairs on-device.,下载本地 AI 模型（约 {mb} MB），在设备端自动检测并去除灰尘和毛发。,下載本機 AI 模型（約 {mb} MB），在裝置端自動偵測並移除灰塵與毛髮。,ローカル AI モデル（約 {mb} MB）をダウンロードして、デバイス上でほこりや毛髪を自動検出・除去します。,로컬 AI 모델(약 {mb} MB)을 다운로드하면 기기에서 먼지와 머리카락을 자동으로 감지하고 제거합니다.,src/lib/develop/EraserPanel.svelte,text
+eraser.autoDownload,Download AI models,下载 AI 模型,下載 AI 模型,AI モデルをダウンロード,AI 모델 다운로드,src/lib/develop/EraserPanel.svelte,button
+eraser.autoButton,Detect & remove,检测并去除,偵測並移除,検出して除去,감지 및 제거,src/lib/develop/EraserPanel.svelte,button
+eraser.autoHint,Runs local AI models on your device (no upload). Use the sensitivity slider if it removes too much or too little.,在本地设备上运行 AI 模型（不上传）。如果去除过多或过少，请使用灵敏度滑块。,在本機裝置上執行 AI 模型（不上傳）。如果移除過多或過少，請使用靈敏度滑桿。,デバイス上のローカル AI モデルを使用します（アップロード不要）。除去が多すぎる・少なすぎる場合は感度スライダーをご利用ください。,기기의 로컬 AI 모델을 실행합니다(업로드 없음). 너무 많거나 적게 제거되면 감도 슬라이더를 사용하세요.,src/lib/develop/EraserPanel.svelte,hint
+eraser.showSpots,Show heal spots,显示修复点,顯示修復點,修復スポットを表示,복구 스팟 표시,src/lib/develop/EraserPanel.svelte,label
+curve.editorAriaLabel,Tone curve editor,色调曲线编辑器,色調曲線編輯器,トーンカーブエディター,톤 커브 편집기,src/lib/develop/CurveEditor.svelte,aria-label
+curve.pointAriaLabel,curve point,曲线点,曲線點,カーブポイント,커브 포인트,src/lib/develop/CurveEditor.svelte,aria-label
+curve.histLabel,Histogram,直方图,直方圖,ヒストグラム,히스토그램,src/lib/develop/CurveEditor.svelte,toggle label
+curve.histLive,Live,实时,即時,ライブ,실시간,src/lib/develop/CurveEditor.svelte,toggle state
+curve.histFrozen,Frozen,冻结,凍結,固定,고정,src/lib/develop/CurveEditor.svelte,toggle state
+curve.histOff,Off,关闭,關閉,オフ,끄기,src/lib/develop/CurveEditor.svelte,toggle state
+curve.histToggleAria,"Cycle background histogram: live, frozen, off",切换背景直方图：实时、冻结、关闭,切換背景直方圖：即時、凍結、關閉,背景ヒストグラムを切り替え：ライブ、固定、オフ,"배경 히스토그램 전환: 실시간, 고정, 끄기",src/lib/develop/CurveEditor.svelte,aria-label
+curve.readIn,in,输入,輸入,入力,입력,src/lib/develop/CurveEditor.svelte,readout label
+curve.readOut,out,输出,輸出,出力,출력,src/lib/develop/CurveEditor.svelte,readout label
+curve.title,Tone Curve,色调曲线,色調曲線,トーンカーブ,톤 커브,src/lib/develop/TonalCurve.svelte,heading
+curve.reset,Reset,重置,重設,リセット,재설정,src/lib/develop/TonalCurve.svelte,button
+curve.adjust,Adjust,调整,調整,調整,조정,src/lib/develop/TonalCurve.svelte,label
+curve.master.title,Master,主,主,マスター,마스터,src/lib/develop/TonalCurve.svelte,title
+curve.master.ariaLabel,Master curve,主曲线,主曲線,マスターカーブ,마스터 커브,src/lib/develop/TonalCurve.svelte,aria-label
+curve.red.title,Red,红,紅,レッド,빨강,src/lib/develop/TonalCurve.svelte,title
+curve.red.ariaLabel,Red curve,红色曲线,紅色曲線,レッドカーブ,빨강 커브,src/lib/develop/TonalCurve.svelte,aria-label
+curve.green.title,Green,绿,綠,グリーン,초록,src/lib/develop/TonalCurve.svelte,title
+curve.green.ariaLabel,Green curve,绿色曲线,綠色曲線,グリーンカーブ,초록 커브,src/lib/develop/TonalCurve.svelte,aria-label
+curve.blue.title,Blue,蓝,藍,ブルー,파랑,src/lib/develop/TonalCurve.svelte,title
+curve.blue.ariaLabel,Blue curve,蓝色曲线,藍色曲線,ブルーカーブ,파랑 커브,src/lib/develop/TonalCurve.svelte,aria-label
+curve.region,Region,区域,區域,領域,영역,src/lib/develop/TonalCurve.svelte,label
+curve.highlights,Highlights,高光,高光,ハイライト,하이라이트,src/lib/develop/TonalCurve.svelte,label
+curve.lights,Lights,亮部,亮部,ライト,밝은 영역,src/lib/develop/TonalCurve.svelte,label
+curve.darks,Darks,暗部,暗部,ダーク,어두운 영역,src/lib/develop/TonalCurve.svelte,label
+curve.shadows,Shadows,阴影,陰影,シャドウ,그림자,src/lib/develop/TonalCurve.svelte,label
+colorWheel.hueSatAriaLabel,"{label} hue and saturation: hue {hue}, saturation {sat}",{label} 色相与饱和度：色相 {hue}，饱和度 {sat},{label} 色相與飽和度：色相 {hue}，飽和度 {sat},{label} 色相と彩度：色相 {hue}、彩度 {sat},"{label} 색조 및 채도: 색조 {hue}, 채도 {sat}",src/lib/develop/ColorWheel.svelte,aria-label
+colorWheel.luminanceAriaLabel,{label} luminance,{label} 明度,{label} 明度,{label} 輝度,{label} 밝기,src/lib/develop/ColorWheel.svelte,aria-label
+crop.title,Crop,裁剪,裁切,クロップ,자르기,src/lib/crop/CropPanel.svelte,heading
+crop.aspectRatio,Aspect ratio,长宽比,長寬比,アスペクト比,종횡비,src/lib/crop/CropPanel.svelte,label
+crop.custom,Custom,自定义,自訂,カスタム,사용자 지정,src/lib/crop/CropPanel.svelte,option
+crop.orientation,Orientation,方向,方向,向き,방향,src/lib/crop/CropPanel.svelte,label
+crop.toggleOrientation,Toggle orientation (X),切换方向 (X),切換方向 (X),向きを切り替え (X),방향 전환 (X),src/lib/crop/CropPanel.svelte,title
+crop.orientationAriaLabel,Orientation,方向,方向,向き,방향,src/lib/crop/CropPanel.svelte,aria-label
+crop.transform,Transform,变换,變形,変形,변환,src/lib/crop/CropPanel.svelte,label
+crop.rotateLeft,Rotate left (⌘/Ctrl + [),向左旋转 (⌘/Ctrl + [),向左旋轉 (⌘/Ctrl + [),左に回転 (⌘/Ctrl + [),왼쪽으로 회전 (⌘/Ctrl + [),src/lib/crop/CropPanel.svelte,title
+crop.rotateRight,Rotate right (⌘/Ctrl + ]),向右旋转 (⌘/Ctrl + ]),向右旋轉 (⌘/Ctrl + ]),右に回転 (⌘/Ctrl + ]),오른쪽으로 회전 (⌘/Ctrl + ]),src/lib/crop/CropPanel.svelte,title
+crop.flipHorizontal,Flip horizontal,水平翻转,水平翻轉,水平反転,수평 뒤집기,src/lib/crop/CropPanel.svelte,title
+crop.flipVertical,Flip vertical,垂直翻转,垂直翻轉,垂直反転,수직 뒤집기,src/lib/crop/CropPanel.svelte,title
+crop.straighten,Straighten,拉直,拉直,水平補正,수평 맞추기,src/lib/crop/CropPanel.svelte,label
+crop.reset,Reset,重置,重設,リセット,재설정,src/lib/crop/CropPanel.svelte,button
+crop.hint,Enter to apply · Esc to discard · Shift locks the ratio,回车应用 · Esc 取消 · Shift 锁定比例,Enter 套用 · Esc 取消 · Shift 鎖定比例,Enter で適用 · Esc で破棄 · Shift で比率を固定,Enter로 적용 · Esc로 취소 · Shift로 비율 고정,src/lib/crop/CropPanel.svelte,hint
+crop.aspect.original,Original,原始,原始,オリジナル,원본,src/lib/crop/presets.ts,option
+crop.aspectGroup.135,135,135,135,135,135,src/lib/crop/presets.ts,optgroup
+crop.aspectGroup.120,120,120,120,120,120,src/lib/crop/presets.ts,optgroup
+crop.aspectGroup.large,Large format,大画幅,大片幅,大判,대형 포맷,src/lib/crop/presets.ts,optgroup
+crop.aspectGroup.screen,Screen · Print,屏幕 · 打印,螢幕 · 列印,スクリーン · 印刷,화면 · 인쇄,src/lib/crop/presets.ts,optgroup
+crop.aspect.36x24,36 × 24  (3:2),36 × 24  (3:2),36 × 24  (3:2),36 × 24  (3:2),36 × 24  (3:2),src/lib/crop/presets.ts,option
+crop.aspect.6x4_5,6 × 4.5  (4:3),6 × 4.5  (4:3),6 × 4.5  (4:3),6 × 4.5  (4:3),6 × 4.5  (4:3),src/lib/crop/presets.ts,option
+crop.aspect.6x6,6 × 6  (1:1),6 × 6  (1:1),6 × 6  (1:1),6 × 6  (1:1),6 × 6  (1:1),src/lib/crop/presets.ts,option
+crop.aspect.6x7,6 × 7  (7:6),6 × 7  (7:6),6 × 7  (7:6),6 × 7  (7:6),6 × 7  (7:6),src/lib/crop/presets.ts,option
+crop.aspect.6x8,6 × 8  (4:3),6 × 8  (4:3),6 × 8  (4:3),6 × 8  (4:3),6 × 8  (4:3),src/lib/crop/presets.ts,option
+crop.aspect.6x9,6 × 9  (3:2),6 × 9  (3:2),6 × 9  (3:2),6 × 9  (3:2),6 × 9  (3:2),src/lib/crop/presets.ts,option
+crop.aspect.4x5,4 × 5,4 × 5,4 × 5,4 × 5,4 × 5,src/lib/crop/presets.ts,option
+crop.aspect.5x7,5 × 7,5 × 7,5 × 7,5 × 7,5 × 7,src/lib/crop/presets.ts,option
+crop.aspect.8x10,8 × 10,8 × 10,8 × 10,8 × 10,8 × 10,src/lib/crop/presets.ts,option
+crop.aspect.1x1,1 × 1,1 × 1,1 × 1,1 × 1,1 × 1,src/lib/crop/presets.ts,option
+crop.aspect.16x9,16 × 9,16 × 9,16 × 9,16 × 9,16 × 9,src/lib/crop/presets.ts,option
+crop.aspect.16x10,16 × 10,16 × 10,16 × 10,16 × 10,16 × 10,src/lib/crop/presets.ts,option
+crop.aspect.8_5x11,8.5 × 11,8.5 × 11,8.5 × 11,8.5 × 11,8.5 × 11,src/lib/crop/presets.ts,option
+tether.start,Tether,联机拍摄,連線拍攝,テザー撮影,테더,src/lib/tether/TetherPanel.svelte,button
+tether.stop,Stop tethering,停止联机拍摄,停止連線拍攝,テザー停止,테더링 중지,src/lib/tether/TetherPanel.svelte,button
+tether.watching,Watching {dir},正在监视 {dir},正在監看 {dir},{dir} を監視中,{dir} 감시 중,src/lib/tether/TetherPanel.svelte,status
+tether.hint,Point your camera's tether app at this folder.,将相机的联机拍摄软件指向此文件夹。,將相機的連線拍攝軟體指向此資料夾。,カメラのテザーアプリをこのフォルダに向けてください。,카메라 테더 앱을 이 폴더로 지정하세요.,src/lib/tether/TetherPanel.svelte,hint
+tether.autoAdvance,Jump to newest shot,跳到最新拍摄,跳至最新拍攝,最新ショットへジャンプ,최신 촬영으로 이동,src/lib/tether/TetherPanel.svelte,label
+tether.lastOk,Last: {name},最近：{name},最近：{name},最終：{name},마지막: {name},src/lib/tether/TetherPanel.svelte,status
+tether.lastErr,Failed: {name},失败：{name},失敗：{name},失敗：{name},실패: {name},src/lib/tether/TetherPanel.svelte,status
+toolbar.enhance,AI Enhance,AI 增强,AI 增強,AI 強調,AI 향상,src/lib/develop/Toolbar.svelte,title
+settings.ai.heading,OpenAI API key,OpenAI API 密钥,OpenAI API 金鑰,OpenAI API キー,OpenAI API 키,src/lib/settings/SettingsMenu.svelte,link
+settings.ai.keyPlaceholder,OpenAI API key,OpenAI API 密钥,OpenAI API 金鑰,OpenAI API キー,OpenAI API 키,src/lib/settings/SettingsMenu.svelte,placeholder
+settings.ai.hint,Stored locally. Used only for the AI Enhance tool.,仅本地保存，仅用于 AI 增强工具。,僅本機儲存，僅用於 AI 增強工具。,ローカルに保存されます。AI 強調ツールにのみ使用されます。,로컬에 저장됩니다. AI 향상 도구에만 사용됩니다.,src/lib/settings/SettingsMenu.svelte,hint
+aiEnhance.title,AI Enhance,AI 增强,AI 增強,AI 強調,AI 향상,src/lib/develop/AiEnhancePanel.svelte,heading
+aiEnhance.experimental,experimental,实验性,實驗性,試験的,실험적,src/lib/develop/AiEnhancePanel.svelte,label
+aiEnhance.button,Enhance,增强,增強,強調,향상,src/lib/develop/AiEnhancePanel.svelte,button
+aiEnhance.working,Enhancing…,增强中…,增強中…,強調中…,향상 중…,src/lib/develop/AiEnhancePanel.svelte,button
+aiEnhance.noKey,Add your OpenAI API key in Settings.,请在设置中添加 OpenAI API 密钥。,請在設定中新增 OpenAI API 金鑰。,設定で OpenAI API キーを追加してください。,설정에서 OpenAI API 키를 추가하세요.,src/lib/develop/AiEnhancePanel.svelte,text
+aiEnhance.noImage,No preview to enhance yet.,暂无可增强的预览。,暫無可增強的預覽。,強調できるプレビューがありません。,향상할 미리보기가 없습니다.,src/lib/develop/AiEnhancePanel.svelte,text
+aiEnhance.holdBefore,Hold to compare original,按住对比原图,按住比較原圖,押し続けてオリジナルと比較,길게 눌러 원본 비교,src/lib/develop/AiEnhancePanel.svelte,button
+aiEnhance.enlarge,Click to enlarge,点击放大,點擊放大,クリックで拡大,클릭하여 확대,src/lib/develop/AiEnhancePanel.svelte,title
+aiEnhance.hint,"Re-imagines the preview to reduce noise, dust and scratches. Result is a creative interpretation, not a faithful restoration, and is preview-only.",重新生成预览以减少噪点、灰尘和划痕。结果为创意性再生成，并非忠实修复，且仅用于预览。,重新生成預覽以減少雜訊、灰塵和刮痕。結果為創意性再生成，並非忠實修復，且僅用於預覽。,プレビューを再生成してノイズ・ほこり・傷を軽減します。結果はクリエイティブな解釈であり、忠実な復元ではなく、プレビュー専用です。,"프리뷰를 재생성하여 노이즈, 먼지, 스크래치를 줄입니다. 결과는 창의적인 해석이며 충실한 복원이 아닌 미리보기 전용입니다.",src/lib/develop/AiEnhancePanel.svelte,hint
+aiEnhance.save,Download enhanced image…,下载增强后的图像…,下載增強後的影像…,強調済み画像をダウンロード…,향상된 이미지 다운로드…,src/lib/develop/AiEnhancePanel.svelte,button
+aiEnhance.saving,Saving…,保存中…,儲存中…,保存中…,저장 중…,src/lib/develop/AiEnhancePanel.svelte,button
+colorMatch.title,Tone Matching,色调匹配,色調比對,トーンマッチング,톤 매칭,src/lib/develop/AiEnhancePanel.svelte,heading
+colorMatch.import,Import reference image,导入参考图像,匯入參考影像,参照画像を読み込む,참조 이미지 가져오기,src/lib/develop/AiEnhancePanel.svelte,button
+colorMatch.match,Match,匹配,比對,マッチ,매칭,src/lib/develop/AiEnhancePanel.svelte,button
+colorMatch.matching,Matching…,匹配中…,比對中…,マッチ中…,매칭 중…,src/lib/develop/AiEnhancePanel.svelte,button
+colorMatch.strength,Strength,强度,強度,強度,강도,src/lib/develop/AiEnhancePanel.svelte,label
+colorMatch.reset,Reset match,重置匹配,重設比對,マッチをリセット,매칭 초기화,src/lib/develop/AiEnhancePanel.svelte,button
+colorMatch.changeRef,Change reference,更换参考,更換參考,参照を変更,참조 변경,src/lib/develop/AiEnhancePanel.svelte,title
+colorMatch.noRef,Import a reference image first.,请先导入参考图像。,請先匯入參考影像。,先に参照画像を読み込んでください。,먼저 참조 이미지를 가져오세요.,src/lib/develop/AiEnhancePanel.svelte,text
+colorMatch.hint,"Matches white balance, contrast and saturation to the reference's color toning. Drag Strength to taste. Fully local — fine-tune any slider afterward, or undo (Ctrl+Z) to revert.",将白平衡、对比度和饱和度匹配到参考图像的色调。拖动“强度”调整程度。完全本地处理——之后可微调任意滑块，或撤销（Ctrl+Z）还原。,將白平衡、對比度和飽和度比對至參考影像的色調。拖曳「強度」調整程度。完全本機處理——之後可微調任意滑桿，或復原（Ctrl+Z）還原。,ホワイトバランス・コントラスト・彩度を参照画像のカラートーンに合わせます。「強度」をドラッグして調整してください。完全ローカル処理——その後スライダーで微調整するか、元に戻す（Ctrl+Z）で取り消せます。,"화이트 밸런스, 대비, 채도를 참조 이미지의 색조에 맞춥니다. 강도를 드래그하여 조절하세요. 완전 로컬 처리 — 이후 슬라이더로 미세 조정하거나 실행 취소(Ctrl+Z)로 되돌릴 수 있습니다.",src/lib/develop/AiEnhancePanel.svelte,hint
+toolbar.upscale,Upscale,放大,放大,アップスケール,업스케일,src/lib/develop/Toolbar.svelte,title
+upscale.title,Upscale,放大,放大,アップスケール,업스케일,src/lib/develop/UpscalePanel.svelte,heading
+upscale.local,local,本地,本機,ローカル,로컬,src/lib/develop/UpscalePanel.svelte,label
+upscale.checking,Checking upscaler…,正在检查放大器…,正在檢查放大工具…,アップスケーラーを確認中…,업스케일러 확인 중…,src/lib/develop/UpscalePanel.svelte,text
+upscale.downloadPrompt,Download the local upscaler (~{mb} MB) to enable on-device super-resolution.,下载本地放大器（约 {mb} MB）以启用设备端超分辨率。,下載本機放大工具（約 {mb} MB）以啟用裝置端超解析度。,ローカルアップスケーラー（約 {mb} MB）をダウンロードして、デバイス上の超解像を有効にします。,로컬 업스케일러(약 {mb} MB)를 다운로드하여 기기 내 초해상도를 활성화하세요.,src/lib/develop/UpscalePanel.svelte,text
+upscale.download,Download upscaler,下载放大器,下載放大工具,アップスケーラーをダウンロード,업스케일러 다운로드,src/lib/develop/UpscalePanel.svelte,button
+upscale.button,Upscale,放大,放大,アップスケール,업스케일,src/lib/develop/UpscalePanel.svelte,button
+upscale.working,Upscaling…,放大中…,放大中…,アップスケール中…,업스케일 중…,src/lib/develop/UpscalePanel.svelte,button
+upscale.already8k,"This image is already 8K or larger on its longest side, so upscaling won't add detail.",该图像最长边已达到或超过 8K，放大不会增加细节。,該影像最長邊已達到或超過 8K，放大不會增加細節。,この画像は長辺がすでに 8K 以上のため、アップスケールしても細部は増えません。,이 이미지는 긴 쪽이 이미 8K 이상이므로 업스케일해도 디테일이 추가되지 않습니다.,src/lib/develop/UpscalePanel.svelte,text
+upscale.save,Save upscaled image…,保存放大后的图像…,儲存放大後的影像…,アップスケール済み画像を保存…,업스케일된 이미지 저장…,src/lib/develop/UpscalePanel.svelte,button
+upscale.hint,Runs a local AI model on your device (no upload). Output is capped at 8K on the longest side; best results come from smaller sources.,在本地设备上运行 AI 模型（不上传）。输出最长边上限为 8K；较小的原图效果最佳。,在本機裝置上執行 AI 模型（不上傳）。輸出最長邊上限為 8K；較小的原圖效果最佳。,デバイス上でローカル AI モデルを実行します（アップロードなし）。出力は長辺 8K まで。小さい素材ほど良い結果が得られます。,"기기에서 로컬 AI 모델을 실행합니다(업로드 없음). 출력은 긴 쪽 최대 8K이며, 작은 원본일수록 좋은 결과를 얻습니다.",src/lib/develop/UpscalePanel.svelte,hint
+upscale.res4k,4K,4K,4K,4K,4K,src/lib/develop/UpscaleControls.svelte,button
+upscale.res8k,8K,8K,8K,8K,8K,src/lib/develop/UpscaleControls.svelte,button
+upscale.enhancedLabel,Upscale this result,放大此结果,放大此結果,この結果をアップスケール,이 결과 업스케일,src/lib/develop/AiEnhancePanel.svelte,label
+upscale.saving,Saving…,保存中…,儲存中…,保存中…,저장 중…,src/lib/develop/UpscaleControls.svelte,button
+telemetry.title,Help improve OpenEnlarge?,帮助改进 OpenEnlarge？,幫助改進 OpenEnlarge？,OpenEnlarge の改善に協力しますか？,OpenEnlarge 개선에 참여하시겠습니까?,src/lib/settings/TelemetryPrompt.svelte,title
+telemetry.body,"Share anonymous usage data — no images, no personal information, just which features are used and your app version. You can change this anytime in Settings.",分享匿名使用数据——不含图像、不含个人信息，仅包括所用功能和应用版本。你可以随时在设置中更改。,分享匿名使用資料——不含影像、不含個人資訊，僅包括所用功能和應用程式版本。你可以隨時在設定中變更。,匿名の使用状況データを共有します——画像や個人情報は含まず、使用機能とアプリバージョンのみです。設定でいつでも変更できます。,익명 사용 데이터를 공유합니다 — 이미지나 개인 정보 없이 사용된 기능과 앱 버전만 포함됩니다. 언제든지 설정에서 변경할 수 있습니다.,src/lib/settings/TelemetryPrompt.svelte,body
+telemetry.learnMore,What we collect,我们收集的内容,我們收集的內容,収集内容を確認,수집 항목 보기,src/lib/settings/TelemetryPrompt.svelte,link
+telemetry.decline,No thanks,不用了,不用了,いいえ,괜찮습니다,src/lib/settings/TelemetryPrompt.svelte,button
+telemetry.accept,"Yes, share",好的，分享,好的，分享,はい、共有する,"네, 공유합니다",src/lib/settings/TelemetryPrompt.svelte,button
+settings.telemetry.heading,Anonymous analytics,匿名分析,匿名分析,匿名分析,익명 분석,src/lib/settings/SettingsMenu.svelte,heading
+settings.telemetry.on,On,开启,開啟,オン,켜기,src/lib/settings/SettingsMenu.svelte,button
+settings.telemetry.off,Off,关闭,關閉,オフ,끄기,src/lib/settings/SettingsMenu.svelte,button
+settings.telemetry.hint,Anonymous usage data only. No images or personal information are ever sent.,仅匿名使用数据。绝不发送任何图像或个人信息。,僅匿名使用資料。絕不傳送任何影像或個人資訊。,匿名の使用状況データのみです。画像や個人情報は送信されません。,익명 사용 데이터만 포함됩니다. 이미지나 개인 정보는 전송되지 않습니다.,src/lib/settings/SettingsMenu.svelte,hint
+settings.telemetry.requestAccess,Request dashboard access,申请仪表板访问权限,申請儀表板存取權限,ダッシュボードアクセスを申請,대시보드 접근 권한 요청,src/lib/settings/SettingsMenu.svelte,link
+basic.negative,Neg,负,負,ネガ,네거,src/lib/develop/Basic.svelte,option
+basic.positive,Pos,正,正,ポジ,포지,src/lib/develop/Basic.svelte,option
+eraser.zoomArea,Zoom to area,缩放到区域,縮放至區域,エリアにズーム,영역으로 확대,src/lib/develop/EraserPanel.svelte,button
+eraser.resetView,Reset view,重置视图,重設檢視,ビューをリセット,보기 초기화,src/lib/develop/EraserPanel.svelte,button
+eraser.marqueeHint,Drag a rectangle on the image to zoom in.,在图像上拖动矩形以放大。,在影像上拖曳矩形以放大。,画像上で矩形をドラッグして拡大します。,이미지 위에서 사각형을 드래그하여 확대하세요.,src/lib/develop/EraserPanel.svelte,hint
+histogram.clipHigh,Highlight clipping (right-click: 253),高光裁切（右键：253）,高光截斷（右鍵：253）,ハイライトクリッピング（右クリック：253）,하이라이트 클리핑 (우클릭: 253),src/lib/viewport/Histogram.svelte,tooltip
+histogram.clipLow,Shadow clipping (right-click: 2),暗部裁切（右键：2）,暗部截斷（右鍵：2）,シャドウクリッピング（右クリック：2）,섀도 클리핑 (우클릭: 2),src/lib/viewport/Histogram.svelte,tooltip
+histogram.clipStrictHint,Strict 253/2 threshold,严格 253/2 阈值,嚴格 253/2 閾值,厳密な 253/2 しきい値,엄격한 253/2 임계값,src/lib/viewport/Histogram.svelte,tooltip
+roll.adjust.heading,Roll look,整卷色调,整卷色調,ロールの色調,롤 톤,src/lib/roll/RollAdjust.svelte,heading
+roll.adjust.whitePoint,White point,白点,白點,ホワイトポイント,화이트 포인트,src/lib/roll/RollAdjust.svelte,label
+toast.developFailed,Develop failed for {count} image(s) — {detail},显影失败 {count} 张 — {detail},顯影失敗 {count} 張 — {detail},{count} 枚の現像に失敗しました — {detail},{count}개 이미지 현상 실패 — {detail},src/lib/workflow.ts,toast
+toast.undo,Undo: {what},撤销：{what},復原：{what},元に戻す：{what},실행 취소: {what},src/lib/develop/historyStore.ts,toast
+toast.redo,Redo: {what},重做：{what},重做：{what},やり直し：{what},다시 실행: {what},src/lib/develop/historyStore.ts,toast
+label.dustRemoval,Dust removal,去除污点,移除污點,ほこり除去,먼지 제거,src/lib/develop/history.ts,undo label
+label.metadata,Metadata,元数据,中繼資料,メタデータ,메타데이터,src/lib/develop/history.ts,undo label
+label.positive,Positive,正片,正片,ポジ,포지티브,src/lib/develop/history.ts,undo label
+label.multiple,Multiple adjustments,多项调整,多項調整,複数の調整,여러 조정,src/lib/develop/history.ts,undo label
+label.edit,Edit,编辑,編輯,編集,편집,src/lib/develop/history.ts,undo label
+basic.off,Off,关闭,關閉,オフ,끄기,src/lib/develop/Basic.svelte,label
+export.overwriteTitle,File already exists,文件已存在,檔案已存在,ファイルが既に存在します,파일이 이미 존재합니다,src/lib/export/ExportModal.svelte,heading
+export.overwriteBody,“{name}” already exists in this folder.,“{name}” 已存在于此文件夹中。,「{name}」已存在於此資料夾中。,「{name}」はこのフォルダに既に存在します。,“{name}”이(가) 이 폴더에 이미 있습니다.,src/lib/export/ExportModal.svelte,paragraph
+export.overwriteProgress,Conflict {index} of {count},冲突 {index} / {count},衝突 {index} / {count},競合 {index} / {count},충돌 {index} / {count},src/lib/export/ExportModal.svelte,label
+export.overwriteApplyAll,Apply to all remaining,应用于其余所有冲突,套用至其餘所有衝突,残りすべてに適用,나머지 모두에 적용,src/lib/export/ExportModal.svelte,checkbox
+export.overwriteOverwrite,Overwrite,覆盖,覆寫,上書き,덮어쓰기,src/lib/export/ExportModal.svelte,button
+export.overwriteSkip,Skip,跳过,略過,スキップ,건너뛰기,src/lib/export/ExportModal.svelte,button
+export.overwriteKeepBoth,Keep both,两者都保留,兩者都保留,両方保持,모두 유지,src/lib/export/ExportModal.svelte,button
+export.overwriteCancel,Cancel,取消,取消,キャンセル,취소,src/lib/export/ExportModal.svelte,button
+export.summarySkipped,{done} of {total} exported · {skipped} skipped,已导出 {done} / {total} · 跳过 {skipped},已匯出 {done} / {total} · 略過 {skipped},{total} 中 {done} 件を書き出し完了 · {skipped} 件スキップ,{total}개 중 {done}개 내보내기 완료 · {skipped}개 건너뜀,src/lib/export/ExportModal.svelte,status
+settings.storage.heading,Storage,存储,儲存空間,ストレージ,저장소,src/lib/settings/SettingsMenu.svelte,heading
+settings.storage.cacheLabel,Image cache,图像缓存,影像快取,画像キャッシュ,이미지 캐시,src/lib/settings/SettingsMenu.svelte,label
+settings.storage.clearCache,Clear image cache,清除图像缓存,清除影像快取,画像キャッシュをクリア,이미지 캐시 지우기,src/lib/settings/SettingsMenu.svelte,button
+settings.storage.clearCacheHint,Frees disk space. Images re-develop the next time you open them.,释放磁盘空间。下次打开照片时会重新显影。,釋放磁碟空間。下次開啟照片時會重新顯影。,ディスク容量を解放します。次回開いたときに画像を再現像します。,디스크 공간을 확보합니다. 다음에 열 때 이미지를 다시 현상합니다.,src/lib/settings/SettingsMenu.svelte,hint
+settings.storage.clearCacheConfirm,Clear the image cache? This frees disk space; your photos and edits are kept and re-develop the next time you open them.,清除图像缓存？这会释放磁盘空间；你的照片和编辑会保留，下次打开时重新显影。,清除影像快取？這會釋放磁碟空間；你的照片和編輯會保留，下次開啟時重新顯影。,画像キャッシュをクリアしますか？ディスク容量が解放されます。写真と編集内容は保持され、次回開いたときに再現像されます。,이미지 캐시를 지우시겠습니까? 디스크 공간이 확보됩니다. 사진과 편집 내용은 유지되며 다음에 열 때 다시 현상됩니다.,src/lib/settings/SettingsMenu.svelte,dialog
+settings.storage.reset,Reset all data,重置所有数据,重設所有資料,すべてのデータをリセット,모든 데이터 초기화,src/lib/settings/SettingsMenu.svelte,button
+settings.storage.resetHint,"Removes all rolls, folders, and edits. Your preferences are kept.",移除所有胶卷、文件夹和编辑。你的偏好设置会保留。,移除所有底片卷、資料夾和編輯。你的偏好設定會保留。,すべてのロール・フォルダ・編集を削除します。設定は保持されます。,"모든 롤, 폴더, 편집을 삭제합니다. 환경설정은 유지됩니다.",src/lib/settings/SettingsMenu.svelte,hint
+settings.storage.resetConfirm,"Reset all data? This permanently removes every roll, folder, edit, and the image cache. Your preferences (language, API key, shortcuts) are kept. The app will restart.",重置所有数据？这会永久移除所有胶卷、文件夹、编辑和图像缓存。你的偏好设置（语言、API 密钥、快捷键）会保留。应用将重启。,重設所有資料？這會永久移除所有底片卷、資料夾、編輯和影像快取。你的偏好設定（語言、API 金鑰、快速鍵）會保留。應用程式將重新啟動。,すべてのデータをリセットしますか？すべてのロール・フォルダ・編集・画像キャッシュが完全に削除されます。設定（言語・API キー・ショートカット）は保持されます。アプリが再起動します。,"모든 데이터를 초기화하시겠습니까? 모든 롤, 폴더, 편집, 이미지 캐시가 영구 삭제됩니다. 환경설정(언어, API 키, 단축키)은 유지됩니다. 앱이 재시작됩니다.",src/lib/settings/SettingsMenu.svelte,dialog
+toast.frameTrimmed,"Film frame detected, auto-cropping",检测到画幅，自动裁切,偵測到底片框，自動裁切,フレームを検出、自動でトリミングしました,"필름 프레임 감지됨, 자동으로 자르기",src/lib/workflow.ts,toast
+settings.debug.heading,Debug mode,调试模式,偵錯模式,デバッグモード,디버그 모드,src/lib/settings/SettingsMenu.svelte,heading
+settings.debug.on,On,开启,開啟,オン,켜기,src/lib/settings/SettingsMenu.svelte,button
+settings.debug.off,Off,关闭,關閉,オフ,끄기,src/lib/settings/SettingsMenu.svelte,button
+settings.debug.hint,Records logs and performance timings to a file you can export to help diagnose problems. Restart and reproduce the issue to also capture startup timing.,将日志和性能计时记录到可导出的文件中以帮助诊断问题。重启并复现问题还可捕获启动计时。,將記錄與效能計時記錄到可匯出的檔案中以協助診斷問題。重新啟動並重現問題還可擷取啟動計時。,問題の診断に役立つログとパフォーマンス計測をエクスポート可能なファイルに記録します。起動時の計測も取得するには、再起動して問題を再現してください。,문제 진단에 도움이 되도록 로그와 성능 측정을 내보낼 수 있는 파일에 기록합니다. 시작 시간도 캡처하려면 앱을 다시 시작하고 문제를 재현하세요.,src/lib/settings/SettingsMenu.svelte,hint
+settings.debug.clearLogConfirm,Turn off debug mode and clear the existing log file?,关闭调试模式并清除现有日志文件吗？,關閉偵錯模式並清除現有記錄檔嗎？,デバッグモードをオフにして既存のログファイルを消去しますか？,디버그 모드를 끄고 기존 로그 파일을 지우시겠습니까?,src/lib/settings/SettingsMenu.svelte,confirm
+app.debug.exportAriaLabel,Export debug log,导出调试日志,匯出偵錯記錄,デバッグログをエクスポート,디버그 로그 내보내기,src/routes/+page.svelte,aria-label
+app.debug.exported,Debug log exported,已导出调试日志,已匯出偵錯記錄,デバッグログをエクスポートしました,디버그 로그를 내보냈습니다,src/routes/+page.svelte,toast
+app.debug.exportFailed,Could not export debug log,无法导出调试日志,無法匯出偵錯記錄,デバッグログをエクスポートできませんでした,디버그 로그를 내보낼 수 없습니다,src/routes/+page.svelte,toast

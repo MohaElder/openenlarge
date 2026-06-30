@@ -29,7 +29,10 @@ def main():
     rows = list(reader)
     locales = locale_columns(reader.fieldnames)
     dicts = {lc: {r["key"]: r[lc] for r in rows} for lc in locales}
-    body = "".join(f"  {lc}: {{\n{emit(dicts[lc])}\n  }},\n" for lc in locales)
+    body = "".join(
+        f"  {json.dumps(lc, ensure_ascii=False)}: {{\n{emit(dicts[lc])}\n  }},\n"
+        for lc in locales
+    )
     OUT.write_text(
         "// AUTO-GENERATED from /i18n-strings.csv — do not edit by hand.\n"
         "// To change strings, edit the CSV and regenerate (see scripts/gen-i18n.py).\n"

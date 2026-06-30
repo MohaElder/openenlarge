@@ -4,7 +4,7 @@
 //  - derives the active locale from the URL path, and
 //  - exposes window.OE = { t, locale } so releases.js can localize OS-aware download labels.
 window.OE = (function () {
-  var LOCALES = ["en", "zh", "ja", "ko"];
+  var LOCALES = ["en", "zh", "zh-hant", "ja", "ko"];
 
   function localeFromPath() {
     var seg = (location.pathname.split("/")[1] || "").toLowerCase();
@@ -13,7 +13,7 @@ window.OE = (function () {
   var locale = localeFromPath();
 
   // STRINGS are fetched once for OE.t (used by releases.js for OS-specific labels).
-  var STRINGS = { en: {}, zh: {}, ja: {}, ko: {} };
+  var STRINGS = { en: {}, zh: {}, "zh-hant": {}, ja: {}, ko: {} };
   function t(key) {
     return (STRINGS[locale] && STRINGS[locale][key]) || STRINGS.en[key] || key;
   }
@@ -24,7 +24,8 @@ window.OE = (function () {
   }
 
   function init() {
-    document.documentElement.lang = locale === "zh" ? "zh-Hans" : locale;
+    document.documentElement.lang =
+      locale === "zh" ? "zh-Hans" : locale === "zh-hant" ? "zh-Hant" : locale;
     fetch(stringsUrl(), { cache: "no-cache" })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) {

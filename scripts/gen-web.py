@@ -13,9 +13,12 @@ import json, pathlib, re, html
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 WEB = ROOT / "web"
 SITE = "https://openenlarge.io"
-LOCALES = ["en", "zh", "ja", "ko"]
-HREFLANG = {"en": "en", "zh": "zh-Hans", "ja": "ja", "ko": "ko"}
-LABELS = {"en": "English", "zh": "中文", "ja": "日本語", "ko": "한국어"}
+LOCALES = ["en", "zh", "zh-hant", "ja", "ko"]
+HREFLANG = {"en": "en", "zh": "zh-Hans", "zh-hant": "zh-Hant", "ja": "ja", "ko": "ko"}
+LABELS = {"en": "English", "zh": "简体中文", "zh-hant": "繁體中文", "ja": "日本語", "ko": "한국어"}
+# Locale whose /docs/ translation a landing page links to. Defaults to the page's own
+# locale; zh-hant falls back to Simplified docs until Traditional docs are translated.
+DOCS_LOCALE = {"zh-hant": "zh"}
 # Globe icon for the language switcher (kept verbatim in sync with scripts/gen-docs.py).
 # Inline SVG renders on every platform; flag emoji do not (Windows shows letters), and a
 # globe avoids the "which flag for English?" problem.
@@ -72,9 +75,11 @@ def localize_links(doc, locale):
     Anchor (#...), external (http), and asset (img/, *.js, *.css, releases*.json) links are left alone."""
     if locale == "en":
         return doc
-    # docs root link
-    doc = doc.replace('href="/docs/index.html"', f'href="/docs/{locale}/index.html"')
-    doc = doc.replace('href="/docs/"', f'href="/docs/{locale}/"')
+    # docs root link. zh-hant docs aren't translated yet, so Traditional readers
+    # are routed to the Simplified docs (readable Chinese) rather than a 404.
+    dloc = DOCS_LOCALE.get(locale, locale)
+    doc = doc.replace('href="/docs/index.html"', f'href="/docs/{dloc}/index.html"')
+    doc = doc.replace('href="/docs/"', f'href="/docs/{dloc}/"')
     # landing cross-links (root-absolute forms used in the nav)
     doc = doc.replace('href="/blog"', f'href="/{locale}/blog.html"')
     doc = doc.replace('href="/index.html"', f'href="/{locale}/index.html"')
