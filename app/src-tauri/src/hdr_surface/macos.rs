@@ -1,32 +1,37 @@
 //! macOS EDR (extended dynamic range) compositing spike.
 //!
 //! Goal of this spike: prove that an embedded `WKWebView` inside a Tauri window
-//! still grants EDR to a *sibling* `CAMetalLayer` composited behind it. If the
-//! synthetic gradient's bright end (linear ~4.0) glows brighter than the
-//! webview's SDR white (1.0) on a real HDR display, EDR is granted and we can
-//! build the real "live HDR" viewport on this foundation. If it does NOT, EDR
-//! is not reachable through an embedded webview and we fall back to gain-maps.
+//! still grants EDR to a *sibling* `CAMetalLayer`. If the bright bands (linear
+//! 2.0 / 4.0) glow brighter than SDR white (1.0) on a real HDR display, EDR is
+//! granted and we can build the real "live HDR" viewport on this foundation. If
+//! they do NOT, EDR is not reachable through an embedded webview and we fall
+//! back to gain-maps.
+//!
+//! For this verification pass the card is stacked IN FRONT OF the webview and
+//! fully covers the UI on purpose — an opaque DOM kept occluding it when it sat
+//! behind. This is a momentary aid; Task 6 replaces this module with the real
+//! viewport-bounded surface that lives behind the DOM.
 //!
 //! What it does, concretely:
 //!   1. Reaches the native `NSWindow` + `WKWebView` via Tauri's
 //!      `WebviewWindow::with_webview` (the closure runs on the main thread).
 //!   2. Inserts a custom `NSView` (layer-hosted by a `CAMetalLayer`) as the
-//!      *bottom-most* sibling of the webview inside the window's content view.
+//!      sibling *directly above* the webview inside the window's content view.
 //!   3. Configures the layer for reference-EDR: `RGBA16Float`, an
 //!      extended-linear Display-P3 colorspace, and
 //!      `wantsExtendedDynamicRangeContent = true` (EDR metadata left nil =
 //!      reference EDR).
-//!   4. Makes the webview transparent (`drawsBackground = false`) so the layer
-//!      shows through wherever the DOM is transparent.
+//!   4. Sets the webview transparent (`drawsBackground = false`) — moot while
+//!      the card is on top, kept for the behind-the-DOM future.
 //!   5. Overrides `hitTest:` to return nil so clicks/scroll fall through to the
 //!      webview (the native view never steals input).
-//!   6. Continuously renders a STATIC horizontal gradient ramp (0.0 -> 4.0
-//!      linear) with a minimal Metal pipeline (fullscreen triangle, no vertex
-//!      buffers), re-armed each tick on the main run loop.
+//!   6. Continuously renders a STATIC EDR test card — 4 equal vertical bands at
+//!      extended-linear luminance 0.5 / 1.0 / 2.0 / 4.0 — with a minimal Metal
+//!      pipeline (fullscreen triangle, no vertex buffers), re-armed each tick on
+//!      the main run loop.
 //!
-//! The gradient is redrawn continuously (~60Hz, via a `performSelector` re-arm
-//! on the main run loop) so it stays visible for evaluation instead of only
-//! flashing once before the DOM composites over it. It is still a STATIC test
+//! The card is redrawn continuously (~60Hz, via a `performSelector` re-arm on
+//! the main run loop) so it stays visible for evaluation. It is a STATIC test
 //! pattern — no real image data is wired here; that is downstream work.
 
 #![allow(unexpected_cfgs)]
@@ -51,10 +56,11 @@ use objc2_quartz_core::{CAMetalDrawable, CAMetalLayer};
 /// Minimal Metal Shading Language for the static EDR test pattern.
 ///
 /// The vertex stage emits a fullscreen triangle from `vertex_id` alone (no
-/// vertex buffer). The fragment stage writes a neutral horizontal ramp whose
-/// value runs from 0.0 on the left to ~4.0 on the right, in the layer's
-/// extended-linear Display-P3 space — so the right edge is 4x SDR white and
-/// should visibly glow on an EDR display.
+/// vertex buffer). The fragment stage writes an EDR comparison test card: 4
+/// equal-width neutral-gray vertical bands with extended-linear Display-P3
+/// luminances 0.5, 1.0, 2.0, 4.0. The 1.0 band is SDR-white reference (max
+/// non-HDR white); on an EDR display the 2.0 and 4.0 bands must visibly
+/// out-glow it — that's the EDR proof.
 const EDR_SHADER_SRC: &str = r#"
 #include <metal_stdlib>
 using namespace metal;
@@ -73,7 +79,10 @@ vertex VOut edr_vertex(uint vid [[vertex_id]]) {
 }
 
 fragment float4 edr_fragment(VOut in [[stage_in]]) {
-    float v = clamp(in.uv.x, 0.0, 1.0) * 4.0;       // 0 (black) .. 4.0 (super-white)
+    // 4 equal vertical bands, left -> right: 0.5, 1.0 (SDR white), 2.0, 4.0.
+    const float bands[4] = { 0.5, 1.0, 2.0, 4.0 };
+    int idx = clamp(int(floor(clamp(in.uv.x, 0.0, 1.0) * 4.0)), 0, 3);
+    float v = bands[idx];
     return float4(v, v, v, 1.0);
 }
 "#;
@@ -258,9 +267,9 @@ fn build_and_attach(
     layer.setFrame(bounds);
     layer.setContentsScale(scale);
 
-    // --- Layer-hosting NSView, inserted behind the webview ---------------
+    // --- Layer-hosting NSView, inserted IN FRONT OF the webview ----------
     // The view owns the render context (layer/pipeline/queue) so its repeating
-    // redraw tick can re-encode the gradient every frame.
+    // redraw tick can re-encode the test card every frame.
     let view = EdrPassthroughView::new(mtm, bounds, layer.clone(), pipeline, queue);
     // Order matters: set the backing layer *before* enabling wantsLayer so the
     // view becomes "layer-hosting" with our CAMetalLayer as its backing store.
@@ -270,14 +279,24 @@ fn build_and_attach(
         NSAutoresizingMaskOptions::ViewWidthSizable | NSAutoresizingMaskOptions::ViewHeightSizable,
     );
 
-    // Insert as the bottom-most sibling so the webview composites in front.
-    content_view.addSubview_positioned_relativeTo(&view, NSWindowOrderingMode::Below, None);
-    // Belt-and-suspenders: also push the layer back in z.
-    layer.setZPosition(-1.0);
+    // Stack ABOVE the webview so the opaque DOM can no longer occlude the test
+    // card. This intentionally covers the whole UI — it is a momentary visual
+    // verification aid (Task 6 replaces this with the viewport-bounded surface).
+    // WKWebView is itself an NSView subclass, so it is the sibling we order over.
+    // SAFETY: `wk_webview` is the WKWebView, which inherits NSView.
+    let webview_view: &NSView = unsafe { &*(wk_webview as *const AnyObject as *const NSView) };
+    content_view.addSubview_positioned_relativeTo(
+        &view,
+        NSWindowOrderingMode::Above,
+        Some(webview_view),
+    );
+    // Belt-and-suspenders: also pull the layer forward in z.
+    layer.setZPosition(1.0);
 
-    // --- Make the webview transparent so the layer shows through ----------
-    // WKWebView has no public `setDrawsBackground:`; the supported way (also
-    // used by wry) is KVC on the private `drawsBackground` property.
+    // --- Make the webview transparent (harmless now the card is on top) ---
+    // Kept for when the surface moves behind the DOM (Task 6). WKWebView has no
+    // public `setDrawsBackground:`; the supported way (also used by wry) is KVC
+    // on the private `drawsBackground` property.
     unsafe {
         let no = NSNumber::numberWithBool(false);
         let key = NSString::from_str("drawsBackground");
