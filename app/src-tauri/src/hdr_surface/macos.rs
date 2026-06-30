@@ -453,23 +453,35 @@ fn upload_texture(
     Ok(())
 }
 
-/// Position the view at `rect`, flipping Y from DOM (top-left) to AppKit
-/// (bottom-left) coordinates, and size the layer's drawable for the dpr.
+/// Position the view at `rect`, mapping DOM (top-left, y-down) coordinates into
+/// the content view's coordinate space — accounting for whether that space is
+/// flipped — and size the layer's drawable for the dpr.
 fn position(window: &NSWindow, webview_view: &NSView, surface: &Surface, rect: ViewportRect) {
     // The DOM `rect` from getBoundingClientRect() is measured relative to the
     // WEBVIEW's top-left (CSS px, top-down). The EDR view is a sibling of the
     // webview under the content view, so position it relative to the webview's
     // OWN frame (in content-view coords) — this absorbs any webview inset /
-    // titlebar in both axes, instead of assuming the webview fills the window.
-    let wv = webview_view.frame(); // AppKit bottom-left origin, in content-view coords
-    let content_size = window
-        .contentView()
+    // titlebar. Whether we flip Y depends on the content view's geometry: wry
+    // often hosts a FLIPPED container view (top-left origin, y-down), in which
+    // case DOM and AppKit already agree on Y and an extra flip would double-apply.
+    let wv = webview_view.frame(); // in content-view coords
+    let content_view = window.contentView();
+    let flipped_content = content_view.as_ref().map(|v| v.isFlipped()).unwrap_or(false);
+    let flipped_webview = webview_view.isFlipped();
+    let content_size = content_view
+        .as_ref()
         .map(|v| v.frame().size)
         .unwrap_or(CGSize::new(0.0, 0.0));
 
-    // Flip within the WEBVIEW's height, then offset by the webview's origin.
+    // X is unaffected by a vertical flip.
     let x = wv.origin.x + rect.x;
-    let y = wv.origin.y + (wv.size.height - rect.y - rect.h);
+    // Y: in a flipped content view DOM and AppKit agree (y-down) — no flip; in a
+    // standard bottom-left content view, flip within the webview's height.
+    let y = if flipped_content {
+        wv.origin.y + rect.y
+    } else {
+        wv.origin.y + (wv.size.height - rect.y - rect.h)
+    };
     let frame = NSRect::new(NSPoint::new(x, y), NSSize::new(rect.w, rect.h));
     surface.view.setFrame(frame);
 
@@ -483,14 +495,28 @@ fn position(window: &NSWindow, webview_view: &NSView, surface: &Surface, rect: V
     let dh = (rect.h * dpr).max(1.0);
     surface.layer.setDrawableSize(CGSize::new(dw, dh));
 
-    // Diagnostic: if still misaligned, the human pastes this line and we read
-    // the exact offset from the webview frame vs. the requested rect.
+    // Decisive diagnostic: read back the actual frame after setFrame, and log
+    // the EDR view + webview rects converted into the SAME absolute screen space
+    // so their placement can be compared directly. `convertRect_toView(.., None)`
+    // converts to window base coords; `convertRectToScreen` then to screen.
+    let edr_after = surface.view.frame();
+    let edr_screen =
+        window.convertRectToScreen(surface.view.convertRect_toView(surface.view.bounds(), None));
+    let wv_screen =
+        window.convertRectToScreen(webview_view.convertRect_toView(webview_view.bounds(), None));
     eprintln!(
         "[hdr] pos: rect=({:.1},{:.1},{:.1},{:.1},dpr={:.2}) webview=(o {:.1},{:.1} sz {:.1},{:.1}) content=({:.1},{:.1}) edr_frame=({:.1},{:.1},{:.1},{:.1})",
         rect.x, rect.y, rect.w, rect.h, rect.dpr,
         wv.origin.x, wv.origin.y, wv.size.width, wv.size.height,
         content_size.width, content_size.height,
         x, y, rect.w, rect.h
+    );
+    eprintln!(
+        "[hdr] pos2: flipped_content={} flipped_webview={} edr_after=({:.1},{:.1},{:.1},{:.1}) edr_screen=({:.1},{:.1},{:.1},{:.1}) webview_screen=({:.1},{:.1},{:.1},{:.1})",
+        flipped_content, flipped_webview,
+        edr_after.origin.x, edr_after.origin.y, edr_after.size.width, edr_after.size.height,
+        edr_screen.origin.x, edr_screen.origin.y, edr_screen.size.width, edr_screen.size.height,
+        wv_screen.origin.x, wv_screen.origin.y, wv_screen.size.width, wv_screen.size.height
     );
 }
 
