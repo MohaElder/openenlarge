@@ -16,16 +16,19 @@
 //! `NSView`/`CAMetalLayer`/`MTLDevice`/… are main-thread-only and not
 //! `Send`/`Sync`, but Tauri managed state must be `Send + Sync` and command
 //! handlers can run off the main thread. The [`Surface`] handle therefore
-//! carries `unsafe impl Send + Sync` whose invariant is "only ever dereferenced
-//! on the main thread" — and every entry point here is reached via
+//! carries `unsafe impl Send + Sync` whose invariant is "only ever touched on
+//! the main thread" — and every entry point here is reached via
 //! `WebviewWindow::with_webview`, whose closure Tauri runs on the main thread.
-//! Nothing in here touches a Cocoa/Metal object off the main thread.
+//! Teardown is the subtle case: releasing a `Retained` runs `-dealloc` (itself a
+//! deref), so [`Surface`]'s `Drop` hops the release to the main queue when it is
+//! dropped off the main thread.
 
 #![allow(unexpected_cfgs)]
 
 use std::sync::{Arc, Mutex};
 
 use core::ffi::c_void;
+use core::mem::ManuallyDrop;
 use core::ptr::NonNull;
 
 use objc2::rc::{Allocated, Retained};
@@ -102,22 +105,101 @@ impl HdrSurfaceView {
 /// Native surface handle stored in Tauri managed state.
 ///
 /// SAFETY (the `unsafe impl`s below): every field is a main-thread-only Cocoa /
-/// Metal object. It is sound to move this between threads ONLY because it is
-/// never *dereferenced* off the main thread — all access goes through the
-/// `*_on_main` functions, which run inside `WebviewWindow::with_webview`'s
-/// main-thread closure.
+/// Metal object. It is sound to move this between threads ONLY because each is
+/// touched exclusively on the main thread — *including release*: releasing a
+/// `Retained` runs the object's `-dealloc`, which is itself a deref that AppKit
+/// requires on the main thread. All live access goes through the `*_on_main`
+/// functions (run inside `WebviewWindow::with_webview`'s main-thread closure),
+/// and teardown is handled by the manual [`Drop`] impl below, which hops the
+/// release to the main queue when the drop happens off the main thread. The
+/// fields are `ManuallyDrop` so the automatic field-drop (which would run on
+/// whatever thread drops the state) never fires — `Drop` owns release entirely.
 pub struct Surface {
-    view: Retained<HdrSurfaceView>,
-    layer: Retained<CAMetalLayer>,
-    device: Retained<ProtocolObject<dyn MTLDevice>>,
-    queue: Retained<ProtocolObject<dyn MTLCommandQueue>>,
-    pipeline: Retained<ProtocolObject<dyn MTLRenderPipelineState>>,
-    texture: Option<Retained<ProtocolObject<dyn MTLTexture>>>,
+    view: ManuallyDrop<Retained<HdrSurfaceView>>,
+    layer: ManuallyDrop<Retained<CAMetalLayer>>,
+    device: ManuallyDrop<Retained<ProtocolObject<dyn MTLDevice>>>,
+    queue: ManuallyDrop<Retained<ProtocolObject<dyn MTLCommandQueue>>>,
+    pipeline: ManuallyDrop<Retained<ProtocolObject<dyn MTLRenderPipelineState>>>,
+    texture: ManuallyDrop<Option<Retained<ProtocolObject<dyn MTLTexture>>>>,
 }
 
-// SAFETY: see the `Surface` doc comment — only ever dereferenced on the main thread.
+// SAFETY: see the `Surface` doc comment — every field (live access AND release)
+// is confined to the main thread; `Drop` upholds that even when the value is
+// dropped off-main.
 unsafe impl Send for Surface {}
 unsafe impl Sync for Surface {}
+
+impl Drop for Surface {
+    fn drop(&mut self) {
+        if MainThreadMarker::new().is_some() {
+            // On the main thread: release the AppKit/Metal objects inline.
+            // SAFETY: each field is initialized and dropped exactly once here;
+            // `ManuallyDrop` suppressed the automatic field-drop.
+            unsafe {
+                ManuallyDrop::drop(&mut self.texture);
+                ManuallyDrop::drop(&mut self.pipeline);
+                ManuallyDrop::drop(&mut self.queue);
+                ManuallyDrop::drop(&mut self.device);
+                ManuallyDrop::drop(&mut self.layer);
+                ManuallyDrop::drop(&mut self.view);
+            }
+            return;
+        }
+        // Off the main thread: move each handle out (transferring its +1 retain
+        // to a raw pointer) and release them on the main dispatch queue. Because
+        // the fields are `ManuallyDrop`, none of them auto-drop here, so there is
+        // no double free; each pointer is released exactly once on the main queue.
+        let mut ptrs: Vec<*mut AnyObject> = Vec::with_capacity(6);
+        // SAFETY: each field is initialized and taken exactly once.
+        unsafe {
+            if let Some(t) = ManuallyDrop::take(&mut self.texture) {
+                ptrs.push(Retained::into_raw(t).cast());
+            }
+            ptrs.push(Retained::into_raw(ManuallyDrop::take(&mut self.pipeline)).cast());
+            ptrs.push(Retained::into_raw(ManuallyDrop::take(&mut self.queue)).cast());
+            ptrs.push(Retained::into_raw(ManuallyDrop::take(&mut self.device)).cast());
+            ptrs.push(Retained::into_raw(ManuallyDrop::take(&mut self.layer)).cast());
+            ptrs.push(Retained::into_raw(ManuallyDrop::take(&mut self.view)).cast());
+        }
+        let ctx = Box::into_raw(Box::new(ptrs)) as *mut c_void;
+        // SAFETY: `_dispatch_main_q` is the process main queue; `ctx` is the
+        // leaked Box reconstructed inside `release_objects_on_main`. (If the main
+        // run loop has already stopped at process exit the block never runs and
+        // the objects leak — acceptable: the OS reclaims them, and it avoids the
+        // off-main `-dealloc` UB this Drop exists to prevent.)
+        unsafe { dispatch_async_f(&_dispatch_main_q, ctx, release_objects_on_main) };
+    }
+}
+
+/// Release the Cocoa/Metal objects handed over by `Surface::drop`, on the main
+/// queue. Reconstructing a `Retained` from each raw pointer and dropping it here
+/// performs the `-dealloc` on the main thread.
+extern "C" fn release_objects_on_main(ctx: *mut c_void) {
+    // SAFETY: `ctx` is the `Box<Vec<*mut AnyObject>>` leaked in `Surface::drop`;
+    // each pointer carries a +1 retain from `Retained::into_raw`.
+    let ptrs: Box<Vec<*mut AnyObject>> = unsafe { Box::from_raw(ctx as *mut Vec<*mut AnyObject>) };
+    for p in ptrs.into_iter() {
+        // SAFETY: +1-owned pointer; turn it back into a `Retained` so the drop
+        // releases it (on the main thread). Null is impossible (all came from
+        // live `Retained`s) but `from_raw` tolerates it via `Option`.
+        unsafe { drop(Retained::from_raw(p)) };
+    }
+}
+
+// Minimal libdispatch FFI (part of libSystem, always linked) so teardown can
+// release main-thread-only objects on the main queue without a new dependency.
+#[repr(C)]
+struct DispatchQueueOpaque {
+    _private: [u8; 0],
+}
+extern "C" {
+    static _dispatch_main_q: DispatchQueueOpaque;
+    fn dispatch_async_f(
+        queue: *const DispatchQueueOpaque,
+        context: *mut c_void,
+        work: extern "C" fn(*mut c_void),
+    );
+}
 
 /// Shared, lockable slot for the lazily-created surface.
 pub type SurfaceSlot = Arc<Mutex<Option<Surface>>>;
@@ -125,6 +207,13 @@ pub type SurfaceSlot = Arc<Mutex<Option<Surface>>>;
 // ---------------------------------------------------------------------------
 // Command entry points (each runs inside a main-thread `with_webview` closure)
 // ---------------------------------------------------------------------------
+//
+// Ordering invariant: `with_webview` dispatches these to the main thread in
+// FIFO submission order, which is NOT necessarily the order the JS requests
+// were issued. The `Mutex` + single-threaded main-queue execution serialize all
+// state mutation, so the worst case of a reordered `set_rect`/`show` pair is a
+// transiently-stale rect (corrected by the next settle) — never a torn read or
+// a wrong-texture race.
 
 /// Lazily create the surface (if needed), upload the buffer, position + show.
 pub fn show_on_main(
@@ -280,13 +369,15 @@ fn create_surface(
         let _: () = msg_send![wk_webview, setValue: &*no, forKey: &*key];
     }
 
+    // Fields are `ManuallyDrop` so the automatic field-drop never fires off the
+    // main thread; `Surface::drop` owns release (see its doc comment).
     Ok(Surface {
-        view,
-        layer,
-        device,
-        queue,
-        pipeline,
-        texture: None,
+        view: ManuallyDrop::new(view),
+        layer: ManuallyDrop::new(layer),
+        device: ManuallyDrop::new(device),
+        queue: ManuallyDrop::new(queue),
+        pipeline: ManuallyDrop::new(pipeline),
+        texture: ManuallyDrop::new(None),
     })
 }
 
@@ -351,7 +442,10 @@ fn upload_texture(
         );
     }
 
-    surface.texture = Some(texture);
+    // Assign through `DerefMut` so the previous texture (if any) drops here — on
+    // the main thread — instead of leaking. `upload_texture` only runs on the
+    // main thread (called from the `*_on_main` path).
+    *surface.texture = Some(texture);
     Ok(())
 }
 
@@ -363,6 +457,9 @@ fn position(window: &NSWindow, surface: &Surface, rect: ViewportRect) {
         .map(|v| v.frame().size.height)
         .unwrap_or(0.0);
     // DOM rect is top-left origin in CSS points; AppKit frames are bottom-left.
+    // This assumes the WKWebView fills the content view (origin at the content
+    // view's top-left); a future inset/overlay titlebar would introduce a
+    // constant Y offset that must be added here.
     let y_flipped = content_h - rect.y - rect.h;
     let frame = NSRect::new(NSPoint::new(rect.x, y_flipped), NSSize::new(rect.w, rect.h));
     surface.view.setFrame(frame);
