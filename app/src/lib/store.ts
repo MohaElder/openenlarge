@@ -7,6 +7,7 @@ import { emptyDust, type DustEdits } from "./develop/dust";
 import { scopeToFolder } from "./library/folderScope";
 import { type SelState, type Mods, noneSelected, allSelected, click } from "./selection";
 import type { SettingsSnapshot } from "./roll/apply";
+import { detectHdrMode, probeHdrEnv, type HdrMode } from "./viewport/hdrCapability";
 
 export const images = writable<ImageEntry[]>([]);
 export const activeId = writable<string | null>(null);
@@ -254,3 +255,11 @@ export const copySettingsOpen = writable<boolean>(false);
 
 /** Bumped on any dust change and on undo/redo so the Viewport re-renders. */
 export const dustRev = writable<number>(0);
+
+/** Resolved HDR capability for the current OS/display/GPU surface — "hidden" on
+ *  Linux (HDR is impossible there), "live-edr" when the display+surface support
+ *  it, else "gainmap-fallback". Drives whether Basic.svelte shows the HDR toggle.
+ *  Defaults to the safe gainmap-fallback until the async probe below resolves;
+ *  probed once at module load (app start). See lib/viewport/hdrCapability.ts. */
+export const hdrMode = writable<HdrMode>("gainmap-fallback");
+probeHdrEnv().then((env) => hdrMode.set(detectHdrMode(env)));

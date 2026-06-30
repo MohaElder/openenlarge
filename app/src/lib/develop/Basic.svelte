@@ -1,7 +1,7 @@
 <script lang="ts">
   import { get } from "svelte/store";
   import { t } from "$lib/i18n";
-  import { params, activeId, images, cropById, folderBaseByPath, baseSampling, sampledBase, sampledDmax, whitePointPinned } from "../store";
+  import { params, activeId, images, cropById, folderBaseByPath, baseSampling, sampledBase, sampledDmax, whitePointPinned, hdrMode } from "../store";
   import { developedFolderImages } from "../export/eligible";
   import { applySelectedTo } from "./copySettings";
   import type { GroupSelection, SettingsSnapshot } from "../roll/apply";
@@ -316,11 +316,13 @@
                 aria-pressed={$params.positive}
                 on:click={() => { if (!$params.positive) togglePositive(); }}>{$t('basic.positive')}</button>
       </span>
-      <button class="hdrtoggle" class:on={$params.hdr}
-              title={$t('basic.hdrTitle')} aria-pressed={$params.hdr}
-              on:click={() => { params.update((p) => ({ ...p, hdr: !p.hdr })); commitActive(); }}>
-        {$t('basic.hdr')}
-      </button>
+      {#if $hdrMode !== "hidden"}
+        <button class="hdrtoggle" class:on={$params.hdr}
+                title={$t('basic.hdrTitle')} aria-pressed={$params.hdr}
+                on:click={() => { params.update((p) => ({ ...p, hdr: !p.hdr })); commitActive(); }}>
+          {$t('basic.hdr')}
+        </button>
+      {/if}
       <button class="reset" on:click={resetBasic}>{$t('basic.reset')}</button>
     </span>
   </div>
