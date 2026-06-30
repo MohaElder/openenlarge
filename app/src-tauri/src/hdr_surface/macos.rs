@@ -73,6 +73,12 @@ vertex VOut edr_vertex(uint vid [[vertex_id]]) {
 
 fragment float4 edr_fragment(VOut in [[stage_in]], texture2d<float> tex [[texture(0)]]) {
     constexpr sampler s(filter::linear, address::clamp_to_edge);
+    // TEMP DIAGNOSTIC: draw a bright-magenta border at the layer's true edges so
+    // the EDR layer bounds are unmistakable on screen (glows in EDR). Remove once
+    // positioning is aligned.
+    if (in.uv.x < 0.012 || in.uv.x > 0.988 || in.uv.y < 0.012 || in.uv.y > 0.988) {
+        return float4(4.0, 0.0, 4.0, 1.0);
+    }
     return float4(tex.sample(s, in.uv).rgb, 1.0);
 }
 "#;
