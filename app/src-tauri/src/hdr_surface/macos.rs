@@ -254,7 +254,9 @@ pub fn show_on_main(
         return;
     }
     surface.view.setHidden(false);
-    position(window, surface, rect);
+    // SAFETY: WKWebView inherits NSView; valid on the main thread.
+    let webview_view: &NSView = unsafe { &*(wk_webview as *const AnyObject as *const NSView) };
+    position(window, webview_view, surface, rect);
     let _ = render(surface);
 }
 
@@ -264,14 +266,16 @@ pub fn set_rect_on_main(webview: tauri::webview::PlatformWebview, slot: SurfaceS
         return;
     }
     let ns_window = webview.ns_window() as *mut NSWindow;
-    if ns_window.is_null() {
+    let wk_webview = webview.inner() as *mut AnyObject;
+    if ns_window.is_null() || wk_webview.is_null() {
         return;
     }
     // SAFETY: valid for the window's lifetime; only used on the main thread.
     let window: &NSWindow = unsafe { &*ns_window };
+    let webview_view: &NSView = unsafe { &*(wk_webview as *const AnyObject as *const NSView) };
     let guard = slot.lock().unwrap();
     if let Some(surface) = guard.as_ref() {
-        position(window, surface, rect);
+        position(window, webview_view, surface, rect);
         let _ = render(surface);
     }
 }
@@ -451,17 +455,22 @@ fn upload_texture(
 
 /// Position the view at `rect`, flipping Y from DOM (top-left) to AppKit
 /// (bottom-left) coordinates, and size the layer's drawable for the dpr.
-fn position(window: &NSWindow, surface: &Surface, rect: ViewportRect) {
-    let content_h = window
+fn position(window: &NSWindow, webview_view: &NSView, surface: &Surface, rect: ViewportRect) {
+    // The DOM `rect` from getBoundingClientRect() is measured relative to the
+    // WEBVIEW's top-left (CSS px, top-down). The EDR view is a sibling of the
+    // webview under the content view, so position it relative to the webview's
+    // OWN frame (in content-view coords) — this absorbs any webview inset /
+    // titlebar in both axes, instead of assuming the webview fills the window.
+    let wv = webview_view.frame(); // AppKit bottom-left origin, in content-view coords
+    let content_size = window
         .contentView()
-        .map(|v| v.frame().size.height)
-        .unwrap_or(0.0);
-    // DOM rect is top-left origin in CSS points; AppKit frames are bottom-left.
-    // This assumes the WKWebView fills the content view (origin at the content
-    // view's top-left); a future inset/overlay titlebar would introduce a
-    // constant Y offset that must be added here.
-    let y_flipped = content_h - rect.y - rect.h;
-    let frame = NSRect::new(NSPoint::new(rect.x, y_flipped), NSSize::new(rect.w, rect.h));
+        .map(|v| v.frame().size)
+        .unwrap_or(CGSize::new(0.0, 0.0));
+
+    // Flip within the WEBVIEW's height, then offset by the webview's origin.
+    let x = wv.origin.x + rect.x;
+    let y = wv.origin.y + (wv.size.height - rect.y - rect.h);
+    let frame = NSRect::new(NSPoint::new(x, y), NSSize::new(rect.w, rect.h));
     surface.view.setFrame(frame);
 
     let dpr = rect.dpr.max(1.0);
@@ -473,6 +482,16 @@ fn position(window: &NSWindow, surface: &Surface, rect: ViewportRect) {
     let dw = (rect.w * dpr).max(1.0);
     let dh = (rect.h * dpr).max(1.0);
     surface.layer.setDrawableSize(CGSize::new(dw, dh));
+
+    // Diagnostic: if still misaligned, the human pastes this line and we read
+    // the exact offset from the webview frame vs. the requested rect.
+    eprintln!(
+        "[hdr] pos: rect=({:.1},{:.1},{:.1},{:.1},dpr={:.2}) webview=(o {:.1},{:.1} sz {:.1},{:.1}) content=({:.1},{:.1}) edr_frame=({:.1},{:.1},{:.1},{:.1})",
+        rect.x, rect.y, rect.w, rect.h, rect.dpr,
+        wv.origin.x, wv.origin.y, wv.size.width, wv.size.height,
+        content_size.width, content_size.height,
+        x, y, rect.w, rect.h
+    );
 }
 
 /// Draw the uploaded texture into the layer's next drawable (scaled to fill).
