@@ -3,8 +3,13 @@
 //! relaunch without re-decoding the original RAW.
 //!
 //! File layout:
+//!   [magic: 4 bytes]  (format/version tag; bumped to invalidate every sidecar at once)
 //!   [has_ir: u8]  (uncompressed, 0 or 1; mirrors the working image's IR presence)
 //!   [zstd payload…]
+//!
+//! A pre-magic sidecar (or one written by an older format) fails the magic check and is
+//! treated as a miss, so the frame re-decodes. Bump `MAGIC` whenever the decoded pixels'
+//! meaning changes (e.g. the v2 bump: the camera color matrix is now always applied).
 //!
 //! Payload (zstd-compressed):
 //!   base: 3 × f32 LE
@@ -17,6 +22,12 @@ use std::io::{self, Read, Write};
 use std::path::Path;
 
 const ZSTD_LEVEL: i32 = 3;
+
+/// Format/version magic written as the first 4 bytes of every sidecar. A mismatch (an
+/// older pre-magic file, or a stale version) is treated as a cache miss so the frame
+/// re-decodes. `OEC2` = the camera-color-matrix-always-on decode; the original format
+/// had no magic and began with the has_ir byte (0/1), which never matches this tag.
+const MAGIC: [u8; 4] = *b"OEC2";
 
 // ---------------------------------------------------------------------------
 // Serialise / deserialise a single Image into/from a byte buffer.
@@ -108,7 +119,8 @@ fn read_f32_le(r: &mut impl Read) -> io::Result<f32> {
 // ---------------------------------------------------------------------------
 
 /// Write a cache file at `path` encoding `(base, working, thumb)`.
-/// The working image's `has_ir` flag is stored uncompressed as the first byte.
+/// The 4-byte magic and the working image's `has_ir` flag are stored uncompressed
+/// ahead of the zstd payload.
 ///
 /// The write is atomic: bytes are first written to a `.oecache.tmp` sibling in
 /// the same directory, then renamed into place.  A failed/partial write never
@@ -136,6 +148,7 @@ pub fn write(path: &Path, base: [f32; 3], working: &Image, thumb: &Image) -> io:
     let tmp = path.with_extension("oecache.tmp");
     let result = (|| -> io::Result<()> {
         let mut file = std::fs::File::create(&tmp)?;
+        file.write_all(&MAGIC)?;
         file.write_all(&[has_ir_byte])?;
         file.write_all(&compressed)?;
         file.flush()?;
@@ -152,14 +165,16 @@ pub fn write(path: &Path, base: [f32; 3], working: &Image, thumb: &Image) -> io:
 /// Read a cache file and return `(base, working, thumb)`.
 pub fn read(path: &Path) -> io::Result<([f32; 3], Image, Image)> {
     let raw = std::fs::read(path)?;
-    if raw.is_empty() {
+    // Reject anything too short to hold the header, or written by an older format
+    // (no/old magic) — the caller re-decodes on this error.
+    if raw.len() < MAGIC.len() + 1 || raw[..MAGIC.len()] != MAGIC {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
-            "empty cache file",
+            "cache empty or stale format",
         ));
     }
-    // Skip the leading has_ir byte; the full image encoding already encodes this.
-    let compressed = &raw[1..];
+    // Skip the magic + the has_ir byte; the full image encoding already encodes this.
+    let compressed = &raw[MAGIC.len() + 1..];
     let payload =
         zstd::decode_all(compressed).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
 
@@ -174,13 +189,20 @@ pub fn read(path: &Path) -> io::Result<([f32; 3], Image, Image)> {
     Ok((base, working, thumb))
 }
 
-/// Fast path: open the file and read only the first byte to check IR presence.
-/// Returns `false` if the file is missing or unreadable.
+/// Fast path: open the file and read the magic + has_ir byte to check IR presence.
+/// Errors if the file is missing, unreadable, or in an older/unknown format (stale
+/// magic) — callers treat that as "no IR" and re-decode.
 pub fn read_has_ir(path: &Path) -> io::Result<bool> {
     let mut file = std::fs::File::open(path)?;
-    let mut byte = [0u8; 1];
-    file.read_exact(&mut byte)?;
-    Ok(byte[0] == 1)
+    let mut head = [0u8; 5]; // 4-byte magic + has_ir byte
+    file.read_exact(&mut head)?;
+    if head[..MAGIC.len()] != MAGIC {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "stale cache format",
+        ));
+    }
+    Ok(head[MAGIC.len()] == 1)
 }
 
 /// Does this path name an `.oecache` file?
@@ -354,7 +376,8 @@ mod tests {
         payload.push(0u8); // working has_ir = false
                            // (no pixel data — truncated)
         let comp = zstd::encode_all(&payload[..], 3).unwrap();
-        let mut bytes = vec![0u8]; // leading has_ir byte (uncompressed)
+        let mut bytes = MAGIC.to_vec(); // valid magic so we exercise the truncation path
+        bytes.push(0u8); // leading has_ir byte (uncompressed)
         bytes.extend_from_slice(&comp);
         std::fs::write(&path, &bytes).unwrap();
 
@@ -364,6 +387,32 @@ mod tests {
             res.is_err(),
             "corrupt cache must return Err, not panic/abort"
         );
+    }
+
+    #[test]
+    fn read_rejects_old_pre_magic_format() {
+        // A pre-magic sidecar begins with the has_ir byte (0/1) then the zstd payload.
+        // Both read() and read_has_ir() must treat it as a miss so the frame re-decodes.
+        let path = tmp_path("pre-magic");
+        let img = make_image_no_ir(2, 2);
+        let thumb = make_image_no_ir(1, 1);
+        let mut payload: Vec<u8> = Vec::new();
+        for &v in [0.0f32, 0.0, 0.0].iter() {
+            payload.extend_from_slice(&v.to_le_bytes());
+        }
+        encode_image(&img, &mut payload);
+        encode_image(&thumb, &mut payload);
+        let comp = zstd::encode_all(&payload[..], 3).unwrap();
+        let mut bytes = vec![0u8]; // old layout: leading has_ir byte, no magic
+        bytes.extend_from_slice(&comp);
+        std::fs::write(&path, &bytes).unwrap();
+
+        assert!(read(&path).is_err(), "pre-magic file must be rejected by read");
+        assert!(
+            read_has_ir(&path).is_err(),
+            "pre-magic file must be rejected by read_has_ir"
+        );
+        let _ = std::fs::remove_file(&path);
     }
 
     #[test]

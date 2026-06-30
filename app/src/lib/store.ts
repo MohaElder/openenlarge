@@ -217,13 +217,6 @@ export const debugMode = writable<boolean>(false);
  * defaults on. */
 export const omitPreviewJpgs = writable<boolean>(true);
 
-/** When true, RAW decode applies the camera's default color matrix (à la RawTherapee's
- * camera-standard input profile) — stays linear, unity WB, so the inversion engine keeps
- * its own white balance. Corrects sensor/dye crosstalk before inversion. Off by default.
- * Persisted via prefs as `camera_matrix`. Changing it re-decodes every image, so the
- * toggle busts the backend decode caches + re-renders (see catalog.ts). */
-export const cameraMatrix = writable<boolean>(false);
-
 /** When true, the roll contact sheet renders as a filmstrip with rebates.
  * When false, renders as a plain proof grid. Persisted via prefs as `roll_film_edge`. */
 export const rollFilmEdge = writable<boolean>(true);

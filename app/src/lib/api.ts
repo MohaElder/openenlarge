@@ -351,10 +351,6 @@ export const api = {
     invoke<void>("save_app_state", { key, value }),
   /** Flip the backend analytics consent gate (persisted separately via savePref). */
   setTelemetry: (enabled: boolean) => invoke<void>("set_telemetry", { enabled }),
-  /** Toggle the global RAW camera-matrix decode; busts every decode-derived cache so
-   * images re-decode through the new flag (persisted separately via savePref). */
-  setDecodeColorMatrix: (enabled: boolean) =>
-    invoke<void>("set_decode_color_matrix", { enabled }),
   /** Emit one anonymous event; the backend drops it unless the user opted in. */
   telemetryEvent: (name: string, props?: Record<string, unknown>) =>
     invoke<void>("telemetry_event", { name, props: props ?? null }),

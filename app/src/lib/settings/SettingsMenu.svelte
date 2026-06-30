@@ -2,7 +2,7 @@
   import { createEventDispatcher } from "svelte";
   import { fade } from "svelte/transition";
   import { locale, LOCALES, t } from "../i18n";
-  import { openaiApiKey, telemetryEnabled, debugMode, cameraMatrix } from "../store";
+  import { openaiApiKey, telemetryEnabled, debugMode } from "../store";
   import { setTelemetryChoice } from "../telemetry";
   import { setDebugMode } from "../debug";
   import { runManualCheck } from "../update/updater";
@@ -130,14 +130,6 @@
       <button class:on={$debugMode} on:click={() => onDebugToggle(true)}>{$t("settings.debug.on")}</button>
     </div>
     <div class="hint">{$t("settings.debug.hint")}</div>
-  </div>
-  <div class="grp">
-    <div class="head">{$t("settings.cameraMatrix.heading")}</div>
-    <div class="seg">
-      <button class:on={!$cameraMatrix} on:click={() => cameraMatrix.set(false)}>{$t("settings.cameraMatrix.off")}</button>
-      <button class:on={$cameraMatrix} on:click={() => cameraMatrix.set(true)}>{$t("settings.cameraMatrix.on")}</button>
-    </div>
-    <div class="hint">{$t("settings.cameraMatrix.hint")}</div>
   </div>
   <button class="shortcuts" on:click={() => dispatch("shortcuts")}>
     <span class="kbd-icon" aria-hidden="true">⌨</span>

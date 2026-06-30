@@ -19,24 +19,8 @@ use film_core::wb::{gains_to_cct, wb_from_kelvin};
 use base64::Engine;
 use serde::Deserialize;
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::State;
-
-/// Global toggle: apply the camera's default color matrix during RAW decode (stays
-/// linear, unity WB — the inversion engine keeps its own white balance). Read by
-/// `decode_any`/the import fallback; set at startup from the `camera_matrix` pref and
-/// by the `set_decode_color_matrix` command. Process-global because it affects every
-/// RAW decode regardless of which image/path triggers it.
-static DECODE_COLOR_MATRIX: AtomicBool = AtomicBool::new(false);
-
-/// Set the global RAW camera-matrix flag (called at startup from the persisted pref).
-pub fn set_decode_color_matrix_flag(enabled: bool) {
-    DECODE_COLOR_MATRIX.store(enabled, Ordering::Relaxed);
-}
-fn decode_color_matrix_enabled() -> bool {
-    DECODE_COLOR_MATRIX.load(Ordering::Relaxed)
-}
 
 fn default_bits() -> u8 {
     16
@@ -205,7 +189,7 @@ fn decode_any(path: &Path) -> Result<film_core::Image, String> {
     match ext.as_str() {
         "tif" | "tiff" => decode_tiff(path).map_err(|e| format!("{e}")),
         "jpg" | "jpeg" | "png" => decode_ldr(path).map_err(|e| format!("{e}")),
-        _ => decode_raw(path, decode_color_matrix_enabled()).map_err(|e| format!("{e}")),
+        _ => decode_raw(path, true).map_err(|e| format!("{e}")),
     }
 }
 
@@ -688,7 +672,7 @@ fn import_compute(
                 // decode_raw can panic on malformed RAW; guard it so one bad file
                 // degrades to the placeholder instead of failing the whole import.
                 std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    decode_raw(p, decode_color_matrix_enabled()).ok()
+                    decode_raw(p, true).ok()
                 }))
                     .ok()
                     .flatten()
@@ -782,15 +766,11 @@ struct DevelopComputed {
 }
 
 /// Per-channel density-neutralisation factors for the current decode: the camera-matrix
-/// auto-equaliser when the global flag is on, else identity (normal path unchanged).
-/// Computed from an already-decoded working buffer so the cache-rehydrate path can recompute
-/// it without re-decoding.
+/// auto-equaliser. RAW decode always applies the camera color matrix now, so this is
+/// computed unconditionally. Derived from an already-decoded working buffer so the
+/// cache-rehydrate path can recompute it without re-decoding.
 fn channel_balance_for(working: &film_core::Image, base: [f32; 3]) -> [f32; 3] {
-    if decode_color_matrix_enabled() {
-        film_core::calibrate::sample_channel_balance(working, base)
-    } else {
-        [1.0, 1.0, 1.0]
-    }
+    film_core::calibrate::sample_channel_balance(working, base)
 }
 
 /// Pure CPU work: decode the RAW, build the quality-capped working image + auto-WB
@@ -1010,33 +990,6 @@ pub fn reset_all_data(
     catalog.reset_content().map_err(|e| format!("{e}"))?;
     let dir = session.cache_dir.lock().unwrap().clone();
     let _ = crate::cache::clear_oecache(&dir);
-    Ok(())
-}
-
-/// Global setting: turn the RAW camera-color-matrix decode on/off. Because it changes
-/// the DECODED pixels (not just the render), every decode-derived cache is busted so
-/// images re-decode through the new flag: the export decode slot, all resident working
-/// buffers, and the on-disk decode sidecars. The frontend re-develops the active image
-/// immediately; the rest re-decode lazily (Grid sweep / on view). Persistence of the
-/// `camera_matrix` pref is handled by the frontend store.
-#[tauri::command]
-pub fn set_decode_color_matrix(enabled: bool, session: State<Session>) -> Result<(), String> {
-    set_decode_color_matrix_flag(enabled);
-    // Export full-res decode slot.
-    *session.decode_cache.lock().unwrap() = None;
-    // Drop resident working buffers + delete on-disk sidecars so the next develop/
-    // thumbnail for each image re-decodes through the new flag instead of serving the
-    // previously-decoded (stale) pixels.
-    let ids: Vec<String> = {
-        let mut images = session.images.lock().unwrap();
-        for img in images.values_mut() {
-            img.developed = None;
-        }
-        images.keys().cloned().collect()
-    };
-    for id in &ids {
-        let _ = std::fs::remove_file(session.cache_path(id));
-    }
     Ok(())
 }
 

@@ -105,11 +105,6 @@ pub fn run() {
                 if prefs.get("telemetry").map(|v| v == "on").unwrap_or(false) {
                     app.state::<telemetry::TelemetryState>().set(true);
                 }
-                // Seed the RAW camera-matrix decode flag from the persisted pref so the
-                // first develop uses the user's choice.
-                commands::set_decode_color_matrix_flag(
-                    prefs.get("camera_matrix").map(|v| v == "true").unwrap_or(false),
-                );
                 if prefs.get("debug_mode").map(|v| v == "on").unwrap_or(false) {
                     let log = app.state::<debug_log::DebugLog>().inner().clone();
                     log.enable();
@@ -133,7 +128,6 @@ pub fn run() {
             commands::develop_image,
             commands::ensure_developed,
             commands::delete_image,
-            commands::set_decode_color_matrix,
             commands::cache_size,
             commands::clear_image_cache,
             commands::reset_all_data,

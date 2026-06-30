@@ -496,7 +496,3 @@ settings.debug.clearLogConfirm,Turn off debug mode and clear the existing log fi
 app.debug.exportAriaLabel,Export debug log,导出调试日志,デバッグログをエクスポート,디버그 로그 내보내기,src/routes/+page.svelte,aria-label
 app.debug.exported,Debug log exported,已导出调试日志,デバッグログをエクスポートしました,디버그 로그를 내보냈습니다,src/routes/+page.svelte,toast
 app.debug.exportFailed,Could not export debug log,无法导出调试日志,デバッグログをエクスポートできませんでした,디버그 로그를 내보낼 수 없습니다,src/routes/+page.svelte,toast
-settings.cameraMatrix.heading,Camera color matrix,相机色彩矩阵,カメラカラーマトリックス,카메라 색상 매트릭스,src/lib/settings/SettingsMenu.svelte,heading
-settings.cameraMatrix.off,Off,关闭,オフ,끄기,src/lib/settings/SettingsMenu.svelte,button
-settings.cameraMatrix.on,On,开启,オン,켜기,src/lib/settings/SettingsMenu.svelte,button
-settings.cameraMatrix.hint,Apply the camera's default color matrix when decoding RAW (kept linear). Corrects color crosstalk before inversion; re-develops every RAW photo.,解码 RAW 时应用相机的默认色彩矩阵（保持线性）。在反相前校正色彩串扰；会重新冲洗所有 RAW 照片。,RAW のデコード時にカメラの既定のカラーマトリックスを適用します（リニアのまま）。反転前に色のクロストークを補正します。すべての RAW 写真を再現像します。,RAW 디코딩 시 카메라의 기본 색상 매트릭스를 적용합니다 (선형 유지). 반전 전에 색상 누화를 보정하며 모든 RAW 사진을 다시 현상합니다.,src/lib/settings/SettingsMenu.svelte,hint

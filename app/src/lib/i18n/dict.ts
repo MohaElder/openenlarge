@@ -499,10 +499,6 @@ export const dict: Record<string, Record<string, string>> = {
     "app.debug.exportAriaLabel": "Export debug log",
     "app.debug.exported": "Debug log exported",
     "app.debug.exportFailed": "Could not export debug log",
-    "settings.cameraMatrix.heading": "Camera color matrix",
-    "settings.cameraMatrix.off": "Off",
-    "settings.cameraMatrix.on": "On",
-    "settings.cameraMatrix.hint": "Apply the camera's default color matrix when decoding RAW (kept linear). Corrects color crosstalk before inversion; re-develops every RAW photo.",
   },
   zh: {
     "app.brand": "OpenEnlarge",
@@ -1002,10 +998,6 @@ export const dict: Record<string, Record<string, string>> = {
     "app.debug.exportAriaLabel": "导出调试日志",
     "app.debug.exported": "已导出调试日志",
     "app.debug.exportFailed": "无法导出调试日志",
-    "settings.cameraMatrix.heading": "相机色彩矩阵",
-    "settings.cameraMatrix.off": "关闭",
-    "settings.cameraMatrix.on": "开启",
-    "settings.cameraMatrix.hint": "解码 RAW 时应用相机的默认色彩矩阵（保持线性）。在反相前校正色彩串扰；会重新冲洗所有 RAW 照片。",
   },
   ja: {
     "app.brand": "OpenEnlarge",
@@ -1505,10 +1497,6 @@ export const dict: Record<string, Record<string, string>> = {
     "app.debug.exportAriaLabel": "デバッグログをエクスポート",
     "app.debug.exported": "デバッグログをエクスポートしました",
     "app.debug.exportFailed": "デバッグログをエクスポートできませんでした",
-    "settings.cameraMatrix.heading": "カメラカラーマトリックス",
-    "settings.cameraMatrix.off": "オフ",
-    "settings.cameraMatrix.on": "オン",
-    "settings.cameraMatrix.hint": "RAW のデコード時にカメラの既定のカラーマトリックスを適用します（リニアのまま）。反転前に色のクロストークを補正します。すべての RAW 写真を再現像します。",
   },
   ko: {
     "app.brand": "OpenEnlarge",
@@ -2008,9 +1996,5 @@ export const dict: Record<string, Record<string, string>> = {
     "app.debug.exportAriaLabel": "디버그 로그 내보내기",
     "app.debug.exported": "디버그 로그를 내보냈습니다",
     "app.debug.exportFailed": "디버그 로그를 내보낼 수 없습니다",
-    "settings.cameraMatrix.heading": "카메라 색상 매트릭스",
-    "settings.cameraMatrix.off": "끄기",
-    "settings.cameraMatrix.on": "켜기",
-    "settings.cameraMatrix.hint": "RAW 디코딩 시 카메라의 기본 색상 매트릭스를 적용합니다 (선형 유지). 반전 전에 색상 누화를 보정하며 모든 RAW 사진을 다시 현상합니다.",
   },
 };

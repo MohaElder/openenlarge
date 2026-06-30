@@ -40,4 +40,8 @@ pub use image::Image;
 /// to the end of finish::tone_curve, so the tone tools recover clipped highlight/shadow
 /// detail on the super-white body. EV-0/slider-0 is identical except gain-mode highlights
 /// above the knee (WB now precedes the rolloff); those thumbnails regenerate on entry (2026-06-25).
-pub const ENGINE_VERSION: u32 = 5;
+/// 6 = Camera color matrix is now always applied during RAW decode (the optional toggle was
+/// removed). Existing libraries were mostly decoded without it, so every thumbnail regenerates
+/// to pick up the matrix-corrected decode — paired with an .oecache version bump that forces a
+/// re-decode rather than rehydrating the old matrix-less sidecar (2026-06-30).
+pub const ENGINE_VERSION: u32 = 6;
