@@ -497,12 +497,17 @@ mod tests {
         let b = p.get("wb_baseline").unwrap().as_array().unwrap();
         assert!((b[0].as_f64().unwrap() - 1.0).abs() < 1e-6 && (b[2].as_f64().unwrap() - 1.0).abs() < 1e-6);
         assert_eq!(p.get("contrast").unwrap().as_f64().unwrap(), 15.0);
-        // The folded Temp/Tint reproduce the original gains (render unchanged).
+        // The folded Temp/Tint reproduce the original WB. The Planckian-locus model
+        // (issue #14) snaps an arbitrary baseline onto the blackbody curve, so it
+        // preserves the perceptual WB *direction* (R/B ratio) exactly while the
+        // absolute per-channel magnitudes settle onto the nearest on-locus white
+        // (~3 % here) — the render is visually unchanged.
         let temp = p.get("temp").unwrap().as_f64().unwrap() as f32;
         let tint = p.get("tint").unwrap().as_f64().unwrap() as f32;
         let g = film_core::wb::wb_from_kelvin(temp, tint / 150.0);
+        assert!((g[0] / g[2] - 1.2 / 0.8).abs() < 0.02, "R/B direction not preserved: {g:?}");
         for (c, want) in [1.2f32, 1.0, 0.8].iter().enumerate() {
-            assert!((g[c] / g[1] - want / 1.0).abs() < 0.03, "ch {c}: gains {g:?} vs [1.2,1,0.8]");
+            assert!((g[c] / g[1] - want / 1.0).abs() < 0.05, "ch {c}: gains {g:?} vs [1.2,1,0.8]");
         }
     }
 

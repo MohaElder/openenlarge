@@ -1,44 +1,76 @@
 //! Correlated-colour-temperature ↔ per-channel white-balance gains.
 //!
-//! `wb_from_kelvin` uses the Tanner-Helland blackbody approximation to get an
-//! RGB white point, then returns gains that neutralise it — normalised so the
-//! reference (NEUTRAL_K, tint 0) yields ≈ [1,1,1]. `tint` shifts green↔magenta.
+//! `wb_from_kelvin` adapts along the **CIE Planckian locus**: it converts the
+//! target and reference (NEUTRAL_K) colour temperatures to CIE xy white points,
+//! then returns the von-Kries gains (in linear sRGB primaries) that map the
+//! target white onto the reference white — normalised so the reference yields
+//! ≈ [1,1,1]. Because the white points ride the blackbody curve, cooling/warming
+//! stays on-locus instead of drifting through magenta/purple (issue #14). The old
+//! Tanner-Helland RGB-ratio approximation under-cut red and over-boosted blue at
+//! the cool end, leaving a violet cast. `tint` shifts green↔magenta.
 
 /// White point that maps to neutral [1,1,1] gains.
 pub const NEUTRAL_K: f32 = 5500.0;
 
-/// Tanner-Helland blackbody RGB (each channel 0..1) for a temperature in Kelvin.
+/// CIE XYZ (D65) → linear sRGB. Standard IEC 61966-2-1 matrix; used to express
+/// the locus white points in the working (sRGB-primary) RGB space so a von-Kries
+/// gain is a plain per-channel divide.
 #[allow(clippy::excessive_precision)]
-fn blackbody_rgb(temp_k: f32) -> [f32; 3] {
-    let t = (temp_k / 100.0).clamp(10.0, 400.0);
-    let r = if t <= 66.0 {
-        1.0
+const XYZ_TO_RGB: [[f32; 3]; 3] = [
+    [3.2404542, -1.5371385, -0.4985314],
+    [-0.9692660, 1.8760108, 0.0415560],
+    [0.0556434, -0.2040259, 1.0572252],
+];
+
+/// CIE Planckian-locus chromaticity (x, y) for a CCT in Kelvin — Kim et al. (1999)
+/// cubic-spline approximation, accurate over ~1667–25000 K (covers the 2000–15000 K
+/// slider range). This is the actual blackbody track, unlike the Tanner-Helland
+/// display approximation it replaces.
+#[allow(clippy::excessive_precision)]
+fn cct_to_xy(temp_k: f32) -> (f32, f32) {
+    let t = temp_k.clamp(1667.0, 25000.0);
+    let (t2, t3) = (t * t, t * t * t);
+    let x = if t <= 4000.0 {
+        -0.2661239e9 / t3 - 0.2343589e6 / t2 + 0.8776956e3 / t + 0.179910
     } else {
-        (329.698727446 * (t - 60.0).powf(-0.1332047592) / 255.0).clamp(0.0, 1.0)
+        -3.0258469e9 / t3 + 2.1070379e6 / t2 + 0.2226347e3 / t + 0.240390
     };
-    let g = if t <= 66.0 {
-        ((99.4708025861 * t.ln() - 161.1195681661) / 255.0).clamp(0.0, 1.0)
+    let (x2, x3) = (x * x, x * x * x);
+    let y = if t <= 2222.0 {
+        -1.1063814 * x3 - 1.34811020 * x2 + 2.18555832 * x - 0.20219683
+    } else if t <= 4000.0 {
+        -0.9549476 * x3 - 1.37418593 * x2 + 2.09137015 * x - 0.16748867
     } else {
-        (288.1221695283 * (t - 60.0).powf(-0.0755148492) / 255.0).clamp(0.0, 1.0)
+        3.0817580 * x3 - 5.87338670 * x2 + 3.75112997 * x - 0.37001483
     };
-    let b = if t >= 66.0 {
-        1.0
-    } else if t <= 19.0 {
-        0.0
-    } else {
-        ((138.5177312231 * (t - 10.0).ln() - 305.0447927307) / 255.0).clamp(0.0, 1.0)
-    };
-    [r.max(1e-4), g.max(1e-4), b.max(1e-4)]
+    (x, y)
+}
+
+/// CIE xy chromaticity (Y normalised to 1) → linear sRGB tristimulus.
+fn xy_to_rgb(x: f32, y: f32) -> [f32; 3] {
+    let yy = y.max(1e-6);
+    let xyz = [x / yy, 1.0, (1.0 - x - y) / yy];
+    std::array::from_fn(|i| {
+        XYZ_TO_RGB[i][0] * xyz[0] + XYZ_TO_RGB[i][1] * xyz[1] + XYZ_TO_RGB[i][2] * xyz[2]
+    })
 }
 
 /// Per-channel gains for a target white balance. Lower K → warmer scene → boost
 /// blue/cut red on output (gains neutralise the warm cast), normalised to neutral
 /// at NEUTRAL_K. `tint` (−1..1-ish, UI −150..150 / 150) shifts green vs magenta.
 pub fn wb_from_kelvin(temp_k: f32, tint: f32) -> [f32; 3] {
-    let cur = blackbody_rgb(temp_k);
-    let neu = blackbody_rgb(NEUTRAL_K);
-    // Gain neutralises the current white point relative to neutral.
-    let mut g = [neu[0] / cur[0], neu[1] / cur[1], neu[2] / cur[2]];
+    let (tx, ty) = cct_to_xy(temp_k);
+    let (nx, ny) = cct_to_xy(NEUTRAL_K);
+    let tgt = xy_to_rgb(tx, ty);
+    let neu = xy_to_rgb(nx, ny);
+    // von-Kries: gain maps a neutral lit by the target illuminant back to the
+    // reference white. Locus RGB stays positive across 2000–15000 K, but guard
+    // the divide so an out-of-gamut excursion can't produce NaN/∞.
+    let mut g = [
+        neu[0] / tgt[0].max(1e-4),
+        neu[1] / tgt[1].max(1e-4),
+        neu[2] / tgt[2].max(1e-4),
+    ];
     // Tint: + → magenta (cut green), − → green (boost green). 0.5 caps full-range tint at ±50% green shift.
     g[1] *= 1.0 - 0.5 * tint;
     // Normalise so green gain stays 1 (keeps overall exposure stable).
@@ -122,6 +154,48 @@ mod tests {
     }
 
     #[test]
+    fn tracks_planckian_locus() {
+        // Issue #14: the Temp slider must adapt along the CIE Planckian locus, not
+        // through magenta/purple. These expected gains are computed independently
+        // (Kim et al. CCT→xy locus + von-Kries in linear sRGB, green-normalised);
+        // the old Tanner-Helland RGB-ratio model under-cut red and over-boosted
+        // blue, missing these by 20–200%. Tolerance is a few % of each gain.
+        let cases: [(f32, [f32; 3]); 7] = [
+            (2000.0, [0.3016, 1.0, 28.725]),
+            (3000.0, [0.5632, 1.0, 2.7544]),
+            (4000.0, [0.7685, 1.0, 1.5384]),
+            (5500.0, [1.0000, 1.0, 1.0000]),
+            (6500.0, [1.1105, 1.0, 0.8442]),
+            (9000.0, [1.2925, 1.0, 0.6573]),
+            (15000.0, [1.4875, 1.0, 0.5166]),
+        ];
+        for (k, want) in cases {
+            let g = wb_from_kelvin(k, 0.0);
+            for c in 0..3 {
+                let tol = 0.03 * want[c].max(0.05);
+                assert!(
+                    (g[c] - want[c]).abs() <= tol,
+                    "k={k} c{c}: got {} want {} (tol {tol})",
+                    g[c],
+                    want[c]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn cooling_cuts_red_hard_enough_to_avoid_purple() {
+        // The purple cast came from leaving too much red when cooling. A true
+        // locus adaptation at 3000 K cuts red to ~0.56; the old model left 0.75,
+        // and that residual red + boosted blue read as violet. Guard the regression.
+        assert!(
+            wb_from_kelvin(3000.0, 0.0)[0] < 0.65,
+            "red under-cut: {}",
+            wb_from_kelvin(3000.0, 0.0)[0]
+        );
+    }
+
+    #[test]
     fn cct_roundtrips() {
         for k in [3200.0_f32, 4500.0, 5500.0, 6500.0, 8000.0] {
             let g = wb_from_kelvin(k, 0.0);
@@ -149,18 +223,16 @@ mod tests {
         // similarly small, monotone steps — no staircase jumps that would flip a
         // re-run between neighbouring temperatures on a tiny content change. The
         // old 50 K grid staircased (≥50 K steps); the continuous solve tracks the
-        // 20 K input step. The Tanner-Helland model has one irreducible ~91 K
-        // dead-zone near 6600 K (red channel clamps to 1.0, so r/b is constant
-        // there and K is genuinely unrecoverable from it) — skipped here.
+        // 20 K input step. Unlike the old Tanner-Helland model (whose clamped red
+        // channel left a ~91 K dead-zone near 6600 K), the Planckian-locus model
+        // has a strictly-monotone r/b ratio everywhere, so no range is skipped.
         let mut prev = gains_to_cct(wb_from_kelvin(3000.0, 0.0)).0;
         let mut k = 3020.0_f32;
         while k <= 12000.0 {
             let est = gains_to_cct(wb_from_kelvin(k, 0.0)).0;
-            if !(6500.0..=6750.0).contains(&k) {
-                let step = est - prev;
-                assert!(step >= -0.5, "non-monotone at {k}: {prev}->{est}");
-                assert!(step < 40.0, "jump at {k}: {prev}->{est} (step {step})");
-            }
+            let step = est - prev;
+            assert!(step >= -0.5, "non-monotone at {k}: {prev}->{est}");
+            assert!(step < 40.0, "jump at {k}: {prev}->{est} (step {step})");
             prev = est;
             k += 20.0;
         }
