@@ -1,12 +1,15 @@
 //! Native HDR/EDR compositing surface.
 //!
-//! This module hosts the platform-specific "live HDR" spike: a native
-//! extended-dynamic-range (EDR) layer composited *behind* the Tauri webview so
-//! that pixels brighter than SDR white (1.0) can actually glow on an HDR
-//! display, instead of being clamped by the WKWebView's SDR canvas.
+//! A platform-native extended-dynamic-range (EDR) layer composited *behind* the
+//! Tauri webview so that pixels brighter than SDR white (1.0) can actually glow
+//! on an HDR display, instead of being clamped by the WKWebView's SDR canvas.
+//! The frontend punches a transparent hole in the DOM over the image viewport;
+//! this surface shows through it.
 //!
-//! Only macOS is implemented for now (CAMetalLayer + reference-EDR). Other
-//! platforms get a gain-map fallback elsewhere.
+//! Driven on-demand by three Tauri commands (`hdr_surface_show` / `_set_rect` /
+//! `_hide`). Only macOS is implemented for now (CAMetalLayer + reference-EDR);
+//! other platforms get the commands as no-ops (gain-map fallback lives
+//! elsewhere). The surface handle lives in managed [`HdrSurfaceState`].
 
 #[cfg(target_os = "macos")]
 pub mod macos;
@@ -20,4 +23,113 @@ pub struct HdrBuffer {
     pub width: u32,
     pub height: u32,
     pub rgba16f: Vec<u16>,
+}
+
+/// Placement of the surface, supplied by the frontend: the SDR canvas's
+/// bounding box in CSS pixels (top-left origin, DOM coordinates) plus the
+/// device-pixel-ratio for backing resolution.
+#[derive(Debug, Clone, Copy, serde::Deserialize)]
+pub struct ViewportRect {
+    pub x: f64,
+    pub y: f64,
+    pub w: f64,
+    pub h: f64,
+    pub dpr: f64,
+}
+
+/// Tauri managed state holding the lazily-created native surface handle.
+///
+/// On macOS the surface lives behind an `Arc<Mutex<Option<..>>>` whose contents
+/// are only ever dereferenced on the main thread (see `macos::Surface`). On
+/// other platforms this is an empty marker and the commands are no-ops.
+#[derive(Default)]
+pub struct HdrSurfaceState {
+    #[cfg(target_os = "macos")]
+    surface: macos::SurfaceSlot,
+}
+
+/// Upload an `rgba16f` buffer to the native EDR surface and show it at `rect`.
+/// The buffer is LINEAR extended-Display-P3 half-float (from `encode_hdr_raw`);
+/// it is uploaded verbatim (no re-linearization). Creates the surface lazily.
+#[tauri::command]
+pub fn hdr_surface_show(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, HdrSurfaceState>,
+    rgba16f: Vec<u16>,
+    width: u32,
+    height: u32,
+    rect: ViewportRect,
+) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        use tauri::Manager;
+        let slot = state.surface.clone();
+        let window = app
+            .get_webview_window("main")
+            .ok_or_else(|| "no main window".to_string())?;
+        // The closure runs on the main thread; all native work happens there.
+        window
+            .with_webview(move |webview| {
+                macos::show_on_main(webview, slot, rgba16f, width, height, rect);
+            })
+            .map_err(|e| format!("with_webview failed: {e}"))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (app, state, rgba16f, width, height, rect);
+        Ok(())
+    }
+}
+
+/// Reposition / resize the native EDR surface (pan, zoom, window resize).
+#[tauri::command]
+pub fn hdr_surface_set_rect(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, HdrSurfaceState>,
+    rect: ViewportRect,
+) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        use tauri::Manager;
+        let slot = state.surface.clone();
+        let window = app
+            .get_webview_window("main")
+            .ok_or_else(|| "no main window".to_string())?;
+        window
+            .with_webview(move |webview| {
+                macos::set_rect_on_main(webview, slot, rect);
+            })
+            .map_err(|e| format!("with_webview failed: {e}"))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (app, state, rect);
+        Ok(())
+    }
+}
+
+/// Hide the native EDR surface, revealing the SDR webview canvas.
+#[tauri::command]
+pub fn hdr_surface_hide(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, HdrSurfaceState>,
+) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        use tauri::Manager;
+        let slot = state.surface.clone();
+        let window = app
+            .get_webview_window("main")
+            .ok_or_else(|| "no main window".to_string())?;
+        window
+            .with_webview(move |webview| {
+                macos::hide_on_main(webview, slot);
+            })
+            .map_err(|e| format!("with_webview failed: {e}"))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (app, state);
+        Ok(())
+    }
 }

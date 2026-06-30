@@ -47,6 +47,7 @@ pub fn run() {
         .manage(session::Session::default())
         .manage(tether::TetherState::default())
         .manage(telemetry::TelemetryState::default())
+        .manage(hdr_surface::HdrSurfaceState::default())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -76,13 +77,6 @@ pub fn run() {
                 // run after the window is realized, hence the deferral.
                 #[cfg(target_os = "macos")]
                 {
-                    // EDR "live HDR" spike: attach a native CAMetalLayer that
-                    // draws a static extended-dynamic-range gradient behind the
-                    // (transparent) webview, to prove EDR is granted through an
-                    // embedded WKWebView. Failure is non-fatal (logged inside).
-                    if let Err(e) = hdr_surface::macos::attach_edr_spike(&win) {
-                        eprintln!("[hdr] attach_edr_spike scheduling failed: {e}");
-                    }
                     let win = win.clone();
                     std::thread::spawn(move || {
                         std::thread::sleep(std::time::Duration::from_millis(400));
@@ -188,6 +182,9 @@ pub fn run() {
             commands::debug_log_append,
             commands::debug_clear,
             commands::save_log,
+            hdr_surface::hdr_surface_show,
+            hdr_surface::hdr_surface_set_rect,
+            hdr_surface::hdr_surface_hide,
             telemetry::set_telemetry,
             telemetry::telemetry_event,
             tether::tether_start,

@@ -1,66 +1,56 @@
-//! macOS EDR (extended dynamic range) compositing spike.
+//! macOS EDR (extended dynamic range) compositing surface — production version.
 //!
-//! Goal of this spike: prove that an embedded `WKWebView` inside a Tauri window
-//! still grants EDR to a *sibling* `CAMetalLayer`. If the bright bands (linear
-//! 2.0 / 4.0) glow brighter than SDR white (1.0) on a real HDR display, EDR is
-//! granted and we can build the real "live HDR" viewport on this foundation. If
-//! they do NOT, EDR is not reachable through an embedded webview and we fall
-//! back to gain-maps.
+//! A native `CAMetalLayer` (RGBA16Float, extended-linear Display-P3, reference
+//! EDR) hosted by an `NSView` that sits *behind* the WKWebView. The frontend
+//! punches a transparent hole in the DOM over the image viewport; this layer
+//! shows through it and can draw pixels brighter than SDR white (1.0) that a
+//! real HDR display renders as true highlights.
 //!
-//! For this verification pass the card is stacked IN FRONT OF the webview and
-//! fully covers the UI on purpose — an opaque DOM kept occluding it when it sat
-//! behind. This is a momentary aid; Task 6 replaces this module with the real
-//! viewport-bounded surface that lives behind the DOM.
+//! Lifecycle is on-demand, driven by three Tauri commands (in the parent
+//! module): `hdr_surface_show` uploads an `rgba16f` buffer + positions the
+//! surface, `hdr_surface_set_rect` repositions on pan/zoom/resize, and
+//! `hdr_surface_hide` hides it (revealing the SDR canvas). The surface is
+//! created lazily on the first `show`.
 //!
-//! What it does, concretely:
-//!   1. Reaches the native `NSWindow` + `WKWebView` via Tauri's
-//!      `WebviewWindow::with_webview` (the closure runs on the main thread).
-//!   2. Inserts a custom `NSView` (layer-hosted by a `CAMetalLayer`) as the
-//!      sibling *directly above* the webview inside the window's content view.
-//!   3. Configures the layer for reference-EDR: `RGBA16Float`, an
-//!      extended-linear Display-P3 colorspace, and
-//!      `wantsExtendedDynamicRangeContent = true` (EDR metadata left nil =
-//!      reference EDR).
-//!   4. Sets the webview transparent (`drawsBackground = false`) — moot while
-//!      the card is on top, kept for the behind-the-DOM future.
-//!   5. Overrides `hitTest:` to return nil so clicks/scroll fall through to the
-//!      webview (the native view never steals input).
-//!   6. Continuously renders a STATIC EDR test card — 4 equal vertical bands at
-//!      extended-linear luminance 0.5 / 1.0 / 2.0 / 4.0 — with a minimal Metal
-//!      pipeline (fullscreen triangle, no vertex buffers), re-armed each tick on
-//!      the main run loop.
-//!
-//! The card is redrawn continuously (~60Hz, via a `performSelector` re-arm on
-//! the main run loop) so it stays visible for evaluation. It is a STATIC test
-//! pattern — no real image data is wired here; that is downstream work.
+//! ## Thread safety
+//! `NSView`/`CAMetalLayer`/`MTLDevice`/… are main-thread-only and not
+//! `Send`/`Sync`, but Tauri managed state must be `Send + Sync` and command
+//! handlers can run off the main thread. The [`Surface`] handle therefore
+//! carries `unsafe impl Send + Sync` whose invariant is "only ever dereferenced
+//! on the main thread" — and every entry point here is reached via
+//! `WebviewWindow::with_webview`, whose closure Tauri runs on the main thread.
+//! Nothing in here touches a Cocoa/Metal object off the main thread.
 
 #![allow(unexpected_cfgs)]
 
-use objc2::rc::Retained;
-use objc2::runtime::{AnyObject, ProtocolObject};
-use objc2::rc::Allocated;
-use objc2::{define_class, msg_send, sel, DefinedClass, MainThreadOnly};
+use std::sync::{Arc, Mutex};
 
-use objc2_app_kit::{NSAutoresizingMaskOptions, NSView, NSWindow, NSWindowOrderingMode};
+use core::ffi::c_void;
+use core::ptr::NonNull;
+
+use objc2::rc::{Allocated, Retained};
+use objc2::runtime::{AnyObject, ProtocolObject};
+use objc2::{define_class, msg_send, MainThreadOnly};
+
+use objc2_app_kit::{NSView, NSWindow, NSWindowOrderingMode};
 use objc2_core_foundation::CGSize;
 use objc2_core_graphics::{kCGColorSpaceExtendedLinearDisplayP3, CGColorSpace};
-use objc2_foundation::{MainThreadMarker, NSNumber, NSPoint, NSRect, NSString};
+use objc2_foundation::{MainThreadMarker, NSNumber, NSPoint, NSRect, NSSize, NSString};
 use objc2_metal::{
     MTLClearColor, MTLCommandBuffer, MTLCommandEncoder, MTLCommandQueue,
-    MTLCreateSystemDefaultDevice, MTLDevice, MTLDrawable, MTLLibrary, MTLLoadAction,
-    MTLPixelFormat, MTLPrimitiveType, MTLRenderCommandEncoder, MTLRenderPassDescriptor,
-    MTLRenderPipelineDescriptor, MTLRenderPipelineState, MTLStoreAction,
+    MTLCreateSystemDefaultDevice, MTLDevice, MTLDrawable, MTLLibrary, MTLLoadAction, MTLOrigin,
+    MTLPixelFormat, MTLPrimitiveType, MTLRegion, MTLRenderCommandEncoder, MTLRenderPassDescriptor,
+    MTLRenderPipelineDescriptor, MTLRenderPipelineState, MTLSize, MTLStorageMode, MTLStoreAction,
+    MTLTexture, MTLTextureDescriptor, MTLTextureUsage,
 };
 use objc2_quartz_core::{CAMetalDrawable, CAMetalLayer};
 
-/// Minimal Metal Shading Language for the static EDR test pattern.
-///
-/// The vertex stage emits a fullscreen triangle from `vertex_id` alone (no
-/// vertex buffer). The fragment stage writes an EDR comparison test card: 4
-/// equal-width neutral-gray vertical bands with extended-linear Display-P3
-/// luminances 0.5, 1.0, 2.0, 4.0. The 1.0 band is SDR-white reference (max
-/// non-HDR white); on an EDR display the 2.0 and 4.0 bands must visibly
-/// out-glow it — that's the EDR proof.
+use super::ViewportRect;
+
+/// Metal Shading Language: a textured fullscreen triangle (no vertex buffers).
+/// The fragment stage samples the uploaded image (linear extended-Display-P3,
+/// already linearized) with linear filtering so it scales to fill the layer.
+/// Alpha is forced to 1.0 so the surface stays opaque behind the punched hole.
 const EDR_SHADER_SRC: &str = r#"
 #include <metal_stdlib>
 using namespace metal;
@@ -74,150 +64,157 @@ vertex VOut edr_vertex(uint vid [[vertex_id]]) {
     float2 uv = float2((vid << 1) & 2, vid & 2);   // (0,0) (2,0) (0,2)
     VOut out;
     out.position = float4(uv * float2(2.0, -2.0) + float2(-1.0, 1.0), 0.0, 1.0);
-    out.uv = uv;
+    out.uv = uv;                                   // visible region uv in [0,1]
     return out;
 }
 
-fragment float4 edr_fragment(VOut in [[stage_in]]) {
-    // 4 equal vertical bands, left -> right: 0.5, 1.0 (SDR white), 2.0, 4.0.
-    const float bands[4] = { 0.5, 1.0, 2.0, 4.0 };
-    int idx = clamp(int(floor(clamp(in.uv.x, 0.0, 1.0) * 4.0)), 0, 3);
-    float v = bands[idx];
-    return float4(v, v, v, 1.0);
+fragment float4 edr_fragment(VOut in [[stage_in]], texture2d<float> tex [[texture(0)]]) {
+    constexpr sampler s(filter::linear, address::clamp_to_edge);
+    return float4(tex.sample(s, in.uv).rgb, 1.0);
 }
 "#;
 
-/// Render context stored on the view so the repeating `redrawEDR` tick can
-/// re-encode the gradient without re-resolving the device/pipeline each frame.
-struct EdrIvars {
-    layer: Retained<CAMetalLayer>,
-    pipeline: Retained<ProtocolObject<dyn MTLRenderPipelineState>>,
-    queue: Retained<ProtocolObject<dyn MTLCommandQueue>>,
-}
-
 define_class!(
     // SAFETY:
-    // - `NSView` is the superclass; it (and the thread-kind MainThreadOnly it
-    //   carries) impose no extra subclassing requirements we violate here.
-    // - This class does not implement `Drop`.
+    // - `NSView` is the superclass; we add no instance variables and do not
+    //   implement `Drop`, so its subclassing requirements are upheld.
     #[unsafe(super(NSView))]
-    #[name = "OEEdrPassthroughView"]
-    #[ivars = EdrIvars]
-    struct EdrPassthroughView;
+    #[name = "OEHdrSurfaceView"]
+    struct HdrSurfaceView;
 
-    impl EdrPassthroughView {
-        // Return nil from hit-testing so every click / scroll over this view
-        // falls through to whatever sibling sits in front of it (the webview).
+    impl HdrSurfaceView {
+        // Return nil from hit-testing so all clicks/scroll fall through to the
+        // webview in front — the surface never steals input.
         #[unsafe(method(hitTest:))]
         fn hit_test(&self, _point: NSPoint) -> *mut NSView {
             std::ptr::null_mut()
         }
-
-        // Repeating redraw tick. Re-encodes the same static 0..4 gradient into
-        // the next drawable, then re-arms itself (~60Hz) on the main run loop so
-        // the layer stays continuously presented behind the webview — otherwise
-        // a single one-shot draw only flashes before the DOM composites over it.
-        #[unsafe(method(redrawEDR))]
-        fn redraw_edr(&self) {
-            let iv = self.ivars();
-            // A nil drawable (e.g. layer momentarily not displayable) just skips
-            // this tick; we never panic and always re-arm below.
-            let _ = render_gradient(&iv.layer, &iv.pipeline, &iv.queue);
-            // Re-arm on the main run loop. performSelector:withObject:afterDelay:
-            // retains `self` until it fires, keeping the view alive across ticks.
-            unsafe {
-                let _: () = msg_send![
-                    self,
-                    performSelector: sel!(redrawEDR),
-                    withObject: std::ptr::null::<AnyObject>(),
-                    afterDelay: 1.0 / 60.0,
-                ];
-            }
-        }
     }
 );
 
-impl EdrPassthroughView {
-    fn new(
-        mtm: MainThreadMarker,
-        frame: NSRect,
-        layer: Retained<CAMetalLayer>,
-        pipeline: Retained<ProtocolObject<dyn MTLRenderPipelineState>>,
-        queue: Retained<ProtocolObject<dyn MTLCommandQueue>>,
-    ) -> Retained<Self> {
+impl HdrSurfaceView {
+    fn new(mtm: MainThreadMarker, frame: NSRect) -> Retained<Self> {
         let this: Allocated<Self> = Self::alloc(mtm);
-        let this = this.set_ivars(EdrIvars {
-            layer,
-            pipeline,
-            queue,
-        });
-        unsafe { msg_send![super(this), initWithFrame: frame] }
+        unsafe { msg_send![this, initWithFrame: frame] }
     }
+}
 
-    /// Kick off the continuous redraw loop on the next main-run-loop turn.
-    fn start_render_loop(&self) {
-        unsafe {
-            let _: () = msg_send![
-                self,
-                performSelector: sel!(redrawEDR),
-                withObject: std::ptr::null::<AnyObject>(),
-                afterDelay: 0.0,
-            ];
+/// Native surface handle stored in Tauri managed state.
+///
+/// SAFETY (the `unsafe impl`s below): every field is a main-thread-only Cocoa /
+/// Metal object. It is sound to move this between threads ONLY because it is
+/// never *dereferenced* off the main thread — all access goes through the
+/// `*_on_main` functions, which run inside `WebviewWindow::with_webview`'s
+/// main-thread closure.
+pub struct Surface {
+    view: Retained<HdrSurfaceView>,
+    layer: Retained<CAMetalLayer>,
+    device: Retained<ProtocolObject<dyn MTLDevice>>,
+    queue: Retained<ProtocolObject<dyn MTLCommandQueue>>,
+    pipeline: Retained<ProtocolObject<dyn MTLRenderPipelineState>>,
+    texture: Option<Retained<ProtocolObject<dyn MTLTexture>>>,
+}
+
+// SAFETY: see the `Surface` doc comment — only ever dereferenced on the main thread.
+unsafe impl Send for Surface {}
+unsafe impl Sync for Surface {}
+
+/// Shared, lockable slot for the lazily-created surface.
+pub type SurfaceSlot = Arc<Mutex<Option<Surface>>>;
+
+// ---------------------------------------------------------------------------
+// Command entry points (each runs inside a main-thread `with_webview` closure)
+// ---------------------------------------------------------------------------
+
+/// Lazily create the surface (if needed), upload the buffer, position + show.
+pub fn show_on_main(
+    webview: tauri::webview::PlatformWebview,
+    slot: SurfaceSlot,
+    rgba16f: Vec<u16>,
+    width: u32,
+    height: u32,
+    rect: ViewportRect,
+) {
+    let Some(mtm) = MainThreadMarker::new() else {
+        eprintln!("[hdr] show closure not on main thread; ignoring");
+        return;
+    };
+    let ns_window = webview.ns_window() as *mut NSWindow;
+    let wk_webview = webview.inner() as *mut AnyObject;
+    if ns_window.is_null() || wk_webview.is_null() {
+        eprintln!("[hdr] null NSWindow/WKWebView handle; ignoring show");
+        return;
+    }
+    // SAFETY: valid for the window's lifetime; only used on the main thread.
+    let window: &NSWindow = unsafe { &*ns_window };
+    let wk_webview: &AnyObject = unsafe { &*wk_webview };
+
+    let mut guard = slot.lock().unwrap();
+    if guard.is_none() {
+        match create_surface(mtm, window, wk_webview) {
+            Ok(s) => *guard = Some(s),
+            Err(e) => {
+                eprintln!("[hdr] create_surface failed: {e}");
+                return;
+            }
         }
     }
+    let surface = guard.as_mut().unwrap();
+    if let Err(e) = upload_texture(surface, &rgba16f, width, height) {
+        eprintln!("[hdr] texture upload failed: {e}");
+        return;
+    }
+    surface.view.setHidden(false);
+    position(window, surface, rect);
+    let _ = render(surface);
 }
 
-/// Attach the EDR spike layer behind `window`'s webview.
-///
-/// Returns `Ok(())` once the native work has been *scheduled* on the main
-/// thread (Tauri runs the `with_webview` closure there). Internal native
-/// failures (e.g. no Metal device, shader compile error) are logged to stderr;
-/// they do not abort app startup — this is an exploratory spike.
-pub fn attach_edr_spike(window: &tauri::WebviewWindow) -> Result<(), String> {
-    window
-        .with_webview(|webview| {
-            // The closure is documented to run on the main thread.
-            let Some(mtm) = MainThreadMarker::new() else {
-                eprintln!("[hdr] with_webview closure not on main thread; skipping EDR spike");
-                return;
-            };
-
-            // SAFETY: On macOS, `ns_window()` returns the `NSWindow*` that hosts
-            // the WKWebView, and `inner()` returns the `WKWebView*`. Both are
-            // valid for the lifetime of the window.
-            let ns_window = webview.ns_window() as *mut NSWindow;
-            let wk_webview = webview.inner() as *mut AnyObject;
-            if ns_window.is_null() || wk_webview.is_null() {
-                eprintln!("[hdr] null NSWindow/WKWebView handle; skipping EDR spike");
-                return;
-            }
-            let window: &NSWindow = unsafe { &*ns_window };
-            let wk_webview: &AnyObject = unsafe { &*wk_webview };
-
-            if let Err(e) = build_and_attach(mtm, window, wk_webview) {
-                eprintln!("[hdr] EDR spike attach failed: {e}");
-            } else {
-                eprintln!("[hdr] EDR spike attached (static 0..4 linear gradient behind webview)");
-            }
-        })
-        .map_err(|e| format!("with_webview failed: {e}"))
+/// Reposition / resize the surface (pan, zoom, window resize). No-op if not yet shown.
+pub fn set_rect_on_main(webview: tauri::webview::PlatformWebview, slot: SurfaceSlot, rect: ViewportRect) {
+    if MainThreadMarker::new().is_none() {
+        return;
+    }
+    let ns_window = webview.ns_window() as *mut NSWindow;
+    if ns_window.is_null() {
+        return;
+    }
+    // SAFETY: valid for the window's lifetime; only used on the main thread.
+    let window: &NSWindow = unsafe { &*ns_window };
+    let guard = slot.lock().unwrap();
+    if let Some(surface) = guard.as_ref() {
+        position(window, surface, rect);
+        let _ = render(surface);
+    }
 }
 
-fn build_and_attach(
+/// Hide the surface, revealing the SDR webview canvas. No-op if not yet shown.
+pub fn hide_on_main(_webview: tauri::webview::PlatformWebview, slot: SurfaceSlot) {
+    if MainThreadMarker::new().is_none() {
+        return;
+    }
+    let guard = slot.lock().unwrap();
+    if let Some(surface) = guard.as_ref() {
+        surface.view.setHidden(true);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Native helpers (main thread only)
+// ---------------------------------------------------------------------------
+
+fn create_surface(
     mtm: MainThreadMarker,
     window: &NSWindow,
     wk_webview: &AnyObject,
-) -> Result<(), String> {
+) -> Result<Surface, String> {
     let content_view = window
         .contentView()
         .ok_or_else(|| "NSWindow has no contentView".to_string())?;
-    let bounds: NSRect = content_view.frame();
-    let scale = window.backingScaleFactor();
 
-    // --- Metal device + pipeline -----------------------------------------
     let device: Retained<ProtocolObject<dyn MTLDevice>> =
         MTLCreateSystemDefaultDevice().ok_or_else(|| "no system default Metal device".to_string())?;
 
+    // Textured render pipeline.
     let source = NSString::from_str(EDR_SHADER_SRC);
     let library = device
         .newLibraryWithSource_options_error(&source, None)
@@ -243,16 +240,13 @@ fn build_and_attach(
         .newCommandQueue()
         .ok_or_else(|| "could not create command queue".to_string())?;
 
-    // --- CAMetalLayer configured for reference EDR -----------------------
+    // CAMetalLayer configured for reference EDR.
     let layer = CAMetalLayer::new();
     layer.setDevice(Some(&device));
     layer.setPixelFormat(MTLPixelFormat::RGBA16Float);
     layer.setFramebufferOnly(true);
     layer.setWantsExtendedDynamicRangeContent(true);
-    // edrMetadata intentionally left nil == reference EDR (HDR10/HLG metadata
-    // is a later tuning knob, out of scope for this spike).
-
-    // Extended-linear Display-P3: values > 1.0 carry through as true EDR.
+    // edrMetadata left nil == reference EDR.
     // SAFETY: `kCGColorSpaceExtendedLinearDisplayP3` is a framework constant.
     let cs_name = unsafe { kCGColorSpaceExtendedLinearDisplayP3 };
     if let Some(cs) = CGColorSpace::with_name(Some(cs_name)) {
@@ -261,75 +255,144 @@ fn build_and_attach(
         eprintln!("[hdr] could not create extended-linear Display-P3 colorspace");
     }
 
-    let drawable_w = (bounds.size.width * scale).max(1.0);
-    let drawable_h = (bounds.size.height * scale).max(1.0);
-    layer.setDrawableSize(CGSize::new(drawable_w, drawable_h));
-    layer.setFrame(bounds);
-    layer.setContentsScale(scale);
-
-    // --- Layer-hosting NSView, inserted IN FRONT OF the webview ----------
-    // The view owns the render context (layer/pipeline/queue) so its repeating
-    // redraw tick can re-encode the test card every frame.
-    let view = EdrPassthroughView::new(mtm, bounds, layer.clone(), pipeline, queue);
-    // Order matters: set the backing layer *before* enabling wantsLayer so the
-    // view becomes "layer-hosting" with our CAMetalLayer as its backing store.
+    // Layer-hosting view, positioned later by `show`/`set_rect`.
+    let zero = NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(0.0, 0.0));
+    let view = HdrSurfaceView::new(mtm, zero);
+    // Order matters: set the backing layer before enabling wantsLayer so the
+    // view becomes layer-hosting with our CAMetalLayer as its backing store.
     view.setLayer(Some(&layer));
     view.setWantsLayer(true);
-    view.setAutoresizingMask(
-        NSAutoresizingMaskOptions::ViewWidthSizable | NSAutoresizingMaskOptions::ViewHeightSizable,
-    );
+    view.setHidden(true);
 
-    // Stack ABOVE the webview so the opaque DOM can no longer occlude the test
-    // card. This intentionally covers the whole UI — it is a momentary visual
-    // verification aid (Task 6 replaces this with the viewport-bounded surface).
-    // WKWebView is itself an NSView subclass, so it is the sibling we order over.
-    // SAFETY: `wk_webview` is the WKWebView, which inherits NSView.
+    // Insert directly BELOW the webview so the DOM composites in front and the
+    // surface shows only through the transparent viewport hole.
+    // SAFETY: WKWebView inherits NSView.
     let webview_view: &NSView = unsafe { &*(wk_webview as *const AnyObject as *const NSView) };
-    content_view.addSubview_positioned_relativeTo(
-        &view,
-        NSWindowOrderingMode::Above,
-        Some(webview_view),
-    );
-    // Belt-and-suspenders: also pull the layer forward in z.
-    layer.setZPosition(1.0);
+    content_view.addSubview_positioned_relativeTo(&view, NSWindowOrderingMode::Below, Some(webview_view));
+    layer.setZPosition(-1.0);
 
-    // --- Make the webview transparent (harmless now the card is on top) ---
-    // Kept for when the surface moves behind the DOM (Task 6). WKWebView has no
-    // public `setDrawsBackground:`; the supported way (also used by wry) is KVC
-    // on the private `drawsBackground` property.
+    // Make the webview transparent so the layer is visible through the hole.
+    // WKWebView has no public `setDrawsBackground:`; KVC on the private
+    // `drawsBackground` property is the supported path (also used by wry).
     unsafe {
         let no = NSNumber::numberWithBool(false);
         let key = NSString::from_str("drawsBackground");
         let _: () = msg_send![wk_webview, setValue: &*no, forKey: &*key];
     }
 
-    // --- Start the continuous redraw loop --------------------------------
-    // A repeating ~60Hz tick (driven by performSelector re-arm on the main run
-    // loop) keeps the gradient presented; a single one-shot draw would only
-    // flash before the DOM composites over it. The view is retained by the
-    // AppKit hierarchy AND by the pending performSelector, and the layer is its
-    // backing store — so dropping the local handles here is safe.
-    view.start_render_loop();
+    Ok(Surface {
+        view,
+        layer,
+        device,
+        queue,
+        pipeline,
+        texture: None,
+    })
+}
 
-    let _ = view;
-    let _ = layer;
+/// Upload the `rgba16f` buffer into a fresh RGBA16Float texture on the surface.
+/// The buffer is LINEAR extended-Display-P3 half-float — uploaded verbatim, no
+/// re-linearization.
+fn upload_texture(
+    surface: &mut Surface,
+    rgba16f: &[u16],
+    width: u32,
+    height: u32,
+) -> Result<(), String> {
+    if width == 0 || height == 0 {
+        return Err("zero texture dimensions".to_string());
+    }
+    let expected = (width as usize) * (height as usize) * 4;
+    if rgba16f.len() < expected {
+        return Err(format!(
+            "rgba16f buffer too small: {} < {} ({}x{}x4)",
+            rgba16f.len(),
+            expected,
+            width,
+            height
+        ));
+    }
+
+    // SAFETY: standard 2D texture descriptor; args are plain values.
+    let desc = unsafe {
+        MTLTextureDescriptor::texture2DDescriptorWithPixelFormat_width_height_mipmapped(
+            MTLPixelFormat::RGBA16Float,
+            width as usize,
+            height as usize,
+            false,
+        )
+    };
+    desc.setUsage(MTLTextureUsage::ShaderRead);
+    desc.setStorageMode(MTLStorageMode::Shared);
+
+    let texture = surface
+        .device
+        .newTextureWithDescriptor(&desc)
+        .ok_or_else(|| "texture allocation failed".to_string())?;
+
+    let region = MTLRegion {
+        origin: MTLOrigin { x: 0, y: 0, z: 0 },
+        size: MTLSize {
+            width: width as usize,
+            height: height as usize,
+            depth: 1,
+        },
+    };
+    let bytes_per_row = (width as usize) * 4 * 2; // 4 channels * 2 bytes (f16)
+    // SAFETY: `rgba16f` is at least `expected` u16s long (checked above), so the
+    // pointer + region + bytesPerRow describe an in-bounds copy. The texture is
+    // shared storage, so the GPU sees the data after this synchronous copy.
+    unsafe {
+        texture.replaceRegion_mipmapLevel_withBytes_bytesPerRow(
+            region,
+            0,
+            NonNull::new(rgba16f.as_ptr() as *mut c_void).unwrap(),
+            bytes_per_row,
+        );
+    }
+
+    surface.texture = Some(texture);
     Ok(())
 }
 
-fn render_gradient(
-    layer: &CAMetalLayer,
-    pipeline: &ProtocolObject<dyn objc2_metal::MTLRenderPipelineState>,
-    queue: &ProtocolObject<dyn MTLCommandQueue>,
-) -> Result<(), String> {
-    let drawable = layer
-        .nextDrawable()
-        .ok_or_else(|| "CAMetalLayer vended no drawable".to_string())?;
-    let texture = drawable.texture();
+/// Position the view at `rect`, flipping Y from DOM (top-left) to AppKit
+/// (bottom-left) coordinates, and size the layer's drawable for the dpr.
+fn position(window: &NSWindow, surface: &Surface, rect: ViewportRect) {
+    let content_h = window
+        .contentView()
+        .map(|v| v.frame().size.height)
+        .unwrap_or(0.0);
+    // DOM rect is top-left origin in CSS points; AppKit frames are bottom-left.
+    let y_flipped = content_h - rect.y - rect.h;
+    let frame = NSRect::new(NSPoint::new(rect.x, y_flipped), NSSize::new(rect.w, rect.h));
+    surface.view.setFrame(frame);
+
+    let dpr = rect.dpr.max(1.0);
+    surface.layer.setContentsScale(dpr);
+    // Layer frame is in the view's own coordinate space (origin at 0,0).
+    surface
+        .layer
+        .setFrame(NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(rect.w, rect.h)));
+    let dw = (rect.w * dpr).max(1.0);
+    let dh = (rect.h * dpr).max(1.0);
+    surface.layer.setDrawableSize(CGSize::new(dw, dh));
+}
+
+/// Draw the uploaded texture into the layer's next drawable (scaled to fill).
+/// A nil drawable or missing texture is a no-op (no panic).
+fn render(surface: &Surface) -> Result<(), String> {
+    let Some(texture) = surface.texture.as_ref() else {
+        return Ok(());
+    };
+    let Some(drawable) = surface.layer.nextDrawable() else {
+        return Ok(());
+    };
+    let out = drawable.texture();
 
     let pass = MTLRenderPassDescriptor::new();
     // SAFETY: single color attachment at index 0.
     let attach = unsafe { pass.colorAttachments().objectAtIndexedSubscript(0) };
-    attach.setTexture(Some(&texture));
+    attach.setTexture(Some(&out));
     attach.setLoadAction(MTLLoadAction::Clear);
     attach.setStoreAction(MTLStoreAction::Store);
     attach.setClearColor(MTLClearColor {
@@ -339,18 +402,21 @@ fn render_gradient(
         alpha: 1.0,
     });
 
-    let cmd = queue
+    let cmd = surface
+        .queue
         .commandBuffer()
         .ok_or_else(|| "no command buffer".to_string())?;
     let encoder = cmd
         .renderCommandEncoderWithDescriptor(&pass)
         .ok_or_else(|| "no render command encoder".to_string())?;
-    encoder.setRenderPipelineState(pipeline);
+    encoder.setRenderPipelineState(&surface.pipeline);
+    // SAFETY: the shader declares texture(0); we bind the uploaded image there.
+    unsafe { encoder.setFragmentTexture_atIndex(Some(texture), 0) };
     // SAFETY: 3 vertices generated procedurally from vertex_id; no buffers bound.
     unsafe { encoder.drawPrimitives_vertexStart_vertexCount(MTLPrimitiveType::Triangle, 0, 3) };
     encoder.endEncoding();
 
-    // Present the drawable (upcast CAMetalDrawable -> MTLDrawable).
+    // Present (upcast CAMetalDrawable -> MTLDrawable).
     let mtl_drawable = ProtocolObject::<dyn MTLDrawable>::from_ref(&*drawable);
     cmd.presentDrawable(mtl_drawable);
     cmd.commit();
