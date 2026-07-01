@@ -477,13 +477,27 @@
     if (hdrRaf !== null) { cancelAnimationFrame(hdrRaf); hdrRaf = null; }
   }
   function clipArg() { return { high: clipHigh, low: clipLow, strict: clipStrict }; }
-  // Deep-zoom window offset/scale — the SAME values applyGeometryAndDraw hands the
-  // WebGL renderer (`win.off`/`win.scale`, where `win = vw0 ?? identity`). The
-  // invert shader on the surface applies these so the EDR shows the zoomed window
-  // instead of squeezing the whole image into the canvas box. Identity ([0,0]/
-  // [1,1]) at fit and in bake mode (vw0 is null there — matching the WebGL path).
-  function hdrViewWindow(): { off: [number, number]; scale: [number, number] } {
-    return vw0 ? { off: vw0.off, scale: vw0.scale } : { off: [0, 0], scale: [1, 1] };
+  // The SAME geometry object handed to the WebGL renderer (buildGeometry → the 7
+  // view-shaping fields), so the surface's MSL invert reproduces the identical view
+  // by construction — orient/crop/straighten + the deep-zoom window (view_off/
+  // view_scale). At fit that's the identity crop + [0,0]/[1,1] window; when zoomed
+  // it's the vw0 window. Before the working texture is uploaded (buildGeometry null)
+  // fall back to identity; the next push (keyed on geomKey) corrects it.
+  function hdrGeom(): {
+    crop_off: [number, number]; crop_scale: [number, number];
+    view_off: [number, number]; view_scale: [number, number];
+    angle: number; aspect: number; orient: [number, number, number, number];
+  } {
+    const g = buildGeometry();
+    if (!g) return {
+      crop_off: [0, 0], crop_scale: [1, 1], view_off: [0, 0], view_scale: [1, 1],
+      angle: 0, aspect: 1, orient: [1, 0, 0, 1],
+    };
+    return {
+      crop_off: g.crop_off, crop_scale: g.crop_scale,
+      view_off: g.view_off, view_scale: g.view_scale,
+      angle: g.angle, aspect: g.aspect, orient: g.orient,
+    };
   }
 
   // Upload (or re-upload) the raw-negative source; on success mark the surface live
@@ -495,8 +509,7 @@
     const curId = id;
     const myseq = ++sourceSeq;
     try {
-      const w = hdrViewWindow();
-      await api.hdrSurfaceSetSource(id, params, hdrViewSpec(), canvasRect(), w.off, w.scale);
+      await api.hdrSurfaceSetSource(id, params, hdrViewSpec(), canvasRect(), hdrGeom());
       if (myseq !== sourceSeq || id !== curId || !params.hdr || !liveEdr) return; // superseded
       hdrUsesSurface = true;
       hdrShown = true; // hides the SDR canvas via the `edrhole` class below
@@ -513,8 +526,7 @@
   // exists, so a stray early call is harmless.
   function pushHdrUniforms() {
     if (!liveEdr || !params.hdr || !id || !imgW || !vpW) return;
-    const w = hdrViewWindow();
-    api.hdrSurfaceSetUniforms(id, params, hdrViewSpec(), clipArg(), canvasRect(), w.off, w.scale).catch((e) => {
+    api.hdrSurfaceSetUniforms(id, params, hdrViewSpec(), clipArg(), canvasRect(), hdrGeom()).catch((e) => {
       if (!(typeof e === "string" && e === "not developed")) console.error("hdrSurfaceSetUniforms failed", e);
     });
   }
@@ -687,19 +699,25 @@
     renderer.setInversion(toInversionUniforms(res));
   }
 
-  // Map orient/flip/straighten/persistent-crop into GPU geometry uniforms, then draw.
-  function applyGeometryAndDraw() {
-    if (!gpuEligible || !renderer || texW === 0) return; // no texture uploaded yet
+  // The EXACT geometry object handed to the WebGL renderer for the current view —
+  // orient/flip/straighten/persistent-crop + deep-zoom window, or bake-mode identity
+  // (geometry pre-baked into the texture). Single source of truth so the WebGL draw
+  // (below) and the EDR-surface push (`hdrGeom`) can never diverge. Returns null
+  // before the working texture is uploaded (texW===0).
+  function buildGeometry(): {
+    crop_off: [number, number]; crop_scale: [number, number];
+    angle: number; aspect: number; orient: [number, number, number, number];
+    raw: boolean; outW: number; outH: number;
+    view_off: [number, number]; view_scale: [number, number];
+  } | null {
+    if (texW === 0) return null; // no texture uploaded yet
     // Bake mode: geometry is already baked into the texture → identity + baked dims.
     if (bakeMode) {
-      renderer.setGeometry({
+      return {
         crop_off: [0, 0], crop_scale: [1, 1], angle: 0, aspect: 1,
         orient: [1, 0, 0, 1], raw, outW: texW, outH: texH,
         view_off: [0, 0], view_scale: [1, 1],
-      });
-      drawGL();
-      frameReady = true; // correct frame for the current image is now on screen
-      return;
+      };
     }
     // u_orient: oriented-UV → source-UV (undoes rot90/flip). Crop is in oriented UV.
     const o = orientUVMatrix(rot90, flipH, flipV);
@@ -714,12 +732,20 @@
     // viewport-sized backing; otherwise fall back to the full-image dims.
     const win = vw0 ?? { off: [0, 0] as [number, number], scale: [1, 1] as [number, number],
       backing: { w: outW, h: outH }, css: { left, top, width: dispW, height: dispH } };
-    renderer.setGeometry({
+    return {
       crop_off: [cropX, cropY], crop_scale: [cropW, cropH],
       angle: (angle * Math.PI) / 180, aspect: oH / oW, orient: o,
       raw, outW: win.backing.w, outH: win.backing.h,
       view_off: win.off, view_scale: win.scale,
-    });
+    };
+  }
+
+  // Map orient/flip/straighten/persistent-crop into GPU geometry uniforms, then draw.
+  function applyGeometryAndDraw() {
+    if (!gpuEligible || !renderer) return;
+    const g = buildGeometry();
+    if (!g) return; // no texture uploaded yet
+    renderer.setGeometry(g);
     drawGL();
     frameReady = true; // correct frame for the current image is now on screen
   }

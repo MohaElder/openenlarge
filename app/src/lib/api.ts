@@ -132,6 +132,20 @@ export interface ViewSpec {
   ir_removal?: IrRemoval;
 }
 
+/** The view-shaping geometry the live-EDR surface's MSL invert consumes — the
+ *  SAME fields the WebGL renderer's `setGeometry` gets (orient/crop/straighten +
+ *  the deep-zoom window), so the surface reproduces the on-screen view exactly.
+ *  Snake_case field names match the backend's nested `geom` serde struct. */
+export interface HdrSurfaceGeom {
+  crop_off: [number, number];
+  crop_scale: [number, number];
+  view_off: [number, number];
+  view_scale: [number, number];
+  angle: number;
+  aspect: number;
+  orient: [number, number, number, number];
+}
+
 /** Geometry + dust/IR for baking a heal-ready working buffer (raw negative). */
 export interface BakeSpec {
   rot90: number; flip_h: boolean; flip_v: boolean; angle: number;
@@ -213,9 +227,9 @@ export const api = {
   hdrSurfaceSetSource: (
     id: string, params: InvertParams, view: ViewSpec,
     rect: { x: number; y: number; w: number; h: number; dpr: number },
-    view_off: [number, number], view_scale: [number, number],
+    geom: HdrSurfaceGeom,
   ) =>
-    invoke<void>("hdr_surface_set_source", { id, params, view: { ...view, dust: wireDust(view.dust) }, rect, viewOff: view_off, viewScale: view_scale }),
+    invoke<void>("hdr_surface_set_source", { id, params, view: { ...view, dust: wireDust(view.dust) }, rect, geom }),
   /** Live-EDR per-frame update: re-resolves uniforms (+ tone LUT) and re-renders
    *  the EXISTING source — no pixels cross IPC. Call per-frame on edits. No-op if
    *  the surface isn't created yet (set_source not called), and on non-macOS. */
@@ -223,9 +237,9 @@ export const api = {
     id: string, params: InvertParams, view: ViewSpec,
     clip: { high: boolean; low: boolean; strict: boolean },
     rect: { x: number; y: number; w: number; h: number; dpr: number },
-    view_off: [number, number], view_scale: [number, number],
+    geom: HdrSurfaceGeom,
   ) =>
-    invoke<void>("hdr_surface_set_uniforms", { id, params, view: { ...view, dust: wireDust(view.dust) }, clip, rect, viewOff: view_off, viewScale: view_scale }),
+    invoke<void>("hdr_surface_set_uniforms", { id, params, view: { ...view, dust: wireDust(view.dust) }, clip, rect, geom }),
   /** Hide the native EDR surface, revealing the live SDR canvas underneath. */
   hdrSurfaceHide: () => invoke<void>("hdr_surface_hide"),
   /** Reposition/resize the native EDR surface (pan/zoom/window resize). */
