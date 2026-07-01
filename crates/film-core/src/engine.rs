@@ -61,9 +61,6 @@ pub struct InversionParams {
     pub paper_grade: f32,
     /// Cineon (Mode D) — highlight soft-clip threshold.
     pub soft_clip: f32,
-    /// HDR mode: expand highlights above the knee into [knee, HDR_HEADROOM] instead
-    /// of the SDR soft-clip toward 1.0. Used only for the HDR rendition (encode_hdr).
-    pub hdr: bool,
     /// Positive passthrough: skip the Cineon inversion and render the decoded
     /// scan directly (display-encoded), applying only exposure (`print_exposure`)
     /// and white balance (`wb`). For already-positive sources (slides/prints).
@@ -99,7 +96,6 @@ impl Default for InversionParams {
             paper_black: 0.0,
             paper_grade: 0.95,
             soft_clip: 0.9,
-            hdr: false,
             positive: false,
             channel_balance: [1.0, 1.0, 1.0],
             hi_recovery: 0.0,
@@ -373,21 +369,9 @@ fn invert_d_impl(rgb: [f32; 3], p: &InversionParams, produce_body: bool) -> [f32
                         filmic_s(t * p.wb[c].max(EPS).powf(CMY_STRENGTH) * expo_gain)
                     }
                 };
-                if p.hdr {
-                    // HDR: expand the filmic shoulder above the knee into [knee, headroom]
-                    // so speculars/lights exceed SDR white (the gain map captures this).
-                    if v > HDR_KNEE {
-                        let e = ((v - HDR_KNEE) / (1.0 - HDR_KNEE)).clamp(0.0, 1.0);
-                        HDR_KNEE + e * (HDR_HEADROOM - HDR_KNEE)
-                    } else {
-                        v
-                    }
-                } else {
-                    v.min(1.0) // SDR: clip to white (v ≥ 0 since filmic_s ≥ 0 and wb ≥ 0)
-                }
+                v.min(1.0) // SDR: clip to white (v ≥ 0 since filmic_s ≥ 0 and wb ≥ 0)
             }
             ToneMode::Faithful => {
-                let ceil = if p.hdr { HDR_HEADROOM } else { 1.0 };
                 // Faithful uses a FIXED density scale on the raw density `d` (NOT the
                 // per-frame `t = d/d_max`): a frozen, faithful transfer identical on every frame.
                 //
@@ -408,15 +392,7 @@ fn invert_d_impl(rgb: [f32; 3], p: &InversionParams, produce_body: bool) -> [f32
                 let l = (10f32.powf(dn) - 1.0).max(0.0);
                 let lit = l * 2f32.powf(FAITHFUL_EXPO_K * ev);
                 let t_eff = (lit + 1.0).log10() * FAITHFUL_SCALE;
-                if p.hdr {
-                    // HDR unchanged: full shoulder into HDR_HEADROOM, no look layer.
-                    let hr = 0.0;
-                    match p.wb_mode {
-                        WbMode::Gain => gamma_shoulder(t_eff, ceil, hr) * p.wb[c],
-                        WbMode::Subtractive =>
-                            gamma_shoulder(t_eff * p.wb[c].max(EPS).powf(CMY_STRENGTH), ceil, hr),
-                    }
-                } else if produce_body {
+                if produce_body {
                     // Display path: emit the GAMMA BODY (super-white preserved). The shoulder +
                     // look layer + clamp move to `display_finalize`, applied by `finish::tone_curve`
                     // after the tone tools. Gain wb folds into the body here (so finish sees a
@@ -433,9 +409,9 @@ fn invert_d_impl(rgb: [f32; 3], p: &InversionParams, produce_body: bool) -> [f32
                     // p.hi_recovery / p.lo_recovery.
                     let hr = p.hi_recovery;
                     let core = match p.wb_mode {
-                        WbMode::Gain => gamma_shoulder(t_eff, ceil, hr) * p.wb[c],
+                        WbMode::Gain => gamma_shoulder(t_eff, 1.0, hr) * p.wb[c],
                         WbMode::Subtractive =>
-                            gamma_shoulder(t_eff * p.wb[c].max(EPS).powf(CMY_STRENGTH), ceil, hr),
+                            gamma_shoulder(t_eff * p.wb[c].max(EPS).powf(CMY_STRENGTH), 1.0, hr),
                     };
                     look_s(core, p.lo_recovery)
                 }
@@ -804,54 +780,6 @@ mod tests {
     }
 
     #[test]
-    fn invert_d_hdr_false_matches_today() {
-        let p = InversionParams {
-            base: [0.7, 0.6, 0.5],
-            ..Default::default()
-        };
-        let phdr = InversionParams {
-            hdr: false,
-            ..p.clone()
-        };
-        for probe in [[0.05f32, 0.04, 0.03], [0.3, 0.25, 0.2], [0.69, 0.59, 0.49]] {
-            assert_eq!(
-                invert_d(probe, &p),
-                invert_d(probe, &phdr),
-                "hdr=false must equal default"
-            );
-        }
-    }
-
-    #[test]
-    fn invert_d_hdr_expands_highlights_above_knee() {
-        let base = [0.7, 0.6, 0.5];
-        let bright_neg = [0.7e-3, 0.6e-3, 0.5e-3]; // dense neg → bright positive
-        let sdr = invert_d(
-            bright_neg,
-            &InversionParams {
-                base,
-                hdr: false,
-                ..Default::default()
-            },
-        );
-        let hdr = invert_d(
-            bright_neg,
-            &InversionParams {
-                base,
-                hdr: true,
-                ..Default::default()
-            },
-        );
-        assert!(sdr[0] <= 1.0001, "SDR highlight caps ~1.0: {}", sdr[0]);
-        assert!(hdr[0] > 1.05, "HDR highlight exceeds 1.0: {}", hdr[0]);
-        assert!(
-            hdr[0] <= 2.5001,
-            "HDR highlight capped at headroom: {}",
-            hdr[0]
-        );
-    }
-
-    #[test]
     fn highlight_rolloff_retains_separation() {
         // Raise exposure (print_exposure 2.0): t scales up, so highlights move
         // toward white but the filmic shoulder still keeps them *below* white with a
@@ -884,36 +812,6 @@ mod tests {
         let mid = invert_d([0.5, 0.5, 0.5], &p);
         for v in mid {
             assert!(v <= 0.9 + 1e-4, "mid below white: {v}");
-        }
-    }
-
-    #[test]
-    fn invert_d_hdr_below_knee_unchanged() {
-        let base = [0.7, 0.6, 0.5];
-        let mid = [0.35f32, 0.30, 0.25];
-        let sdr = invert_d(
-            mid,
-            &InversionParams {
-                base,
-                hdr: false,
-                ..Default::default()
-            },
-        );
-        let hdr = invert_d(
-            mid,
-            &InversionParams {
-                base,
-                hdr: true,
-                ..Default::default()
-            },
-        );
-        if sdr[0] < 0.8 {
-            assert!(
-                (sdr[0] - hdr[0]).abs() < 1e-5,
-                "below-knee differs: {} vs {}",
-                sdr[0],
-                hdr[0]
-            );
         }
     }
 
@@ -1434,38 +1332,6 @@ mod tests {
         assert!(
             out.iter().all(|&v| (0.0..=1.0).contains(&v)),
             "in range: {out:?}"
-        );
-    }
-
-    #[test]
-    fn faithful_hdr_bypasses_look() {
-        // HDR Faithful keeps the headroom-expanded value (look applies SDR only): a dense
-        // neg exceeds 1.0 under HDR but is capped at 1.0 under SDR.
-        let base = [1.0, 1.0, 1.0];
-        let bright = [10f32.powf(-1.6); 3];
-        let sdr = invert_d(
-            bright,
-            &InversionParams {
-                base,
-                tone_mode: ToneMode::Faithful,
-                hdr: false,
-                ..Default::default()
-            },
-        );
-        let hdr = invert_d(
-            bright,
-            &InversionParams {
-                base,
-                tone_mode: ToneMode::Faithful,
-                hdr: true,
-                ..Default::default()
-            },
-        );
-        assert!(sdr[0] <= 1.0001, "SDR capped: {}", sdr[0]);
-        assert!(
-            hdr[0] > 1.0001,
-            "HDR exceeds SDR white (look bypassed): {}",
-            hdr[0]
         );
     }
 
