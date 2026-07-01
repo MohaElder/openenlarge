@@ -15,9 +15,10 @@
 pub mod macos;
 
 /// Raw HDR pixel buffer for the native EDR compositing surface: row-major RGBA
-/// half-float (linear extended-P3), 4 channels per pixel. Highlights brighter
-/// than SDR white (1.0) are preserved (not clamped) so a real EDR display can
-/// render them brighter than the webview's SDR canvas.
+/// half-float (linear extended sRGB, BT.709 primaries), 4 channels per
+/// pixel. Highlights brighter than SDR white (1.0) are preserved (not
+/// clamped) so a real EDR display can render them brighter than the
+/// webview's SDR canvas.
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct HdrBuffer {
     pub width: u32,
@@ -52,8 +53,8 @@ pub struct HdrSurfaceState {
 /// on the main thread. Shared by the `hdr_surface_show` command and the fused
 /// `commands::hdr_surface_render_show` (which renders the buffer in Rust), so
 /// the main-thread show path lives in exactly one place. The buffer is LINEAR
-/// extended-Display-P3 half-float, uploaded verbatim (no re-linearization);
-/// the surface is created lazily on first call.
+/// extended sRGB (BT.709 primaries) half-float, uploaded verbatim (no
+/// re-linearization); the surface is created lazily on first call.
 #[cfg(target_os = "macos")]
 pub(crate) fn show_buffer(
     window: &tauri::WebviewWindow,
@@ -73,8 +74,9 @@ pub(crate) fn show_buffer(
 }
 
 /// Upload an `rgba16f` buffer to the native EDR surface and show it at `rect`.
-/// The buffer is LINEAR extended-Display-P3 half-float (from `encode_hdr_raw`);
-/// it is uploaded verbatim (no re-linearization). Creates the surface lazily.
+/// The buffer is LINEAR extended sRGB (BT.709 primaries) half-float (from
+/// `encode_hdr_raw`); it is uploaded verbatim (no re-linearization). Creates
+/// the surface lazily.
 #[tauri::command]
 pub fn hdr_surface_show(
     app: tauri::AppHandle,
