@@ -73,12 +73,6 @@ vertex VOut edr_vertex(uint vid [[vertex_id]]) {
 
 fragment float4 edr_fragment(VOut in [[stage_in]], texture2d<float> tex [[texture(0)]]) {
     constexpr sampler s(filter::linear, address::clamp_to_edge);
-    // TEMP DIAGNOSTIC: draw a bright-magenta border at the layer's true edges so
-    // the EDR layer bounds are unmistakable on screen (glows in EDR). Remove once
-    // positioning is aligned.
-    if (in.uv.x < 0.012 || in.uv.x > 0.988 || in.uv.y < 0.012 || in.uv.y > 0.988) {
-        return float4(4.0, 0.0, 4.0, 1.0);
-    }
     return float4(tex.sample(s, in.uv).rgb, 1.0);
 }
 "#;
@@ -262,7 +256,7 @@ pub fn show_on_main(
     surface.view.setHidden(false);
     // SAFETY: WKWebView inherits NSView; valid on the main thread.
     let webview_view: &NSView = unsafe { &*(wk_webview as *const AnyObject as *const NSView) };
-    position(window, webview_view, surface, rect);
+    position(webview_view, surface, rect);
     let _ = render(surface);
 }
 
@@ -271,17 +265,16 @@ pub fn set_rect_on_main(webview: tauri::webview::PlatformWebview, slot: SurfaceS
     if MainThreadMarker::new().is_none() {
         return;
     }
-    let ns_window = webview.ns_window() as *mut NSWindow;
     let wk_webview = webview.inner() as *mut AnyObject;
-    if ns_window.is_null() || wk_webview.is_null() {
+    if wk_webview.is_null() {
         return;
     }
-    // SAFETY: valid for the window's lifetime; only used on the main thread.
-    let window: &NSWindow = unsafe { &*ns_window };
+    // SAFETY: WKWebView inherits NSView; valid for the window's lifetime and only
+    // used on the main thread.
     let webview_view: &NSView = unsafe { &*(wk_webview as *const AnyObject as *const NSView) };
     let guard = slot.lock().unwrap();
     if let Some(surface) = guard.as_ref() {
-        position(window, webview_view, surface, rect);
+        position(webview_view, surface, rect);
         let _ = render(surface);
     }
 }
@@ -468,12 +461,11 @@ fn upload_texture(
 /// (flipped) webview's coordinate space into the EDR view's parent — which
 /// correctly handles the flip AND any container nesting/offset — then size the
 /// layer's drawable for the dpr.
-fn position(window: &NSWindow, webview_view: &NSView, surface: &Surface, rect: ViewportRect) {
+fn position(webview_view: &NSView, surface: &Surface, rect: ViewportRect) {
     // The WKWebView is FLIPPED (top-left origin, y-down), so its NSView
     // coordinate space matches the DOM/CSS `rect` exactly: the DOM rect IS the
     // canvas's frame in the webview's coordinates. Let AppKit convert it into
-    // the EDR view's SUPERVIEW space rather than hand-rolling the flip (our
-    // manual formula landed ~170pt down / ~70pt left).
+    // the EDR view's SUPERVIEW space rather than hand-rolling the flip.
     let dom_rect = NSRect::new(NSPoint::new(rect.x, rect.y), NSSize::new(rect.w, rect.h));
     // SAFETY: called on the main thread; `superview` is the view we attached the
     // EDR view under (the content view) once it is in the hierarchy.
@@ -487,118 +479,19 @@ fn position(window: &NSWindow, webview_view: &NSView, surface: &Surface, rect: V
     let dpr = rect.dpr.max(1.0);
     surface.layer.setContentsScale(dpr);
     // Do NOT set the backing layer's frame ourselves: for a layer-HOSTING
-    // NSView, AppKit keeps the layer's frame synced to the VIEW's frame, and
-    // the layer frame is interpreted in the SUPERLAYER's space — so an override
-    // of (0,0,w,h) pinned the Metal layer to the content view's bottom-left
-    // (~72pt left / ~176pt below the view's real position). Only the pixel
-    // render size (`drawableSize`) is ours to set; it is independent of the
-    // layer's on-screen frame.
-    let fw = frame.size.width;
-    let fh = frame.size.height;
-    let dw = (fw * dpr).max(1.0);
-    let dh = (fh * dpr).max(1.0);
+    // NSView, AppKit keeps the layer's frame synced to the VIEW's frame (and the
+    // layer frame is interpreted in the SUPERLAYER's space, so overriding it to
+    // (0,0,w,h) would pin the layer to the content view's origin). Only the
+    // pixel render size (`drawableSize`) is ours to set; it is independent of
+    // the layer's on-screen frame.
+    let dw = (frame.size.width * dpr).max(1.0);
+    let dh = (frame.size.height * dpr).max(1.0);
     surface.layer.setDrawableSize(CGSize::new(dw, dh));
-
-    // Diagnostics. `pos` shows the raw inputs; `pos2` shows the CONVERTED frame
-    // plus screen-space rects for the EDR view and webview so absolute placement
-    // can be compared directly.
-    let flipped_content = window
-        .contentView()
-        .as_ref()
-        .map(|v| v.isFlipped())
-        .unwrap_or(false);
-    let flipped_webview = webview_view.isFlipped();
-    let edr_after = surface.view.frame();
-    let edr_screen =
-        window.convertRectToScreen(surface.view.convertRect_toView(surface.view.bounds(), None));
-    let wv_screen =
-        window.convertRectToScreen(webview_view.convertRect_toView(webview_view.bounds(), None));
-    eprintln!(
-        "[hdr] pos: rect=({:.1},{:.1},{:.1},{:.1},dpr={:.2}) converted_frame=({:.1},{:.1},{:.1},{:.1})",
-        rect.x, rect.y, rect.w, rect.h, rect.dpr,
-        frame.origin.x, frame.origin.y, frame.size.width, frame.size.height
-    );
-    eprintln!(
-        "[hdr] pos2: flipped_content={} flipped_webview={} edr_after=({:.1},{:.1},{:.1},{:.1}) edr_screen=({:.1},{:.1},{:.1},{:.1}) webview_screen=({:.1},{:.1},{:.1},{:.1})",
-        flipped_content, flipped_webview,
-        edr_after.origin.x, edr_after.origin.y, edr_after.size.width, edr_after.size.height,
-        edr_screen.origin.x, edr_screen.origin.y, edr_screen.size.width, edr_screen.size.height,
-        wv_screen.origin.x, wv_screen.origin.y, wv_screen.size.width, wv_screen.size.height
-    );
-
-    // One-time native view-hierarchy dump: walk WKWebView -> ... -> contentView
-    // and EDR view -> ... -> contentView, printing each view's class, frame and
-    // isFlipped. Reveals whether the webview sits inside an offset container the
-    // EDR view doesn't share (which would explain a constant placement offset).
-    static HIER_DUMPED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-    if !HIER_DUMPED.swap(true, std::sync::atomic::Ordering::Relaxed) {
-        dump_hierarchy(window, webview_view, &surface.view);
-    }
-}
-
-/// Objective-C runtime class name of a view (e.g. "WKWebView", "NSView").
-fn view_class_name(view: &NSView) -> String {
-    let obj: &AnyObject = view;
-    obj.class().name().to_string_lossy().into_owned()
-}
-
-/// Log one view's class, frame and flipped flag on a `[hdr] hier:` line.
-fn log_view(tag: &str, idx: usize, view: &NSView) {
-    let f = view.frame();
-    eprintln!(
-        "[hdr] hier: {tag}[{idx}] class={} frame=({:.1},{:.1},{:.1},{:.1}) flipped={}",
-        view_class_name(view),
-        f.origin.x,
-        f.origin.y,
-        f.size.width,
-        f.size.height,
-        view.isFlipped()
-    );
-}
-
-/// Walk `start` up its superview chain, logging each view.
-fn dump_chain(tag: &str, start: &NSView) {
-    log_view(tag, 0, start);
-    let mut idx = 1;
-    // SAFETY: called on the main thread; `superview` walks the live hierarchy.
-    let mut cur = unsafe { start.superview() };
-    while let Some(v) = cur {
-        log_view(tag, idx, &v);
-        idx += 1;
-        cur = unsafe { v.superview() };
-    }
-}
-
-fn dump_hierarchy(window: &NSWindow, webview_view: &NSView, edr_view: &NSView) {
-    let wf = window.frame();
-    let clr = window.contentLayoutRect();
-    let (cv_class, cvf) = window
-        .contentView()
-        .map(|v| (view_class_name(&v), v.frame()))
-        .unwrap_or_else(|| ("<none>".to_string(), NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(0.0, 0.0))));
-    eprintln!(
-        "[hdr] hier: window frame=({:.1},{:.1},{:.1},{:.1}) contentLayoutRect=({:.1},{:.1},{:.1},{:.1}) contentView class={} frame=({:.1},{:.1},{:.1},{:.1})",
-        wf.origin.x, wf.origin.y, wf.size.width, wf.size.height,
-        clr.origin.x, clr.origin.y, clr.size.width, clr.size.height,
-        cv_class, cvf.origin.x, cvf.origin.y, cvf.size.width, cvf.size.height
-    );
-    dump_chain("WEBVIEW", webview_view);
-    dump_chain("EDR", edr_view);
 }
 
 /// Draw the uploaded texture into the layer's next drawable (scaled to fill).
 /// A nil drawable or missing texture is a no-op (no panic).
 fn render(surface: &Surface) -> Result<(), String> {
-    // Log the frame at render time: if this differs from what `position()` set,
-    // the view drifted after `setFrame` (autoresizing/layout reflow).
-    let vf = surface.view.frame();
-    let lf = surface.layer.frame();
-    eprintln!(
-        "[hdr] render_frame: view=({:.1},{:.1},{:.1},{:.1}) layer=({:.1},{:.1},{:.1},{:.1})",
-        vf.origin.x, vf.origin.y, vf.size.width, vf.size.height,
-        lf.origin.x, lf.origin.y, lf.size.width, lf.size.height
-    );
-
     let Some(texture) = surface.texture.as_ref() else {
         return Ok(());
     };
