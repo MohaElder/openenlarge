@@ -566,7 +566,6 @@ fn tone_curve(v: f32, p: &FinishParams) -> f32 {
 /// separate follow-up task); this is the tested reference for that work, so
 /// it is only exercised by tests today.
 #[inline]
-#[allow(dead_code)]
 pub(crate) fn hdr_finalize(v: f32) -> f32 {
     if v <= HDR_KNEE {
         v
@@ -574,6 +573,29 @@ pub(crate) fn hdr_finalize(v: f32) -> f32 {
         let span = HDR_HEADROOM - HDR_KNEE;
         HDR_KNEE + span * ((v - HDR_KNEE) / span).tanh()
     }
+}
+
+/// Blend top for the HDR highlight reconstruction: below HDR_KNEE the extension
+/// is identity (== SDR); by HDR_W_HI it is fully the chroma-preserved highlight.
+/// Tunable on-device (Task 5). MUST equal the MSL `hdr_finish` in msl.rs.
+pub(crate) const HDR_W_HI: f32 = 1.2;
+
+/// Chroma-preserving HDR finalize. `body` = the pre-shoulder tone body (per-channel,
+/// super-white — carries the real highlight chroma); `sdr` = the finished SDR color
+/// in [0,1] (byte-identical to finish_pixel). Below the knee returns `sdr` (parity);
+/// above, tones the highlight LUMINANCE via `hdr_finalize` and reconstructs RGB from
+/// `body`'s chromaticity (`body/max(body)`), blended sdr→highlight across the shoulder.
+/// The single source of truth mirrored by the MSL shader and used by the CPU export.
+pub(crate) fn hdr_finish(body: [f32; 3], sdr: [f32; 3]) -> [f32; 3] {
+    let m_u = body[0].max(body[1]).max(body[2]);
+    if m_u <= HDR_KNEE {
+        return sdr;
+    }
+    let l_hdr = hdr_finalize(m_u); // scalar tanh shoulder → [HDR_KNEE, HDR_HEADROOM)
+    let inv = l_hdr / m_u; // chromaticity (body/m_u) scaled to the HDR luminance
+    let highlight: [f32; 3] = std::array::from_fn(|c| body[c] * inv);
+    let w = smoothstep(HDR_KNEE, HDR_W_HI, m_u); // 0 at knee → 1 by HDR_W_HI
+    std::array::from_fn(|c| sdr[c] + (highlight[c] - sdr[c]) * w)
 }
 
 /// Hue-preserving HDR finalize for a full RGB pixel: computes the compression
@@ -1279,6 +1301,42 @@ mod tests {
             "dark reddened more"
         );
         assert!(dark[0] > dark[2], "dark is warmer (R>B)");
+    }
+
+    #[test]
+    fn hdr_finish_below_knee_is_sdr_exactly() {
+        // max(body) <= HDR_KNEE (0.8) → identity: the HDR extension must not touch it.
+        let sdr = [0.42, 0.31, 0.55];
+        let body = [0.5, 0.4, 0.3];
+        assert_eq!(hdr_finish(body, sdr), sdr);
+    }
+
+    #[test]
+    fn hdr_finish_preserves_highlight_chroma_and_extends_luma() {
+        // A blown WARM highlight: body is warm (R>G>B) & super-white; sdr is the shoulder-
+        // desaturated near-white. hdr_finish must keep the warm hue and push luminance >1.
+        let body = [2.0, 1.4, 0.9];
+        let sdr = [0.98, 0.96, 0.93]; // near-white (what the shoulder produced)
+        let out = hdr_finish(body, sdr);
+        // Well above the blend top (HDR_W_HI=1.2) → fully the reconstructed highlight.
+        // Luminance extended into headroom:
+        let m = out[0].max(out[1]).max(out[2]);
+        assert!(m > 1.0, "expected super-white luminance, got {m}");
+        assert!(m <= HDR_HEADROOM + 1e-4);
+        // Chroma preserved (NOT gray): R>G>B, and the ratios match body's chromaticity.
+        assert!(out[0] > out[1] && out[1] > out[2], "warm order lost: {out:?}");
+        let rg_body = body[0] / body[1];
+        let rg_out = out[0] / out[1];
+        assert!((rg_body - rg_out).abs() < 1e-3, "hue drift: body R/G {rg_body} vs out {rg_out}");
+    }
+
+    #[test]
+    fn hdr_finish_continuous_at_knee() {
+        // Just above the knee, output ≈ sdr (w=0 at the knee) — no ring/edge.
+        let body = [0.8001, 0.6, 0.4];
+        let sdr = [0.8, 0.6, 0.4];
+        let out = hdr_finish(body, sdr);
+        for c in 0..3 { assert!((out[c] - sdr[c]).abs() < 1e-2, "kink at knee: {out:?} vs {sdr:?}"); }
     }
 
     #[test]
