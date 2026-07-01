@@ -215,7 +215,7 @@ export const api = {
     rect: { x: number; y: number; w: number; h: number; dpr: number },
     view_off: [number, number], view_scale: [number, number],
   ) =>
-    invoke<void>("hdr_surface_set_source", { id, params, view: { ...view, dust: wireDust(view.dust) }, rect, view_off, view_scale }),
+    invoke<void>("hdr_surface_set_source", { id, params, view: { ...view, dust: wireDust(view.dust) }, rect, viewOff: view_off, viewScale: view_scale }),
   /** Live-EDR per-frame update: re-resolves uniforms (+ tone LUT) and re-renders
    *  the EXISTING source — no pixels cross IPC. Call per-frame on edits. No-op if
    *  the surface isn't created yet (set_source not called), and on non-macOS. */
@@ -225,7 +225,7 @@ export const api = {
     rect: { x: number; y: number; w: number; h: number; dpr: number },
     view_off: [number, number], view_scale: [number, number],
   ) =>
-    invoke<void>("hdr_surface_set_uniforms", { id, params, view: { ...view, dust: wireDust(view.dust) }, clip, rect, view_off, view_scale }),
+    invoke<void>("hdr_surface_set_uniforms", { id, params, view: { ...view, dust: wireDust(view.dust) }, clip, rect, viewOff: view_off, viewScale: view_scale }),
   /** Hide the native EDR surface, revealing the live SDR canvas underneath. */
   hdrSurfaceHide: () => invoke<void>("hdr_surface_hide"),
   /** Reposition/resize the native EDR surface (pan/zoom/window resize). */
