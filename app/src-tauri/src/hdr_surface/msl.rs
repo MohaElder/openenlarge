@@ -301,13 +301,13 @@ fragment float4 invert_frag(VOut in [[stage_in]],
 /// (saturation/LUT/grade/mix/point) run on the **display-finalized** body
 /// `displayFinalize(toneBody)` — the Faithful shoulder + `lookS` contrast — EXACTLY
 /// as `finish_pixel` / GLSL `finalize_body=true` do, giving the SDR finished color
-/// `disp` in [0,1]. The HDR highlight is then a single hue-preserving GAIN on that
-/// SDR color: `gain = 1.0` for `mU <= HDR_KNEE` (so shadows/midtones and any pixel
-/// SDR did not shoulder are BYTE-IDENTICAL to SDR), and for `mU > HDR_KNEE`,
-/// `gain = hdr_finalize_scalar(mU) / displayFinalize(mU)` (clamped `>= 1`) — the HDR
-/// shoulder value over the SDR display value at the pre-finalize magnitude
-/// `mU = max(bodyU)`. So a highlight SDR compressed toward white is scaled up into
-/// the EDR headroom, while everything else equals SDR exactly.
+/// `disp` in [0,1]. The HDR highlight is then a CHROMA-PRESERVING finalize —
+/// mirror of `film-core::hdr_finish` (Sub-project C): below `HDR_KNEE` the output
+/// is exactly `disp` (SDR parity); above, the highlight is the pre-shoulder body's
+/// chromaticity `bodyU/mU` scaled to the HDR shoulder luminance
+/// `hdr_finalize_scalar(mU)` (so a blown highlight keeps its hue into headroom
+/// instead of graying), blended `mix(disp, highlight, smoothstep(HDR_KNEE,
+/// HDR_W_HI, mU))` (`mU = max(bodyU)`).
 /// One deliberate deviation from the GLSL, flagged in the report: the blacks term
 /// uses `(1-v)^3` via multiplication (matching `finish.rs`'s `.powi(3)`), not
 /// `pow(1-v,3.0)` which is NaN for the super-white `v>1` case.
@@ -317,6 +317,7 @@ constant float FIN_PI = 3.14159265358979;
 constant float FIN_BRIGHTNESS_RANGE = 0.5;      // MUST equal finish.rs BRIGHTNESS_DENSITY_RANGE
 constant float HDR_KNEE = 0.8;                  // MUST equal engine.rs HDR_KNEE
 constant float HDR_HEADROOM = 2.5;              // MUST equal engine.rs HDR_HEADROOM
+constant float HDR_W_HI = 1.2;                  // MUST equal finish.rs HDR_W_HI (blend top)
 // Faithful display-finalize (shoulder + lookS contrast) — MUST equal engine.rs
 // display_finalize / shaders.ts. FAITHFUL_GAMMA is already declared by the invert stage.
 constant float FAITHFUL_KNEE = 0.892;
@@ -594,20 +595,22 @@ fragment float4 finish_frag(VOut in [[stage_in]],
     float3 s = oklabSaturate(bodyFin, u);
     float3 cu = float3(lutSample(lut, s.r, 0), lutSample(lut, s.g, 1), lutSample(lut, s.b, 2));
     float3 disp = pointColor(colorMixer(colorGrade(cu, u), u), u);   // == the SDR finished color, in [0,1]
-    // HDR highlight = a single hue-preserving GAIN on the SDR finished color.
-    // The gain is EXACTLY 1.0 below HDR_KNEE, so shadows / midtones / any pixel SDR
-    // did NOT shoulder toward white are BYTE-IDENTICAL to the SDR output. Above
-    // HDR_KNEE the gain is the HDR shoulder value over the SDR display value at the
-    // pre-finalize magnitude `mU`, so a highlight SDR compressed toward 1.0 is
-    // scaled up into the EDR headroom instead. `max(gain,1)` keeps it monotone at
-    // the knee. Hue-preserving: one scalar applied to all three channels.
+    // Chroma-preserving HDR finalize — mirror of film-core::hdr_finish. Below the
+    // knee the output is EXACTLY the SDR color (parity). Above, the highlight is
+    // the pre-shoulder BODY's chromaticity (`bodyU/mU`) scaled to the HDR shoulder
+    // luminance `hdr_finalize_scalar(mU)` — so a blown highlight keeps its hue into
+    // headroom instead of graying — blended from SDR (`disp`) at the knee to the
+    // reconstructed highlight by HDR_W_HI.
     float mU = max(bodyU.r, max(bodyU.g, bodyU.b));
-    float gain = 1.0;
-    if (mU > HDR_KNEE) {
-        gain = hdr_finalize_scalar(mU) / max(displayFinalize(mU), INV_EPS);
-        gain = max(gain, 1.0);
+    float3 outc;
+    if (mU <= HDR_KNEE) {
+        outc = disp;                              // below knee: exact SDR parity
+    } else {
+        float lHdr = hdr_finalize_scalar(mU);     // tanh shoulder → [KNEE, HEADROOM)
+        float3 highlight = bodyU * (lHdr / mU);   // body chromaticity at HDR luminance
+        float w = smoothstep(HDR_KNEE, HDR_W_HI, mU);
+        outc = mix(disp, highlight, w);
     }
-    float3 outc = disp * gain;
     // Clipping overlay tests the finished display color (disp), matching the GLSL.
     int code = clipCode(disp, u);
     // The drawable/CAMetalLayer is extended-LINEAR sRGB, but `outc` is
