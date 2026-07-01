@@ -480,6 +480,12 @@
   //    param changes in a frame coalesce into a single IPC call.
   let hdrRaf: number | null = null;
   let sourceSeq = 0;
+  // Monotonic "last-issued-wins" epoch sent with every surface command. Bumped at
+  // ISSUE time (synchronously, before any await) so a hide issued after a uniforms
+  // push always carries a strictly larger epoch; the backend drops any command whose
+  // epoch is older than the last one it acted on (fixes the stale set_uniforms
+  // un-hiding the surface after a hide).
+  let hdrEpoch = 0;
   // Guards against re-uploading the source on every edit: the source reactive block
   // re-runs whenever `params` is reassigned (its `params.hdr` gate), but the pixels
   // only change when `hdrSourceKey` does. Set optimistically BEFORE the await so
@@ -522,7 +528,7 @@
     const curId = id;
     const myseq = ++sourceSeq;
     try {
-      await api.hdrSurfaceSetSource(id, params, hdrViewSpec(), canvasRect(), hdrGeom());
+      await api.hdrSurfaceSetSource(id, params, hdrViewSpec(), canvasRect(), hdrGeom(), ++hdrEpoch);
       if (myseq !== sourceSeq || id !== curId || !params.hdr || !liveEdr) return; // superseded
       hdrUsesSurface = true;
       hdrShown = true; // hides the SDR canvas via the `edrhole` class below
@@ -539,7 +545,7 @@
   // exists, so a stray early call is harmless.
   function pushHdrUniforms() {
     if (!liveEdr || !params.hdr || !id || !imgW || !vpW) return;
-    api.hdrSurfaceSetUniforms(id, params, hdrViewSpec(), clipArg(), canvasRect(), hdrGeom()).catch((e) => {
+    api.hdrSurfaceSetUniforms(id, params, hdrViewSpec(), clipArg(), canvasRect(), hdrGeom(), ++hdrEpoch).catch((e) => {
       if (!(typeof e === "string" && e === "not developed")) console.error("hdrSurfaceSetUniforms failed", e);
     });
   }
@@ -557,7 +563,7 @@
   function hideHdrSurface() {
     cancelHdrRaf();
     lastHdrSourceKey = ""; // re-enabling / next image must re-upload the source
-    if (hdrUsesSurface) { api.hdrSurfaceHide().catch(() => {}); hdrUsesSurface = false; }
+    if (hdrUsesSurface) { api.hdrSurfaceHide(++hdrEpoch).catch(() => {}); hdrUsesSurface = false; }
   }
 
   // Clear the overlay on image switch so a stale HDR frame never shows for the wrong

@@ -227,9 +227,9 @@ export const api = {
   hdrSurfaceSetSource: (
     id: string, params: InvertParams, view: ViewSpec,
     rect: { x: number; y: number; w: number; h: number; dpr: number },
-    geom: HdrSurfaceGeom,
+    geom: HdrSurfaceGeom, epoch: number,
   ) =>
-    invoke<void>("hdr_surface_set_source", { id, params, view: { ...view, dust: wireDust(view.dust) }, rect, geom }),
+    invoke<void>("hdr_surface_set_source", { id, params, view: { ...view, dust: wireDust(view.dust) }, rect, geom, epoch }),
   /** Live-EDR per-frame update: re-resolves uniforms (+ tone LUT) and re-renders
    *  the EXISTING source — no pixels cross IPC. Call per-frame on edits. No-op if
    *  the surface isn't created yet (set_source not called), and on non-macOS. */
@@ -237,11 +237,12 @@ export const api = {
     id: string, params: InvertParams, view: ViewSpec,
     clip: { high: boolean; low: boolean; strict: boolean },
     rect: { x: number; y: number; w: number; h: number; dpr: number },
-    geom: HdrSurfaceGeom,
+    geom: HdrSurfaceGeom, epoch: number,
   ) =>
-    invoke<void>("hdr_surface_set_uniforms", { id, params, view: { ...view, dust: wireDust(view.dust) }, clip, rect, geom }),
-  /** Hide the native EDR surface, revealing the live SDR canvas underneath. */
-  hdrSurfaceHide: () => invoke<void>("hdr_surface_hide"),
+    invoke<void>("hdr_surface_set_uniforms", { id, params, view: { ...view, dust: wireDust(view.dust) }, clip, rect, geom, epoch }),
+  /** Hide the native EDR surface, revealing the live SDR canvas underneath. The
+   *  monotonic `epoch` lets the backend drop a hide that a newer command superseded. */
+  hdrSurfaceHide: (epoch: number) => invoke<void>("hdr_surface_hide", { epoch }),
   /** Reposition/resize the native EDR surface (pan/zoom/window resize). */
   hdrSurfaceSetRect: (rect: { x: number; y: number; w: number; h: number; dpr: number }) =>
     invoke<void>("hdr_surface_set_rect", { rect }),
