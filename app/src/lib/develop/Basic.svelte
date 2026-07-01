@@ -424,7 +424,11 @@
       <Slider label={$t('basic.blacks')} min={-100} max={100} bind:value={$params.blacks} def={0} format={signed} />
 
       <!-- Presence -->
-      <Slider label={$t('basic.texture')} min={-100} max={100} bind:value={$params.texture} def={0} format={signed} />
+      <!-- Texture (spatial USM) is not applied to the HDR rendition, so hide it while HDR
+           is on to avoid a control that bakes edge halos into the gain map (see finish_from). -->
+      {#if !$params.hdr}
+        <Slider label={$t('basic.texture')} min={-100} max={100} bind:value={$params.texture} def={0} format={signed} />
+      {/if}
       <Slider label={$t('basic.vibrance')} min={-100} max={100} bind:value={$params.vibrance} def={0} gradient={SAT_GRADIENT} format={signed} />
       <Slider label={$t('basic.saturation')} min={-100} max={100} bind:value={$params.saturation} def={0} gradient={SAT_GRADIENT} format={signed} />
     </div>

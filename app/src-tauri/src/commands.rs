@@ -566,7 +566,11 @@ pub(crate) fn finish_from(p: &InvertParams) -> FinishParams {
         shadows: (p.shadows / 100.0).max(0.0),
         whites: p.whites / 100.0,
         blacks: p.blacks / 100.0,
-        texture: p.texture / 100.0,
+        // Texture (a spatial USM) is not applied to the HDR rendition (finish_image_hdr
+        // skips the spatial pass, and the live MSL shader has none), so applying it to
+        // the SDR base alone would bake inverse-texture halos into the gain map. Force it
+        // off whenever HDR is on — the UI hides the slider to match (Basic.svelte).
+        texture: if p.hdr { 0.0 } else { p.texture / 100.0 },
         vibrance: p.vibrance / 100.0,
         saturation: p.saturation / 100.0,
         brightness: p.brightness / 100.0,
