@@ -386,19 +386,28 @@
     };
     // Deep-zoom windowed path: the SDR canvas renders only the visible crop-window
     // into a viewport-sized box (`vw0`). Mirror it via deriveView (same visible-
-    // region math as viewWindow) so `crop`/`out_w`/`out_h` match the on-screen
-    // window; the surface is positioned at that same canvas box (canvasRect), so
-    // the EDR aligns with the SDR at any zoom. At fit deriveView yields the whole
-    // image ([0,0,imgW,imgH]) — identical to the pre-zoom behavior.
+    // region math as viewWindow) so `crop` matches the on-screen window; the surface
+    // is positioned at that same canvas box (canvasRect), so the EDR aligns with the
+    // SDR at any zoom. At fit deriveView yields the whole image ([0,0,imgW,imgH]) —
+    // identical to the pre-zoom framing.
+    //   Resolution: render at `vw0.backing` (= the SDR GL canvas's device-pixel
+    // backing: displaySize × dpr, MAX_BACKING-capped), NOT deriveView's CSS-px
+    // out_w/out_h. The native Metal drawable is sized rect.w*dpr × rect.h*dpr, so
+    // a CSS-px texture would upload at ~1/dpr resolution and upscale to fill it
+    // (soft). Matching vw0.backing makes the texture 1:1 with the drawable and the
+    // SDR — same sharpness (and the same proxy/hi-res cap the SDR already honors).
     if (vw0) {
       const v = deriveView(eff, cx, cy, imgW, imgH, vpW, vpH, raw);
-      return { ...v, finish: true, ...geom };
+      return { ...v, out_w: vw0.backing.w, out_h: vw0.backing.h, finish: true, ...geom };
     }
     // No windowed render (bake mode / non-GPU): the canvas shows the full image at
-    // its display box, so render the whole image — the original fit-view path.
-    const rscale = Math.min(eff, CAP / Math.max(imgW, imgH));
-    const out_w = Math.max(1, Math.round(imgW * rscale));
-    const out_h = Math.max(1, Math.round(imgH * rscale));
+    // its display box, so render the whole image at device-pixel resolution
+    // (display size × dpr, uniformly capped to MAX_BACKING like the SDR backing).
+    const dispDevW = imgW * eff * dpr;
+    const dispDevH = imgH * eff * dpr;
+    const k = Math.min(1, MAX_BACKING / Math.max(dispDevW, dispDevH, 1));
+    const out_w = Math.max(1, Math.round(dispDevW * k));
+    const out_h = Math.max(1, Math.round(dispDevH * k));
     return { crop: [0, 0, imgW, imgH], out_w, out_h, raw, finish: true, ...geom };
   }
 
