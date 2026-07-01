@@ -560,6 +560,22 @@ float3 clipOverlay(float3 disp, int code, constant HdrUniforms& u) {
     return disp;
 }
 
+// sRGB EOTF with a LINEAR continuation above 1.0 — MUST equal hdr.rs
+// srgb_to_linear_ext EXACTLY. The finished color is display-referred sRGB, but
+// the CAMetalLayer is tagged extended-LINEAR sRGB, so the output must be
+// linearized (super-white > 1.0 linearizes via the C1 linear extension, NOT a
+// clamp) or midtones read as too bright (flat/low-contrast). Distinct from the
+// [0,1]-only `srgbToLinear` used inside OKLab saturation.
+float srgbToLinearExt(float v) {
+    if (v <= 0.0) return 0.0;
+    if (v <= 0.04045) return v / 12.92;
+    if (v <= 1.0) return pow((v + 0.055) / 1.055, 2.4);
+    return 1.0 + (v - 1.0) * (2.4 / 1.055);   // slope of the EOTF at v=1, extended linearly
+}
+float3 srgbToLinearExt3(float3 c) {
+    return float3(srgbToLinearExt(c.r), srgbToLinearExt(c.g), srgbToLinearExt(c.b));
+}
+
 fragment float4 finish_frag(VOut in [[stage_in]],
                             texture2d<float> src [[texture(0)]],
                             texture2d<float> lut [[texture(1)]],
@@ -594,6 +610,11 @@ fragment float4 finish_frag(VOut in [[stage_in]],
     float3 outc = disp * gain;
     // Clipping overlay tests the finished display color (disp), matching the GLSL.
     int code = clipCode(disp, u);
-    return float4(clipOverlay(outc, code, u), 1.0);
+    // The drawable/CAMetalLayer is extended-LINEAR sRGB, but `outc` is
+    // display-referred sRGB — linearize (with the >1.0 linear continuation so
+    // super-white survives) before writing, mirroring Sub-project A's
+    // `hdr.rs::srgb_to_linear_ext` before its upload to the same linear layer.
+    // The clip overlay's red/blue markers linearize too (they stay red/blue).
+    return float4(srgbToLinearExt3(clipOverlay(outc, code, u)), 1.0);
 }
 "#;
