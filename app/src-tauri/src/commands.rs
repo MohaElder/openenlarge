@@ -1820,9 +1820,18 @@ fn encode_thumb(inv: &film_core::Image, params: &InvertParams) -> Result<String,
     let sdr = finish_image(inv, &finish);
     if params.hdr {
         let hdr = finish_image_hdr(inv, &finish);
-        let jpeg = crate::hdr::encode_gain_map_jpeg(&sdr, &hdr, THUMB_QUALITY)?;
-        let b64 = base64::engine::general_purpose::STANDARD.encode(&jpeg);
-        Ok(format!("data:image/jpeg;base64,{b64}"))
+        match crate::hdr::encode_gain_map_jpeg(&sdr, &hdr, THUMB_QUALITY) {
+            Ok(jpeg) => {
+                let b64 = base64::engine::general_purpose::STANDARD.encode(&jpeg);
+                Ok(format!("data:image/jpeg;base64,{b64}"))
+            }
+            // Gain-map encode failed (libultrahdr FFI) — fall back to the SDR JPEG
+            // we already rendered rather than stranding the thumbnail entirely.
+            Err(e) => {
+                eprintln!("encode_thumb: gain-map encode failed, falling back to SDR: {e}");
+                to_jpeg_b64(&sdr, false, THUMB_QUALITY)
+            }
+        }
     } else {
         to_jpeg_b64(&sdr, false, THUMB_QUALITY)
     }
@@ -2703,7 +2712,7 @@ fn render_grid_thumbnail(
     ip.channel_balance = channel_balance;
     let inv = invert_image_core(render_src, &ip, mode_from(&params.mode));
     let inv = finish_image(&inv, &finish_from(&params));
-    to_jpeg_b64(&inv, false, 82)
+    to_jpeg_b64(&inv, false, THUMB_QUALITY)
 }
 
 /// (Kelvin, gains_to_cct tint) that makes a sampled display pixel `rgb` render neutral.
