@@ -75,6 +75,30 @@ pub(crate) fn show_buffer(
         .map_err(|e| format!("with_webview failed: {e}"))
 }
 
+/// Upload the raw linear negative + invert uniforms to the native EDR surface
+/// and render the per-frame invert path (invert → intermediate → TEMP
+/// passthrough), on the main thread. Shared entry so `commands::
+/// hdr_surface_set_source` stays thin. `source_bytes` is packed RGBA16Float
+/// (8 bytes/px) at `width`×`height`; `uniforms` already has base/d_max/
+/// cam_balance/aspect patched from the session.
+#[cfg(target_os = "macos")]
+pub(crate) fn set_source(
+    window: &tauri::WebviewWindow,
+    state: &HdrSurfaceState,
+    source_bytes: Vec<u8>,
+    width: u32,
+    height: u32,
+    uniforms: uniforms::HdrUniforms,
+    rect: ViewportRect,
+) -> Result<(), String> {
+    let slot = state.surface.clone();
+    window
+        .with_webview(move |webview| {
+            macos::set_source_on_main(webview, slot, source_bytes, width, height, uniforms, rect);
+        })
+        .map_err(|e| format!("with_webview failed: {e}"))
+}
+
 /// Upload an `rgba16f` buffer to the native EDR surface and show it at `rect`.
 /// The buffer is LINEAR extended sRGB (BT.709 primaries) half-float (from
 /// `encode_hdr_raw`); it is uploaded verbatim (no re-linearization). Creates

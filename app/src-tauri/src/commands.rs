@@ -1568,6 +1568,78 @@ pub fn hdr_surface_render_show(
     }
 }
 
+/// Upload the RAW linear negative (the same buffer `working_pixels` feeds
+/// WebGL's `setSourceFloat`) to the native EDR surface as its per-frame invert
+/// SOURCE, and render the invert pass (invert → intermediate → TEMP
+/// passthrough). Called rarely — image load / develop / proxy change — since it
+/// re-uploads the source texture. Only `id`/`params`/`view`/`rect` cross IPC,
+/// never pixels. On non-macOS it is a no-op.
+///
+/// NOTE: `params` is passed (beyond the brief's `(id, view)`) because the invert
+/// uniforms are resolved from the develop params here; the pixels themselves are
+/// un-graded (raw negative). Base/d_max/cam_balance are patched from the session
+/// `Developed` record (which `HdrUniforms::from_params` can't see), mirroring
+/// `encode_hdr_raw`'s resolve; `aspect` comes from the packed source dims.
+#[tauri::command]
+pub async fn hdr_surface_set_source(
+    id: String,
+    params: InvertParams,
+    view: ViewSpec,
+    rect: crate::hdr_surface::ViewportRect,
+    session: State<'_, Session>,
+    state: State<'_, crate::hdr_surface::HdrSurfaceState>,
+    window: tauri::WebviewWindow,
+) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        use crate::hdr_surface::uniforms::{ClipState, HdrUniforms};
+        ensure_resident(&session, &id)?;
+        // Snapshot the raw working negative + the develop-time invert inputs.
+        let (working, dev_base, dev_dmax, dev_cam) = {
+            let images = session.images.lock().unwrap();
+            let dev = images
+                .get(&id)
+                .ok_or("unknown image id")?
+                .developed
+                .as_ref()
+                .ok_or("not developed")?;
+            (dev.working.clone(), dev.base, dev.d_max, dev.channel_balance)
+        };
+        // Pack the raw negative (RGBA16Float, 8 bytes/px) off the async thread.
+        let (sw, sh, bytes) = tauri::async_runtime::spawn_blocking(move || {
+            crate::gpu_upload::pack_rgba16f(&working, crate::gpu_upload::MAX_GPU_EDGE)
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+
+        // Build invert+geometry uniforms. Inject the session base so the
+        // base-dependent resolution is correct, then override d_max /
+        // cam_balance / aspect (which the pure-params builder can't resolve),
+        // exactly like `encode_hdr_raw` resolves from the `Developed` record.
+        let mut p2 = params.clone();
+        p2.base_override = Some(effective_base(&params, dev_base));
+        let mut u = HdrUniforms::from_params(&p2, &view, &ClipState::default());
+        u.d_max = effective_dmax(&params, dev_dmax);
+        u.cam_balance = dev_cam.into();
+        u.aspect = oriented_aspect(sw, sh, view.rot90);
+
+        crate::hdr_surface::set_source(&window, &state, bytes, sw, sh, u, rect)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (id, params, view, rect, &session, &state, &window);
+        Ok(())
+    }
+}
+
+/// Oriented-image aspect (height / width) for the invert straighten uniform:
+/// rot90 of 1 or 3 swaps width/height.
+#[cfg(target_os = "macos")]
+fn oriented_aspect(w: u32, h: u32, rot90: u8) -> f32 {
+    let (ow, oh) = if rot90 % 2 == 1 { (h, w) } else { (w, h) };
+    (oh.max(1) as f32) / (ow.max(1) as f32)
+}
+
 /// The persistent per-image edits that shape a thumbnail's geometry and retouching.
 /// Mirrors the relevant `ViewSpec` fields but without the zoom/view crop — a
 /// thumbnail always shows the whole (cropped) frame. All fields default so the
