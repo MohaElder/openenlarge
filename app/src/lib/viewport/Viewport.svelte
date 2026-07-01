@@ -477,6 +477,14 @@
     if (hdrRaf !== null) { cancelAnimationFrame(hdrRaf); hdrRaf = null; }
   }
   function clipArg() { return { high: clipHigh, low: clipLow, strict: clipStrict }; }
+  // Deep-zoom window offset/scale — the SAME values applyGeometryAndDraw hands the
+  // WebGL renderer (`win.off`/`win.scale`, where `win = vw0 ?? identity`). The
+  // invert shader on the surface applies these so the EDR shows the zoomed window
+  // instead of squeezing the whole image into the canvas box. Identity ([0,0]/
+  // [1,1]) at fit and in bake mode (vw0 is null there — matching the WebGL path).
+  function hdrViewWindow(): { off: [number, number]; scale: [number, number] } {
+    return vw0 ? { off: vw0.off, scale: vw0.scale } : { off: [0, 0], scale: [1, 1] };
+  }
 
   // Upload (or re-upload) the raw-negative source; on success mark the surface live
   // and push one uniforms update to reconcile any edits made during the async gap.
@@ -487,7 +495,8 @@
     const curId = id;
     const myseq = ++sourceSeq;
     try {
-      await api.hdrSurfaceSetSource(id, params, hdrViewSpec(), canvasRect());
+      const w = hdrViewWindow();
+      await api.hdrSurfaceSetSource(id, params, hdrViewSpec(), canvasRect(), w.off, w.scale);
       if (myseq !== sourceSeq || id !== curId || !params.hdr || !liveEdr) return; // superseded
       hdrUsesSurface = true;
       hdrShown = true; // hides the SDR canvas via the `edrhole` class below
@@ -504,7 +513,8 @@
   // exists, so a stray early call is harmless.
   function pushHdrUniforms() {
     if (!liveEdr || !params.hdr || !id || !imgW || !vpW) return;
-    api.hdrSurfaceSetUniforms(id, params, hdrViewSpec(), clipArg(), canvasRect()).catch((e) => {
+    const w = hdrViewWindow();
+    api.hdrSurfaceSetUniforms(id, params, hdrViewSpec(), clipArg(), canvasRect(), w.off, w.scale).catch((e) => {
       if (!(typeof e === "string" && e === "not developed")) console.error("hdrSurfaceSetUniforms failed", e);
     });
   }
