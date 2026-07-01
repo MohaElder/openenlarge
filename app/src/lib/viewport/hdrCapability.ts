@@ -38,7 +38,8 @@ export async function probeHdrEnv(): Promise<HdrEnv> {
     typeof window !== "undefined" && "matchMedia" in window
       ? window.matchMedia("(dynamic-range: high)").matches
       : false;
-  const surfaceSupported =
-    os === "macos" ? true : os === "windows" ? "gpu" in navigator : false;
+  // Windows/WebGPU surface not yet wired → route to gainmap-fallback;
+  // revisit when the Windows path lands.
+  const surfaceSupported = os === "macos" ? true : false;
   return { os, displayHdr, surfaceSupported };
 }

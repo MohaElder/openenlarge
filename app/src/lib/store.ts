@@ -262,4 +262,6 @@ export const dustRev = writable<number>(0);
  *  Defaults to the safe gainmap-fallback until the async probe below resolves;
  *  probed once at module load (app start). See lib/viewport/hdrCapability.ts. */
 export const hdrMode = writable<HdrMode>("gainmap-fallback");
-probeHdrEnv().then((env) => hdrMode.set(detectHdrMode(env)));
+probeHdrEnv()
+  .then((env) => hdrMode.set(detectHdrMode(env)))
+  .catch(() => hdrMode.set("gainmap-fallback"));
