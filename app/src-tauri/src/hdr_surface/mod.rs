@@ -82,6 +82,7 @@ pub(crate) fn show_buffer(
 /// (8 bytes/px) at `width`×`height`; `uniforms` already has base/d_max/
 /// cam_balance/aspect patched from the session.
 #[cfg(target_os = "macos")]
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn set_source(
     window: &tauri::WebviewWindow,
     state: &HdrSurfaceState,
@@ -89,12 +90,15 @@ pub(crate) fn set_source(
     width: u32,
     height: u32,
     uniforms: uniforms::HdrUniforms,
+    lut_bytes: Vec<u8>,
     rect: ViewportRect,
 ) -> Result<(), String> {
     let slot = state.surface.clone();
     window
         .with_webview(move |webview| {
-            macos::set_source_on_main(webview, slot, source_bytes, width, height, uniforms, rect);
+            macos::set_source_on_main(
+                webview, slot, source_bytes, width, height, uniforms, lut_bytes, rect,
+            );
         })
         .map_err(|e| format!("with_webview failed: {e}"))
 }

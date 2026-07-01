@@ -48,7 +48,9 @@ use objc2_metal::{
 };
 use objc2_quartz_core::{CAMetalDrawable, CAMetalLayer};
 
-use super::msl::{HDR_UNIFORMS_BUFFER_INDEX, HDR_UNIFORMS_STRUCT_MSL, INVERT_FRAG_MSL};
+use super::msl::{
+    FINISH_FRAG_MSL, HDR_UNIFORMS_BUFFER_INDEX, HDR_UNIFORMS_STRUCT_MSL, INVERT_FRAG_MSL,
+};
 use super::uniforms::HdrUniforms;
 use super::ViewportRect;
 
@@ -131,12 +133,16 @@ pub struct Surface {
     pipeline: ManuallyDrop<Retained<ProtocolObject<dyn MTLRenderPipelineState>>>,
     /// Invert pipeline (`invert_frag`): raw negative → inverted positive.
     invert_pipeline: ManuallyDrop<Retained<ProtocolObject<dyn MTLRenderPipelineState>>>,
+    /// Finish pipeline (`finish_frag`): inverted positive → finished HDR output.
+    finish_pipeline: ManuallyDrop<Retained<ProtocolObject<dyn MTLRenderPipelineState>>>,
     /// Finished-buffer texture for the `render_show` path (Task 8A).
     texture: ManuallyDrop<Option<Retained<ProtocolObject<dyn MTLTexture>>>>,
     /// Raw linear negative uploaded by `set_source` (the per-frame invert input).
     source_texture: ManuallyDrop<Option<Retained<ProtocolObject<dyn MTLTexture>>>>,
     /// Intermediate render target holding the inverted positive (unclamped).
     inter_texture: ManuallyDrop<Option<Retained<ProtocolObject<dyn MTLTexture>>>>,
+    /// 256×1 RGBA8 composed tone-curve LUT for the finish stage.
+    lut_texture: ManuallyDrop<Option<Retained<ProtocolObject<dyn MTLTexture>>>>,
     /// Invert+geometry uniforms for the current source (POD, set inline via
     /// `setFragmentBytes`, so no Metal buffer / release concern).
     uniforms: Option<HdrUniforms>,
@@ -157,9 +163,11 @@ impl Drop for Surface {
             // SAFETY: each field is initialized and dropped exactly once here;
             // `ManuallyDrop` suppressed the automatic field-drop.
             unsafe {
+                ManuallyDrop::drop(&mut self.lut_texture);
                 ManuallyDrop::drop(&mut self.inter_texture);
                 ManuallyDrop::drop(&mut self.source_texture);
                 ManuallyDrop::drop(&mut self.texture);
+                ManuallyDrop::drop(&mut self.finish_pipeline);
                 ManuallyDrop::drop(&mut self.invert_pipeline);
                 ManuallyDrop::drop(&mut self.pipeline);
                 ManuallyDrop::drop(&mut self.queue);
@@ -173,9 +181,12 @@ impl Drop for Surface {
         // to a raw pointer) and release them on the main dispatch queue. Because
         // the fields are `ManuallyDrop`, none of them auto-drop here, so there is
         // no double free; each pointer is released exactly once on the main queue.
-        let mut ptrs: Vec<*mut AnyObject> = Vec::with_capacity(9);
+        let mut ptrs: Vec<*mut AnyObject> = Vec::with_capacity(11);
         // SAFETY: each field is initialized and taken exactly once.
         unsafe {
+            if let Some(t) = ManuallyDrop::take(&mut self.lut_texture) {
+                ptrs.push(Retained::into_raw(t).cast());
+            }
             if let Some(t) = ManuallyDrop::take(&mut self.inter_texture) {
                 ptrs.push(Retained::into_raw(t).cast());
             }
@@ -185,6 +196,7 @@ impl Drop for Surface {
             if let Some(t) = ManuallyDrop::take(&mut self.texture) {
                 ptrs.push(Retained::into_raw(t).cast());
             }
+            ptrs.push(Retained::into_raw(ManuallyDrop::take(&mut self.finish_pipeline)).cast());
             ptrs.push(Retained::into_raw(ManuallyDrop::take(&mut self.invert_pipeline)).cast());
             ptrs.push(Retained::into_raw(ManuallyDrop::take(&mut self.pipeline)).cast());
             ptrs.push(Retained::into_raw(ManuallyDrop::take(&mut self.queue)).cast());
@@ -342,7 +354,7 @@ fn create_surface(
     // pipelines render into RGBA16Float targets (the drawable + the RGBA16Float
     // intermediate).
     let full_src = format!(
-        "{MSL_PREAMBLE}{HDR_UNIFORMS_STRUCT_MSL}{BLIT_FRAG}{INVERT_FRAG_MSL}"
+        "{MSL_PREAMBLE}{HDR_UNIFORMS_STRUCT_MSL}{BLIT_FRAG}{INVERT_FRAG_MSL}{FINISH_FRAG_MSL}"
     );
     let library = device
         .newLibraryWithSource_options_error(&NSString::from_str(&full_src), None)
@@ -356,11 +368,16 @@ fn create_surface(
     let invert_fn = library
         .newFunctionWithName(&NSString::from_str("invert_frag"))
         .ok_or_else(|| "missing invert_frag".to_string())?;
+    let finish_fn = library
+        .newFunctionWithName(&NSString::from_str("finish_frag"))
+        .ok_or_else(|| "missing finish_frag".to_string())?;
 
     let pipeline = make_pipeline(&device, &vertex_fn, &blit_fn)
         .map_err(|e| format!("blit pipeline: {e}"))?;
     let invert_pipeline = make_pipeline(&device, &vertex_fn, &invert_fn)
         .map_err(|e| format!("invert pipeline: {e}"))?;
+    let finish_pipeline = make_pipeline(&device, &vertex_fn, &finish_fn)
+        .map_err(|e| format!("finish pipeline: {e}"))?;
     let queue = device
         .newCommandQueue()
         .ok_or_else(|| "could not create command queue".to_string())?;
@@ -425,9 +442,11 @@ fn create_surface(
         queue: ManuallyDrop::new(queue),
         pipeline: ManuallyDrop::new(pipeline),
         invert_pipeline: ManuallyDrop::new(invert_pipeline),
+        finish_pipeline: ManuallyDrop::new(finish_pipeline),
         texture: ManuallyDrop::new(None),
         source_texture: ManuallyDrop::new(None),
         inter_texture: ManuallyDrop::new(None),
+        lut_texture: ManuallyDrop::new(None),
         uniforms: None,
         source_dims: (0, 0),
     })
@@ -610,6 +629,7 @@ pub fn set_source_on_main(
     width: u32,
     height: u32,
     uniforms: HdrUniforms,
+    lut_bytes: Vec<u8>,
     rect: ViewportRect,
 ) {
     let Some(mtm) = MainThreadMarker::new() else {
@@ -641,12 +661,60 @@ pub fn set_source_on_main(
         eprintln!("[hdr] source upload failed: {e}");
         return;
     }
+    if let Err(e) = upload_lut_texture(surface, &lut_bytes) {
+        eprintln!("[hdr] LUT upload failed: {e}");
+        return;
+    }
     surface.uniforms = Some(uniforms);
     surface.view.setHidden(false);
     // SAFETY: WKWebView inherits NSView; valid on the main thread.
     let webview_view: &NSView = unsafe { &*(wk_webview as *const AnyObject as *const NSView) };
     position(webview_view, surface, rect);
-    let _ = render_invert(surface);
+    let _ = render_pipeline(surface);
+}
+
+/// Upload the 256×1 composed tone-curve LUT (RGBA8, R=lut_r/G=lut_g/B=lut_b) as
+/// a Metal texture the finish stage samples per channel.
+fn upload_lut_texture(surface: &mut Surface, bytes: &[u8]) -> Result<(), String> {
+    const LUT_W: usize = 256;
+    let expected = LUT_W * 4; // RGBA8
+    if bytes.len() < expected {
+        return Err(format!("LUT buffer too small: {} < {expected}", bytes.len()));
+    }
+    // SAFETY: standard 2D descriptor; plain-value args.
+    let desc = unsafe {
+        MTLTextureDescriptor::texture2DDescriptorWithPixelFormat_width_height_mipmapped(
+            MTLPixelFormat::RGBA8Unorm,
+            LUT_W,
+            1,
+            false,
+        )
+    };
+    desc.setUsage(MTLTextureUsage::ShaderRead);
+    desc.setStorageMode(MTLStorageMode::Shared);
+    let texture = surface
+        .device
+        .newTextureWithDescriptor(&desc)
+        .ok_or_else(|| "LUT texture allocation failed".to_string())?;
+    let region = MTLRegion {
+        origin: MTLOrigin { x: 0, y: 0, z: 0 },
+        size: MTLSize {
+            width: LUT_W,
+            height: 1,
+            depth: 1,
+        },
+    };
+    // SAFETY: `bytes` is at least `expected` long (checked); shared storage.
+    unsafe {
+        texture.replaceRegion_mipmapLevel_withBytes_bytesPerRow(
+            region,
+            0,
+            NonNull::new(bytes.as_ptr() as *mut c_void).unwrap(),
+            LUT_W * 4,
+        );
+    }
+    *surface.lut_texture = Some(texture);
+    Ok(())
 }
 
 /// Upload the raw-negative bytes (RGBA16Float, 8 bytes/px) into the source
@@ -736,14 +804,15 @@ fn upload_source_texture(
     Ok(())
 }
 
-/// Render the per-frame invert: PASS 1 inverts the source into the intermediate
-/// (unclamped positive), PASS 2 TEMPORARILY passes the intermediate through to
-/// the drawable (Task 4 replaces PASS 2 with the finish stage). No-op if the
-/// source/intermediate/uniforms/drawable aren't ready.
-fn render_invert(surface: &Surface) -> Result<(), String> {
-    let (Some(src), Some(inter), Some(uniforms)) = (
+/// Render the full per-frame pipeline: PASS 1 inverts the source into the
+/// intermediate (unclamped positive); PASS 2 FINISHES the intermediate (tone /
+/// color / HDR finalize, reading the LUT texture) into the drawable. No-op if
+/// the source/intermediate/uniforms/LUT/drawable aren't ready.
+fn render_pipeline(surface: &Surface) -> Result<(), String> {
+    let (Some(src), Some(inter), Some(lut), Some(uniforms)) = (
         surface.source_texture.as_ref(),
         surface.inter_texture.as_ref(),
+        surface.lut_texture.as_ref(),
         surface.uniforms.as_ref(),
     ) else {
         return Ok(());
@@ -764,6 +833,7 @@ fn render_invert(surface: &Surface) -> Result<(), String> {
             std::mem::size_of::<HdrUniforms>(),
         )
     };
+    let ubuf_index = HDR_UNIFORMS_BUFFER_INDEX as usize;
 
     // PASS 1: invert (source -> intermediate).
     {
@@ -789,7 +859,7 @@ fn render_invert(surface: &Surface) -> Result<(), String> {
             enc.setFragmentBytes_length_atIndex(
                 NonNull::new(ubytes.as_ptr() as *mut c_void).unwrap(),
                 ubytes.len(),
-                HDR_UNIFORMS_BUFFER_INDEX as usize,
+                ubuf_index,
             )
         };
         // SAFETY: 3 procedural vertices, no vertex buffers.
@@ -797,8 +867,7 @@ fn render_invert(surface: &Surface) -> Result<(), String> {
         enc.endEncoding();
     }
 
-    // PASS 2 (TEMP): passthrough intermediate -> drawable so the invert is
-    // visible / sanity-checkable. Task 4 replaces this with the finish stage.
+    // PASS 2: finish (intermediate + LUT -> drawable). Tone / color / HDR finalize.
     {
         let pass = MTLRenderPassDescriptor::new();
         // SAFETY: single color attachment at index 0.
@@ -814,10 +883,18 @@ fn render_invert(surface: &Surface) -> Result<(), String> {
         });
         let enc = cmd
             .renderCommandEncoderWithDescriptor(&pass)
-            .ok_or_else(|| "no passthrough encoder".to_string())?;
-        enc.setRenderPipelineState(&surface.pipeline);
-        // SAFETY: the blit shader declares texture(0).
+            .ok_or_else(|| "no finish encoder".to_string())?;
+        enc.setRenderPipelineState(&surface.finish_pipeline);
+        // SAFETY: the finish shader declares texture(0) (inter) + texture(1) (LUT) + buffer(0).
         unsafe { enc.setFragmentTexture_atIndex(Some(inter), 0) };
+        unsafe { enc.setFragmentTexture_atIndex(Some(lut), 1) };
+        unsafe {
+            enc.setFragmentBytes_length_atIndex(
+                NonNull::new(ubytes.as_ptr() as *mut c_void).unwrap(),
+                ubytes.len(),
+                ubuf_index,
+            )
+        };
         // SAFETY: 3 procedural vertices, no vertex buffers.
         unsafe { enc.drawPrimitives_vertexStart_vertexCount(MTLPrimitiveType::Triangle, 0, 3) };
         enc.endEncoding();

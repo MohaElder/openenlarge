@@ -1623,7 +1623,19 @@ pub async fn hdr_surface_set_source(
         u.cam_balance = dev_cam.into();
         u.aspect = oriented_aspect(sw, sh, view.rot90);
 
-        crate::hdr_surface::set_source(&window, &state, bytes, sw, sh, u, rect)
+        // Composed 256×1 tone-curve LUT (RGBA8: R=lut_r/G=lut_g/B=lut_b), the same
+        // curve the finish stage samples (matches the CPU `finish_pixel` sample_lut
+        // and the JS `toneLutBytes`).
+        let fp = finish_from(&params);
+        let mut lut_bytes = vec![0u8; 256 * 4];
+        for i in 0..256 {
+            lut_bytes[i * 4] = (fp.lut_r[i].clamp(0.0, 1.0) * 255.0).round() as u8;
+            lut_bytes[i * 4 + 1] = (fp.lut_g[i].clamp(0.0, 1.0) * 255.0).round() as u8;
+            lut_bytes[i * 4 + 2] = (fp.lut_b[i].clamp(0.0, 1.0) * 255.0).round() as u8;
+            lut_bytes[i * 4 + 3] = 255;
+        }
+
+        crate::hdr_surface::set_source(&window, &state, bytes, sw, sh, u, lut_bytes, rect)
     }
     #[cfg(not(target_os = "macos"))]
     {

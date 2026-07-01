@@ -277,3 +277,296 @@ fragment float4 invert_frag(VOut in [[stage_in]],
     return float4(hdr_invert(rgb, u), 1.0);
 }
 "#;
+
+/// MSL finish stage — a port of `FRAG` (`app/src/lib/viewport/gl/shaders.ts:16-332`),
+/// which mirrors `crates/film-core/src/finish.rs::finish_pixel`. Concatenated
+/// AFTER the preamble + `HDR_UNIFORMS_STRUCT_MSL` + `INVERT_FRAG_MSL` (it reuses
+/// `INV_EPS` from the invert stage and `VOut`/`HdrUniforms`). Reads the inverted
+/// intermediate at `texture(0)`, the 256×1 composed tone LUT at `texture(1)`,
+/// and `HdrUniforms` at `buffer(0)`.
+///
+/// Pipeline (identical order to `finish_pixel` / `finishAt`): per-zone WB →
+/// brightness/density (`10^(b·0.5)`) → tone body (whites/blacks cubic,
+/// highlights/shadows smoothstep, contrast pivot — NO leading clamp, NO
+/// SDR display-finalize) → OKLab saturation → tone LUT → color grade → color
+/// mix (8-band) → point color → **HDR finalize** → clipping overlay.
+///
+/// Constants MUST equal `finish.rs` / the GLSL twin: tone gains 0.20/0.20/0.18/
+/// 0.18, `BRIGHTNESS_DENSITY_RANGE=0.5`, `SAT_C_REF=0.20`, `SAT_C_NEUTRAL=0.025`,
+/// `SKIN_HUE=0.70`, `SKIN_WIDTH=0.55`, `SKIN_DAMP=0.5`, the OKLab matrices, the
+/// color-mixer band centres + gains, the point-color tolerances, `HDR_KNEE=0.8`,
+/// `HDR_HEADROOM=2.5` (`engine.rs`).
+///
+/// HDR-FINALIZE DESIGN (see task-4-report for the full rationale): the tone body
+/// preserves super-white; the creative color ops (saturation/LUT/grade/mix/point)
+/// are display-domain [0,1] operations and run on the CLAMPED body; the highlight
+/// magnitude is then reattached hue-preservingly and rolled off by
+/// `hdr_finalize_rgb` (port of `finish.rs::hdr_finalize_rgb`). Two deliberate
+/// deviations from the GLSL, flagged in the report: (1) the blacks term uses
+/// `(1-v)^3` via multiplication (matching `finish.rs`'s `.powi(3)`), not
+/// `pow(1-v,3.0)` which is NaN for the super-white `v>1` case; (2) the SDR
+/// `display_finalize` look/shoulder is replaced by `hdr_finalize_rgb` per the
+/// brief (drops the Faithful `lookS` contrast on the HDR path).
+pub const FINISH_FRAG_MSL: &str = r#"
+// ---- finish stage: port of FRAG (shaders.ts) / finish.rs::finish_pixel ----
+constant float FIN_PI = 3.14159265358979;
+constant float FIN_BRIGHTNESS_RANGE = 0.5;      // MUST equal finish.rs BRIGHTNESS_DENSITY_RANGE
+constant float HDR_KNEE = 0.8;                  // MUST equal engine.rs HDR_KNEE
+constant float HDR_HEADROOM = 2.5;              // MUST equal engine.rs HDR_HEADROOM
+// OKLab saturation constants (MUST equal finish.rs).
+constant float SAT_C_REF = 0.20;
+constant float SAT_C_NEUTRAL = 0.025;
+constant float SKIN_HUE = 0.70;
+constant float SKIN_WIDTH = 0.55;
+constant float SKIN_DAMP = 0.5;
+// Color-mixer / point-color constants (MUST equal shaders.ts).
+constant float BAND_CENTERS[8] = { 0.0, 30.0, 60.0, 120.0, 180.0, 240.0, 280.0, 320.0 };
+constant float CM_FALLOFF_DEG = 50.0;
+constant float CM_HUE_SHIFT_MAX = 30.0;
+constant float CM_LUM_GAIN = 0.25;
+constant float CM_SAT_GATE_LO = 0.05;
+constant float CM_SAT_GATE_HI = 0.20;
+constant float PC_RANGE_MIN_DEG = 5.0;
+constant float PC_RANGE_MAX_DEG = 60.0;
+constant float PC_SAT_TOL = 0.25;
+constant float PC_LUM_TOL = 0.25;
+constant float PC_VAR_SPAN = 2.0;
+// Clipping-overlay thresholds (MUST equal shaders.ts).
+constant float CLIP_LO = 2.0 / 255.0;
+constant float CLIP_LO_STRICT = 8.0 / 255.0;
+constant float CLIP_HI = 0.992;
+constant float CLIP_HI_STRICT = 0.96;
+
+// GLSL `mod` (result takes sign of the divisor), not C fmod — needed for the hue wraps.
+float fin_mod(float x, float y) { return x - y * floor(x / y); }
+
+float3 applyPerZoneWb(float3 rgb, constant HdrUniforms& u) {
+    if (u.pz_enabled == 0) return rgb;
+    float L = dot(rgb, float3(0.2126, 0.7152, 0.0722));
+    float wsh = 1.0 - smoothstep(0.08, 0.58, L);
+    float whi = smoothstep(0.41, 0.91, L);
+    float wmid = clamp(1.0 - wsh - whi, 0.0, 1.0);
+    float3 gain = wsh * u.pz_sh + wmid * u.pz_mid + whi * u.pz_hi;
+    return max(rgb * gain, float3(0.0));
+}
+
+// Tone body: tone sliders on the (possibly super-white) body. NO leading clamp,
+// NO SDR display-finalize — the HDR finalize handles the shoulder. Blacks cube via
+// multiply (matches finish.rs `.powi(3)`; `pow(neg,3.0)` is NaN for v>1).
+float toneBody(float v, constant HdrUniforms& u) {
+    v += u.whites * 0.20 * v * v * v;
+    float omv = 1.0 - v;
+    v += u.blacks * 0.20 * (omv * omv * omv);
+    v += u.highlights * 0.18 * smoothstep(0.5, 1.0, v);
+    v += u.shadows * 0.18 * (1.0 - smoothstep(0.0, 0.5, v));
+    v = 0.5 + (v - 0.5) * (1.0 + u.contrast);
+    return v;
+}
+
+float3 colorGrade(float3 rgb, constant HdrUniforms& u) {
+    float L = dot(rgb, float3(0.2126, 0.7152, 0.0722));
+    float wsh = 1.0 - smoothstep(u.cg_sh_edge - u.cg_soft, u.cg_sh_edge + u.cg_soft, L);
+    float whi = smoothstep(u.cg_hi_edge - u.cg_soft, u.cg_hi_edge + u.cg_soft, L);
+    float wmid = clamp(1.0 - wsh - whi, 0.0, 1.0);
+    float3 outc = rgb
+        + wsh * (u.cg_sh_off + float3(u.cg_sh_lum))
+        + wmid * (u.cg_mid_off + float3(u.cg_mid_lum))
+        + whi * (u.cg_hi_off + float3(u.cg_hi_lum))
+        + (u.cg_glob_off + float3(u.cg_glob_lum));
+    return clamp(outc, 0.0, 1.0);
+}
+
+float3 rgb2hsl(float3 c) {
+    float mx = max(max(c.r, c.g), c.b);
+    float mn = min(min(c.r, c.g), c.b);
+    float l = (mx + mn) * 0.5;
+    if (mx - mn < 1e-7) return float3(0.0, 0.0, l);
+    float d = mx - mn;
+    float s = l > 0.5 ? d / (2.0 - mx - mn) : d / (mx + mn);
+    float h;
+    if (mx == c.r) h = (c.g - c.b) / d + (c.g < c.b ? 6.0 : 0.0);
+    else if (mx == c.g) h = (c.b - c.r) / d + 2.0;
+    else h = (c.r - c.g) / d + 4.0;
+    return float3(h * 60.0, s, l);
+}
+float hue2rgb(float p, float q, float t) {
+    t = fract(t);
+    if (t < 1.0 / 6.0) return p + (q - p) * 6.0 * t;
+    if (t < 0.5) return q;
+    if (t < 2.0 / 3.0) return p + (q - p) * (2.0 / 3.0 - t) * 6.0;
+    return p;
+}
+float3 hsl2rgb(float h, float s, float l) {
+    if (s <= 0.0) return float3(l);
+    float q = l < 0.5 ? l * (1.0 + s) : l + s - l * s;
+    float p = 2.0 * l - q;
+    float hk = h / 360.0;
+    return float3(hue2rgb(p, q, hk + 1.0 / 3.0), hue2rgb(p, q, hk), hue2rgb(p, q, hk - 1.0 / 3.0));
+}
+float wrap180(float d) {
+    float x = fin_mod(d + 180.0, 360.0) - 180.0;
+    return x <= -180.0 ? x + 360.0 : x;
+}
+float bandWeight(float h, float center) {
+    float d = abs(wrap180(h - center));
+    return d >= CM_FALLOFF_DEG ? 0.0 : 0.5 * (1.0 + cos(FIN_PI * d / CM_FALLOFF_DEG));
+}
+float3 colorMixer(float3 rgb, constant HdrUniforms& u) {
+    float3 hsl = rgb2hsl(rgb);
+    float h = hsl.x, s = hsl.y, l = hsl.z;
+    float gate = smoothstep(CM_SAT_GATE_LO, CM_SAT_GATE_HI, s);
+    float hueDelta = 0.0, satFactor = 1.0, lumDelta = 0.0;
+    for (int i = 0; i < 8; i++) {
+        float w = bandWeight(h, BAND_CENTERS[i]);
+        hueDelta += w * gate * u.cm_hue[i] * CM_HUE_SHIFT_MAX;
+        satFactor += w * gate * u.cm_sat[i];
+        lumDelta += w * u.cm_lum[i] * CM_LUM_GAIN;
+    }
+    return hsl2rgb(h + hueDelta, clamp(s * satFactor, 0.0, 1.0), clamp(l + lumDelta, 0.0, 1.0));
+}
+float pcTol(float base, float variance) {
+    return max(0.02, base * (1.0 + (variance / 100.0) * PC_VAR_SPAN));
+}
+float pcHueWeight(float h, float target, float range) {
+    float hw = PC_RANGE_MIN_DEG + (range / 100.0) * (PC_RANGE_MAX_DEG - PC_RANGE_MIN_DEG);
+    float d = abs(wrap180(h - target));
+    return d >= hw ? 0.0 : 0.5 * (1.0 + cos(FIN_PI * d / hw));
+}
+float3 pointColor(float3 rgb, constant HdrUniforms& u) {
+    if (u.pc_count <= 0) return rgb;
+    float3 hsl = rgb2hsl(rgb);
+    float h = hsl.x, s = hsl.y, l = hsl.z;
+    float hueDelta = 0.0, satFactor = 1.0, lumDelta = 0.0;
+    for (int k = 0; k < 8; k++) {
+        if (k >= u.pc_count) break;
+        float wh = pcHueWeight(h, u.pc_hue[k], u.pc_range[k]);
+        if (wh <= 0.0) continue;
+        float ws = clamp(1.0 - abs(s - u.pc_sat[k]) / pcTol(PC_SAT_TOL, u.pc_variance[k]), 0.0, 1.0);
+        float wl = clamp(1.0 - abs(l - u.pc_lum[k]) / pcTol(PC_LUM_TOL, u.pc_variance[k]), 0.0, 1.0);
+        float w = wh * ws * wl;
+        hueDelta += w * u.pc_hue_shift[k] * CM_HUE_SHIFT_MAX;
+        satFactor += w * u.pc_sat_shift[k];
+        lumDelta += w * u.pc_lum_shift[k] * CM_LUM_GAIN;
+    }
+    return hsl2rgb(h + hueDelta, clamp(s * satFactor, 0.0, 1.0), clamp(l + lumDelta, 0.0, 1.0));
+}
+
+// OKLab perceptual saturation (MUST equal finish.rs apply_saturation).
+float srgbToLinear(float c) { return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4); }
+float linearToSrgb(float c) { return c <= 0.0031308 ? 12.92 * c : 1.055 * pow(c, 1.0 / 2.4) - 0.055; }
+float3 srgbToLinear3(float3 c) { return float3(srgbToLinear(c.r), srgbToLinear(c.g), srgbToLinear(c.b)); }
+float3 linearToSrgb3(float3 c) { return float3(linearToSrgb(c.r), linearToSrgb(c.g), linearToSrgb(c.b)); }
+float3 linearToOklab(float3 rgb) {
+    float l = 0.4122214708 * rgb.r + 0.5363325363 * rgb.g + 0.0514459929 * rgb.b;
+    float m = 0.2119034982 * rgb.r + 0.6806995451 * rgb.g + 0.1073969566 * rgb.b;
+    float s = 0.0883024619 * rgb.r + 0.2817188376 * rgb.g + 0.6299787005 * rgb.b;
+    float3 lms_ = pow(max(float3(l, m, s), float3(0.0)), float3(1.0 / 3.0));
+    return float3(
+        0.2104542553 * lms_.x + 0.7936177850 * lms_.y - 0.0040720468 * lms_.z,
+        1.9779984951 * lms_.x - 2.4285922050 * lms_.y + 0.4505937099 * lms_.z,
+        0.0259040371 * lms_.x + 0.7827717662 * lms_.y - 0.8086757660 * lms_.z);
+}
+float3 oklabToLinear(float3 lab) {
+    float l_ = lab.x + 0.3963377774 * lab.y + 0.2158037573 * lab.z;
+    float m_ = lab.x - 0.1055613458 * lab.y - 0.0638541728 * lab.z;
+    float s_ = lab.x - 0.0894841775 * lab.y - 1.2914855480 * lab.z;
+    float3 lms = float3(l_ * l_ * l_, m_ * m_ * m_, s_ * s_ * s_);
+    return float3(
+         4.0767416621 * lms.x - 3.3077115913 * lms.y + 0.2309699292 * lms.z,
+        -1.2684380046 * lms.x + 2.6097574011 * lms.y - 0.3413193965 * lms.z,
+        -0.0041960863 * lms.x - 0.7034186147 * lms.y + 1.7076147010 * lms.z);
+}
+float fin_hueDist(float a, float b) {
+    float d = fin_mod(abs(a - b), 2.0 * FIN_PI);
+    return d > FIN_PI ? 2.0 * FIN_PI - d : d;
+}
+float3 oklabSaturate(float3 rgb, constant HdrUniforms& u) {
+    if (abs(u.saturation) < 1e-5 && abs(u.vibrance) < 1e-5) return rgb;
+    float3 lab = linearToOklab(srgbToLinear3(rgb));
+    float c = length(lab.yz);
+    if (c < 1e-5) return rgb;
+    float hh = atan2(lab.z, lab.y);
+    float vibW = 1.0 - clamp(c / SAT_C_REF, 0.0, 1.0);
+    float gain = u.saturation + u.vibrance * vibW;
+    float neutral = smoothstep(0.0, SAT_C_NEUTRAL, c);
+    float skin = 1.0 - SKIN_DAMP * smoothstep(SKIN_WIDTH, 0.0, fin_hueDist(hh, SKIN_HUE));
+    gain *= neutral * skin;
+    float scale = max(1.0 + gain, 0.0);
+    float3 lab2 = float3(lab.x, lab.y * scale, lab.z * scale);
+    float3 gray = oklabToLinear(float3(lab.x, 0.0, 0.0));
+    float3 col = oklabToLinear(lab2);
+    float tg = 1.0;
+    for (int ch = 0; ch < 3; ch++) {
+        float g0 = gray[ch]; float c0 = col[ch];
+        if (c0 > 1.0) tg = min(tg, (1.0 - g0) / (c0 - g0));
+        else if (c0 < 0.0) tg = min(tg, g0 / (g0 - c0));
+    }
+    tg = clamp(tg, 0.0, 1.0);
+    float3 outLin = clamp(mix(gray, col, tg), 0.0, 1.0);
+    return linearToSrgb3(outLin);
+}
+
+// Per-channel tone LUT sample (256x1 RGBA; R=ch0 G=ch1 B=ch2). clamp_to_edge +
+// linear filter reproduce sample_lut's clamp + interpolation.
+float lutSample(texture2d<float> lut, float x, int ch) {
+    constexpr sampler s(filter::linear, address::clamp_to_edge);
+    float4 v = lut.sample(s, float2(x, 0.5));
+    return ch == 0 ? v.r : (ch == 1 ? v.g : v.b);
+}
+
+// HDR finalize: tanh shoulder above HDR_KNEE, hue-preserving via the shared
+// max-channel ratio. Port of finish.rs::hdr_finalize_rgb (identity below knee).
+float hdr_finalize_scalar(float v) {
+    if (v <= HDR_KNEE) return v;
+    float span = HDR_HEADROOM - HDR_KNEE;
+    return HDR_KNEE + span * tanh((v - HDR_KNEE) / span);
+}
+float3 hdr_finalize_rgb(float3 rgb) {
+    float m = max(rgb.r, max(rgb.g, rgb.b));
+    if (m <= INV_EPS) return rgb;
+    float ratio = hdr_finalize_scalar(m) / m;
+    return rgb * ratio;
+}
+
+// Clipping overlay (detail-loss warning), on the finished display color.
+int clipCode(float3 src, constant HdrUniforms& u) {
+    float hiT = u.clip_strict > 0.5 ? CLIP_HI_STRICT : CLIP_HI;
+    float loT = u.clip_strict > 0.5 ? CLIP_LO_STRICT : CLIP_LO;
+    int code = 0;
+    if (src.r >= hiT || src.g >= hiT || src.b >= hiT) code += 2;
+    if (src.r <= loT || src.g <= loT || src.b <= loT) code += 1;
+    return code;
+}
+float3 clipOverlay(float3 disp, int code, constant HdrUniforms& u) {
+    if (u.clip_high_on > 0.5 && (code & 2) != 0) return float3(1.0, 0.15, 0.15);
+    if (u.clip_low_on > 0.5 && (code & 1) != 0) return float3(0.2, 0.45, 1.0);
+    return disp;
+}
+
+fragment float4 finish_frag(VOut in [[stage_in]],
+                            texture2d<float> src [[texture(0)]],
+                            texture2d<float> lut [[texture(1)]],
+                            constant HdrUniforms& u [[buffer(0)]]) {
+    constexpr sampler smp(filter::linear, address::clamp_to_edge);
+    float3 raw = src.sample(smp, in.uv).rgb;
+    // Per-zone WB (first op) + brightness/density gain (super-white preserved).
+    float3 c = applyPerZoneWb(raw, u) * pow(10.0, u.brightness * FIN_BRIGHTNESS_RANGE);
+    // Tone body (unclamped): carries super-white into the HDR finalize.
+    float3 bodyU = float3(toneBody(c.r, u), toneBody(c.g, u), toneBody(c.b, u));
+    // Creative color ops are display-domain [0,1] — run on the clamped body.
+    float3 bodyC = clamp(bodyU, 0.0, 1.0);
+    float3 s = oklabSaturate(bodyC, u);
+    float3 cu = float3(lutSample(lut, s.r, 0), lutSample(lut, s.g, 1), lutSample(lut, s.b, 2));
+    float3 disp = pointColor(colorMixer(colorGrade(cu, u), u), u);
+    // HDR reattach: scale the graded color up to carry the super-white highlight
+    // magnitude (hue-preserving), then roll off with the shoulder. Below 1.0 the
+    // graded color passes straight to the (identity-below-knee) shoulder.
+    float mU = max(bodyU.r, max(bodyU.g, bodyU.b));
+    float mC = max(disp.r, max(disp.g, disp.b));
+    float3 hdrRGB = (mU > 1.0 && mC > INV_EPS) ? disp * (mU / mC) : disp;
+    float3 outc = hdr_finalize_rgb(hdrRGB);
+    // Clipping overlay tests the finished display color (disp), matching the GLSL.
+    int code = clipCode(disp, u);
+    return float4(clipOverlay(outc, code, u), 1.0);
+}
+"#;
