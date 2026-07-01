@@ -486,13 +486,15 @@ fn position(window: &NSWindow, webview_view: &NSView, surface: &Surface, rect: V
 
     let dpr = rect.dpr.max(1.0);
     surface.layer.setContentsScale(dpr);
-    // Layer frame is in the view's own coordinate space (origin 0,0). Use the
-    // CONVERTED frame's size in case the conversion rescaled it.
+    // Do NOT set the backing layer's frame ourselves: for a layer-HOSTING
+    // NSView, AppKit keeps the layer's frame synced to the VIEW's frame, and
+    // the layer frame is interpreted in the SUPERLAYER's space — so an override
+    // of (0,0,w,h) pinned the Metal layer to the content view's bottom-left
+    // (~72pt left / ~176pt below the view's real position). Only the pixel
+    // render size (`drawableSize`) is ours to set; it is independent of the
+    // layer's on-screen frame.
     let fw = frame.size.width;
     let fh = frame.size.height;
-    surface
-        .layer
-        .setFrame(NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(fw, fh)));
     let dw = (fw * dpr).max(1.0);
     let dh = (fh * dpr).max(1.0);
     surface.layer.setDrawableSize(CGSize::new(dw, dh));
