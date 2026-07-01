@@ -1588,6 +1588,7 @@ pub async fn hdr_surface_set_source(
     view: ViewSpec,
     geom: GeomArg,
     rect: crate::hdr_surface::ViewportRect,
+    epoch: u64,
     session: State<'_, Session>,
     state: State<'_, crate::hdr_surface::HdrSurfaceState>,
     window: tauri::WebviewWindow,
@@ -1620,11 +1621,11 @@ pub async fn hdr_surface_set_source(
         .await
         .map_err(|e| e.to_string())?;
 
-        crate::hdr_surface::set_source(&window, &state, bytes, sw, sh, u, lut_bytes, rect)
+        crate::hdr_surface::set_source(&window, &state, bytes, sw, sh, u, lut_bytes, rect, epoch)
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (id, params, view, geom, rect, &session, &state, &window);
+        let _ = (id, params, view, geom, rect, epoch, &session, &state, &window);
         Ok(())
     }
 }
@@ -1756,6 +1757,7 @@ pub fn hdr_surface_set_uniforms(
     clip: ClipArg,
     geom: GeomArg,
     rect: crate::hdr_surface::ViewportRect,
+    epoch: u64,
     session: State<Session>,
     state: State<crate::hdr_surface::HdrSurfaceState>,
     window: tauri::WebviewWindow,
@@ -1770,11 +1772,11 @@ pub fn hdr_surface_set_uniforms(
         };
         let (u, lut_bytes) =
             resolve_surface_uniforms(&id, &params, &view, clip_state, &geom, &session)?;
-        crate::hdr_surface::set_uniforms(&window, &state, u, lut_bytes, rect)
+        crate::hdr_surface::set_uniforms(&window, &state, u, lut_bytes, rect, epoch)
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (id, params, view, clip, geom, rect, &session, &state, &window);
+        let _ = (id, params, view, clip, geom, rect, epoch, &session, &state, &window);
         Ok(())
     }
 }

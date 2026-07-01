@@ -92,12 +92,13 @@ pub(crate) fn set_source(
     uniforms: uniforms::HdrUniforms,
     lut_bytes: Vec<u8>,
     rect: ViewportRect,
+    epoch: u64,
 ) -> Result<(), String> {
     let slot = state.surface.clone();
     window
         .with_webview(move |webview| {
             macos::set_source_on_main(
-                webview, slot, source_bytes, width, height, uniforms, lut_bytes, rect,
+                webview, slot, source_bytes, width, height, uniforms, lut_bytes, rect, epoch,
             );
         })
         .map_err(|e| format!("with_webview failed: {e}"))
@@ -114,11 +115,12 @@ pub(crate) fn set_uniforms(
     uniforms: uniforms::HdrUniforms,
     lut_bytes: Vec<u8>,
     rect: ViewportRect,
+    epoch: u64,
 ) -> Result<(), String> {
     let slot = state.surface.clone();
     window
         .with_webview(move |webview| {
-            macos::set_uniforms_on_main(webview, slot, uniforms, lut_bytes, rect);
+            macos::set_uniforms_on_main(webview, slot, uniforms, lut_bytes, rect, epoch);
         })
         .map_err(|e| format!("with_webview failed: {e}"))
 }
@@ -178,11 +180,15 @@ pub fn hdr_surface_set_rect(
     }
 }
 
-/// Hide the native EDR surface, revealing the SDR webview canvas.
+/// Hide the native EDR surface, revealing the SDR webview canvas. `epoch` is the
+/// monotonic last-issued-wins guard: it drops a stale hide AND bumps
+/// `latest_epoch` so a lower-epoch `set_uniforms`/`set_source` still in flight is
+/// dropped when it lands (can't re-show a frozen frame after hide).
 #[tauri::command]
 pub fn hdr_surface_hide(
     app: tauri::AppHandle,
     state: tauri::State<'_, HdrSurfaceState>,
+    epoch: u64,
 ) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
@@ -193,13 +199,13 @@ pub fn hdr_surface_hide(
             .ok_or_else(|| "no main window".to_string())?;
         window
             .with_webview(move |webview| {
-                macos::hide_on_main(webview, slot);
+                macos::hide_on_main(webview, slot, epoch);
             })
             .map_err(|e| format!("with_webview failed: {e}"))
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (app, state);
+        let _ = (app, state, epoch);
         Ok(())
     }
 }

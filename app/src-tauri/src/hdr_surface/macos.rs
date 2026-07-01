@@ -244,8 +244,17 @@ extern "C" {
     );
 }
 
-/// Shared, lockable slot for the lazily-created surface.
-pub type SurfaceSlot = Arc<Mutex<Option<Surface>>>;
+/// The lazily-created surface plus the monotonic `latest_epoch` "last-issued-wins"
+/// guard, behind ONE mutex. `latest_epoch` lives here (not on `Surface`) so it
+/// persists across create/hide and works even when `surface` is `None`.
+#[derive(Default)]
+pub struct SurfaceState {
+    surface: Option<Surface>,
+    latest_epoch: u64,
+}
+
+/// Shared, lockable slot for the surface state.
+pub type SurfaceSlot = Arc<Mutex<SurfaceState>>;
 
 // ---------------------------------------------------------------------------
 // Command entry points (each runs inside a main-thread `with_webview` closure)
@@ -282,16 +291,16 @@ pub fn show_on_main(
     let wk_webview: &AnyObject = unsafe { &*wk_webview };
 
     let mut guard = slot.lock().unwrap();
-    if guard.is_none() {
+    if guard.surface.is_none() {
         match create_surface(mtm, window, wk_webview) {
-            Ok(s) => *guard = Some(s),
+            Ok(s) => guard.surface = Some(s),
             Err(e) => {
                 eprintln!("[hdr] create_surface failed: {e}");
                 return;
             }
         }
     }
-    let surface = guard.as_mut().unwrap();
+    let surface = guard.surface.as_mut().unwrap();
     if let Err(e) = upload_texture(surface, &rgba16f, width, height) {
         eprintln!("[hdr] texture upload failed: {e}");
         return;
@@ -316,19 +325,26 @@ pub fn set_rect_on_main(webview: tauri::webview::PlatformWebview, slot: SurfaceS
     // used on the main thread.
     let webview_view: &NSView = unsafe { &*(wk_webview as *const AnyObject as *const NSView) };
     let guard = slot.lock().unwrap();
-    if let Some(surface) = guard.as_ref() {
+    if let Some(surface) = guard.surface.as_ref() {
         position(webview_view, surface, rect);
         let _ = render(surface);
     }
 }
 
-/// Hide the surface, revealing the SDR webview canvas. No-op if not yet shown.
-pub fn hide_on_main(_webview: tauri::webview::PlatformWebview, slot: SurfaceSlot) {
+/// Hide the surface, revealing the SDR webview canvas. Guarded by the epoch:
+/// a stale hide (lower epoch than the latest issued) is dropped; otherwise it
+/// bumps `latest_epoch` (so a later, lower-epoch `set_uniforms` in flight is then
+/// dropped and can't re-show a frozen frame). No visual work if not yet shown.
+pub fn hide_on_main(_webview: tauri::webview::PlatformWebview, slot: SurfaceSlot, epoch: u64) {
     if MainThreadMarker::new().is_none() {
         return;
     }
-    let guard = slot.lock().unwrap();
-    if let Some(surface) = guard.as_ref() {
+    let mut guard = slot.lock().unwrap();
+    if epoch < guard.latest_epoch {
+        return; // stale — a newer command already superseded this hide.
+    }
+    guard.latest_epoch = epoch;
+    if let Some(surface) = guard.surface.as_ref() {
         surface.view.setHidden(true);
     }
 }
@@ -622,6 +638,7 @@ fn render(surface: &Surface) -> Result<(), String> {
 /// Upload the raw linear negative as the invert source, stash the invert
 /// uniforms, then render invert → intermediate → (TEMP) passthrough → drawable.
 /// Creates the surface lazily, like `show_on_main`.
+#[allow(clippy::too_many_arguments)]
 pub fn set_source_on_main(
     webview: tauri::webview::PlatformWebview,
     slot: SurfaceSlot,
@@ -631,6 +648,7 @@ pub fn set_source_on_main(
     uniforms: HdrUniforms,
     lut_bytes: Vec<u8>,
     rect: ViewportRect,
+    epoch: u64,
 ) {
     let Some(mtm) = MainThreadMarker::new() else {
         eprintln!("[hdr] set_source closure not on main thread; ignoring");
@@ -647,16 +665,22 @@ pub fn set_source_on_main(
     let wk_webview: &AnyObject = unsafe { &*wk_webview };
 
     let mut guard = slot.lock().unwrap();
-    if guard.is_none() {
+    // Epoch guard: drop a stale command (never un-hides) so a late set_source
+    // can't re-show after a newer hide/re-enable.
+    if epoch < guard.latest_epoch {
+        return;
+    }
+    guard.latest_epoch = epoch;
+    if guard.surface.is_none() {
         match create_surface(mtm, window, wk_webview) {
-            Ok(s) => *guard = Some(s),
+            Ok(s) => guard.surface = Some(s),
             Err(e) => {
                 eprintln!("[hdr] create_surface failed: {e}");
                 return;
             }
         }
     }
-    let surface = guard.as_mut().unwrap();
+    let surface = guard.surface.as_mut().unwrap();
     if let Err(e) = upload_source_texture(surface, &source_bytes, width, height) {
         eprintln!("[hdr] source upload failed: {e}");
         return;
@@ -682,6 +706,7 @@ pub fn set_uniforms_on_main(
     uniforms: HdrUniforms,
     lut_bytes: Vec<u8>,
     rect: ViewportRect,
+    epoch: u64,
 ) {
     if MainThreadMarker::new().is_none() {
         eprintln!("[hdr] set_uniforms closure not on main thread; ignoring");
@@ -696,7 +721,13 @@ pub fn set_uniforms_on_main(
     let webview_view: &NSView = unsafe { &*(wk_webview as *const AnyObject as *const NSView) };
 
     let mut guard = slot.lock().unwrap();
-    let Some(surface) = guard.as_mut() else {
+    // Epoch guard: a set_uniforms that was issued BEFORE a newer hide (lower
+    // epoch) is dropped here — so it never un-hides a frozen EDR frame. THE FIX.
+    if epoch < guard.latest_epoch {
+        return;
+    }
+    guard.latest_epoch = epoch;
+    let Some(surface) = guard.surface.as_mut() else {
         return; // no surface yet — the frontend calls set_source first.
     };
     if let Err(e) = upload_lut_texture(surface, &lut_bytes) {
