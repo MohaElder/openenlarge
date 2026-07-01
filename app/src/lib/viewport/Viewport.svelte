@@ -224,6 +224,18 @@
     }
     const ro = new ResizeObserver(measure);
     if (el) ro.observe(el);
+    // Keep the native EDR surface's rect glued to the WebGL canvas's on-screen box.
+    // A ResizeObserver fires AFTER layout, so canvasRect() reads the correct
+    // post-resize box — unlike the geomKey-driven push, which can run before the DOM
+    // has resized the canvas. This fixes zoom-OUT to fit, where the canvas shrinks
+    // from the viewport-sized (zoomed) window back to the letterboxed dispW×dispH
+    // box but the surface kept the stale viewport-sized rect ("fills the view"). The
+    // canvas element is stable (useGL is const; the {#if useGL} block never toggles),
+    // so a single observe suffices. No-op unless the surface is actually showing.
+    const canvasRO = new ResizeObserver(() => {
+      if (hdrUsesSurface && hdrShown) api.hdrSurfaceSetRect(canvasRect()).catch(() => {});
+    });
+    if (canvas) canvasRO.observe(canvas);
     // macOS WebKit delivers a trackpad PINCH as non-standard gesture* events (not
     // ctrl+wheel), so onWheel never sees it. While the WB picker is armed, capture
     // the pinch and map it to the same ring resize (and own the gesture so the
@@ -246,6 +258,7 @@
     el?.addEventListener("gesturechange", onGestureChange, opts);
     return () => {
       ro.disconnect();
+      canvasRO.disconnect();
       el?.removeEventListener("gesturestart", onGestureStart);
       el?.removeEventListener("gesturechange", onGestureChange);
       if (hiTimer) { clearTimeout(hiTimer); hiTimer = null; }
