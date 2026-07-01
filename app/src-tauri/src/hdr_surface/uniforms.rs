@@ -259,13 +259,16 @@ impl HdrUniforms {
     /// three fields from the session's `Developed`, mirroring how
     /// `resolved_inversion` overwrites `dev.base`/`dev.d_max`/
     /// `dev.channel_balance` after calling the same `resolve_to_uniforms`.
-    /// Likewise, full geometry (`crop_off`/`crop_scale` from the working
-    /// image's pixel crop, `aspect` from the oriented working-image
-    /// dimensions, deep-zoom `view_off`/`view_scale`) needs the working
-    /// image's pixel dimensions, which aren't part of `InvertParams`/
-    /// `ViewSpec` either, so those four fields default to identity; `orient`
-    /// and `angle` — the two geometry uniforms fully derivable from
-    /// `ViewSpec` alone — ARE resolved for real.
+    /// Geometry is mostly resolvable here: `crop_off`/`crop_scale` come
+    /// straight from `ViewSpec.image_crop` (the normalized `[x,y,w,h]`
+    /// persistent crop, mapped directly like `Viewport.svelte`'s `imageCrop ??
+    /// [0,0,1,1]` — no pixel math), and `orient`/`angle` derive from
+    /// `ViewSpec`'s rot90/flip/angle. Only `aspect` (needs the oriented
+    /// working-image pixel dimensions) and the deep-zoom `view_off`/
+    /// `view_scale` (need the visible-window state) are genuinely
+    /// deferred-to-consumer — they default to identity here and the
+    /// `set_uniforms` command should patch them from the same
+    /// working-image/window state, alongside `base`/`d_max`/`cam_balance`.
     pub fn from_params(params: &InvertParams, view: &ViewSpec, clip: &ClipState) -> HdrUniforms {
         let base = params.base_override.unwrap_or([1.0, 1.0, 1.0]);
         let ri = resolve_to_uniforms(params, base);
@@ -293,6 +296,11 @@ impl HdrUniforms {
 
         let out_w = (view.out_w.max(1)) as f32;
         let out_h = (view.out_h.max(1)) as f32;
+
+        // Persistent crop: ViewSpec.image_crop carries the normalized [x,y,w,h]
+        // directly (mirrors Viewport.svelte's `imageCrop ?? [0,0,1,1]` → crop
+        // off/scale — no pixel math). None = whole image (identity).
+        let ic = view.image_crop.unwrap_or([0.0, 0.0, 1.0, 1.0]);
 
         HdrUniforms {
             contrast: fp.contrast,
@@ -366,8 +374,8 @@ impl HdrUniforms {
             lo_recovery: ri.lo_recovery,
             cam_balance: ri.channel_balance.into(),
 
-            crop_off: [0.0, 0.0].into(),
-            crop_scale: [1.0, 1.0].into(),
+            crop_off: [ic[0] as f32, ic[1] as f32].into(),
+            crop_scale: [ic[2] as f32, ic[3] as f32].into(),
             angle: view.angle.to_radians(),
             aspect: 1.0,
             orient: orient_uv_matrix(view.rot90, view.flip_h, view.flip_v).into(),
@@ -476,5 +484,22 @@ mod tests {
         let u = HdrUniforms::from_params(&p, &v, &ClipState::default());
         assert!((u.texel.x - 1.0 / 2000.0).abs() < 1e-9);
         assert!((u.texel.y - 1.0 / 1000.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn from_params_maps_crop_from_image_crop() {
+        let p = sample_invert_params();
+        let mut v = sample_view_spec();
+        v.image_crop = Some([0.1, 0.2, 0.5, 0.6]);
+        let u = HdrUniforms::from_params(&p, &v, &ClipState::default());
+        assert!((u.crop_off.x - 0.1).abs() < 1e-6);
+        assert!((u.crop_off.y - 0.2).abs() < 1e-6);
+        assert!((u.crop_scale.x - 0.5).abs() < 1e-6);
+        assert!((u.crop_scale.y - 0.6).abs() < 1e-6);
+        // None → whole-image identity.
+        v.image_crop = None;
+        let u2 = HdrUniforms::from_params(&p, &v, &ClipState::default());
+        assert_eq!(u2.crop_off, Vec2 { x: 0.0, y: 0.0 });
+        assert_eq!(u2.crop_scale, Vec2 { x: 1.0, y: 1.0 });
     }
 }

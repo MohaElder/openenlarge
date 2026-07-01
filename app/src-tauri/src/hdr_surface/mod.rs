@@ -13,8 +13,8 @@
 
 #[cfg(target_os = "macos")]
 pub mod macos;
-mod msl;
-mod uniforms;
+pub(crate) mod msl;
+pub(crate) mod uniforms;
 
 /// Raw HDR pixel buffer for the native EDR compositing surface: row-major RGBA
 /// half-float (linear extended sRGB, BT.709 primaries), 4 channels per
