@@ -14,7 +14,9 @@ use film_core::calibrate::auto_wb_gains_masked;
 use film_core::decode::{decode_ldr, decode_raw, decode_raw_preview, decode_tiff};
 use film_core::dust::{self, Stamp};
 use film_core::engine::{invert_image, invert_image_core, InversionParams, Mode};
-use film_core::finish::{finish_image, tone_luts, ColorGrade, ColorMix, FinishParams, PcSample};
+use film_core::finish::{
+    finish_image, finish_image_hdr, tone_luts, ColorGrade, ColorMix, FinishParams, PcSample,
+};
 use film_core::wb::{gains_to_cct, wb_from_kelvin};
 use base64::Engine;
 use serde::Deserialize;
@@ -1287,66 +1289,26 @@ fn render_view_compute(
     to_jpeg_b64(&out, false, PREVIEW_JPEG_QUALITY)
 }
 
-/// Run one prepared image through invert → dust → IR-retouch → finish, as the
-/// HDR rendition: `hdr=true` (the invert-side highlight expansion above the
-/// filmic knee, up to `HDR_HEADROOM`) + `finalize_body=false` (the finish-side
-/// legacy clamped tone curve, applied to an already-display-referred input).
-/// Shared by the gain-map HDR encoder (`render_and_encode_hdr`) and the raw
-/// rgba16f buffer command (`encode_hdr_raw`) so neither duplicates the
-/// invert→dust→ir→finish block.
-///
-/// `finish_image`'s tone-curve / saturation / LUT / color-grade / color-mix
-/// stages all assume (and internally clamp to) an SDR `[0,1]` domain — they
-/// were written for the plain SDR finish path and have no headroom concept.
-/// Routing an HDR-expanded body (which can reach up to `HDR_HEADROOM`, e.g.
-/// 2.5) straight through `finish_image` would therefore silently clip every
-/// super-white highlight back down to `1.0`, defeating the point of an HDR
-/// rendition. To avoid that without reaching into `finish_image`'s internals,
-/// each channel is split into its `[0,1]`-clamped SDR body (which gets the
-/// full, ordinary finish treatment — identical tone tools/LUT/grade a user
-/// dials in) and the raw super-white *excess* above `1.0`; the excess is
-/// added back, unprocessed, after finish. Below the knee (the vast majority of
-/// a typical frame) this is a no-op (excess is 0, so behavior is byte-identical
-/// to the plain SDR finish); only literal super-white highlights carry through
-/// as real linear headroom.
-fn render_hdr_image(
+/// Invert → dust → IR-retouch one prepared image, the shared precursor to both
+/// the SDR (`finish_image`) and chroma-preserving HDR (`finish_image_hdr`)
+/// finish stages. Shared by the gain-map HDR encoder (`render_and_encode_hdr`)
+/// and the raw rgba16f buffer command (`render_hdr_buffer`) so neither
+/// duplicates the invert→dust→ir block.
+fn invert_dust_ir(
     src: &film_core::Image,
     ip: &InversionParams,
     mode: Mode,
-    finish: &FinishParams,
     stamps: &[Stamp],
     ir_removal: &IrRemoval,
 ) -> film_core::Image {
-    let mut ip_hdr = ip.clone();
-    ip_hdr.hdr = true;
-    let mut finish_hdr = finish.clone();
-    finish_hdr.finalize_body = false; // HDR rendition is already display-referred
-
-    let mut inv = invert_image_core(src, &ip_hdr, mode);
+    let mut inv = invert_image_core(src, ip, mode);
     dust::apply(&mut inv, stamps);
     if ir_removal.enabled {
         if let Some(ir) = src.ir.as_ref() {
             dust::apply_ir(&mut inv, ir, ir_removal.sensitivity);
         }
     }
-
-    let excess: Vec<[f32; 3]> = inv
-        .pixels
-        .iter()
-        .map(|px| std::array::from_fn(|c| (px[c] - 1.0).max(0.0)))
-        .collect();
-    for px in inv.pixels.iter_mut() {
-        for c in px.iter_mut() {
-            *c = c.min(1.0);
-        }
-    }
-    let mut out = finish_image(&inv, &finish_hdr);
-    for (px, ex) in out.pixels.iter_mut().zip(excess.iter()) {
-        for c in 0..3 {
-            px[c] += ex[c];
-        }
-    }
-    out
+    inv
 }
 
 /// Pack a finished `film_core::Image` (display-referred sRGB, highlights may
@@ -1368,7 +1330,10 @@ fn hdr_image_to_rgba16f(img: &film_core::Image) -> crate::hdr_surface::HdrBuffer
 
 /// Dual-render one prepared image (invert → dust → IR → finish) as SDR and HDR,
 /// then mux into a gain-map JPEG. Shared by the HDR preview command and HDR export.
-/// `src` carries the optional IR plane used when `ir_removal.enabled`.
+/// `src` carries the optional IR plane used when `ir_removal.enabled`. Both
+/// renditions share the SAME inverted body (`hdr=false`, matching `render_view`
+/// exactly): `finish_image_hdr` derives its own super-white headroom from that
+/// body's un-clamped tone response, so no separate `hdr=true` invert is needed.
 fn render_and_encode_hdr(
     src: &film_core::Image,
     ip: &InversionParams,
@@ -1378,15 +1343,9 @@ fn render_and_encode_hdr(
     ir_removal: &IrRemoval,
     quality: u8,
 ) -> Result<Vec<u8>, String> {
-    let mut inv = invert_image_core(src, ip, mode);
-    dust::apply(&mut inv, stamps);
-    if ir_removal.enabled {
-        if let Some(ir) = src.ir.as_ref() {
-            dust::apply_ir(&mut inv, ir, ir_removal.sensitivity);
-        }
-    }
+    let inv = invert_dust_ir(src, ip, mode, stamps, ir_removal);
     let sdr = finish_image(&inv, finish); // Faithful SDR body → finalize (as given)
-    let hdr = render_hdr_image(src, ip, mode, finish, stamps, ir_removal);
+    let hdr = finish_image_hdr(&inv, finish); // chroma-preserving HDR (Sub-project C)
     crate::hdr::encode_gain_map_jpeg(&sdr, &hdr, quality)
 }
 
@@ -1522,7 +1481,8 @@ pub(crate) fn render_hdr_buffer(
         view.out_h.max(1),
     );
 
-    let hdr = render_hdr_image(&scaled, &ip, mode, &finish, &stamps, &view.ir_removal);
+    let inv = invert_dust_ir(&scaled, &ip, mode, &stamps, &view.ir_removal);
+    let hdr = finish_image_hdr(&inv, &finish);
     Ok(hdr_image_to_rgba16f(&hdr))
 }
 
@@ -3546,6 +3506,7 @@ mod tests {
         InversionParams {
             base: [1.0, 1.0, 1.0],
             d_max: 1.5,
+            tone_mode: film_core::ToneMode::Faithful, // matches production's build_params
             ..Default::default()
         }
     }
@@ -3559,7 +3520,8 @@ mod tests {
         let src = test_developed_image_2x1_bright();
         let ip = test_inversion_params();
         let finish = test_finish_params();
-        let img = render_hdr_image(&src, &ip, Mode::D, &finish, &[], &IrRemoval::default());
+        let inv = invert_dust_ir(&src, &ip, Mode::D, &[], &IrRemoval::default());
+        let img = finish_image_hdr(&inv, &finish);
         let buf = hdr_image_to_rgba16f(&img);
         assert_eq!(buf.width, 2);
         assert_eq!(buf.height, 1);
@@ -4197,6 +4159,43 @@ mod tests {
                 || bytes.windows(apple.len()).any(|w| w == apple),
             "no gain map"
         );
+    }
+
+    #[test]
+    fn render_and_encode_hdr_hdr_rendition_preserves_highlight_chroma() {
+        // Mirrors `render_and_encode_hdr`'s own computation (invert → `finish_image_hdr`)
+        // on a blown, warm highlight: a dense (near-black) negative scan, with `wb_baseline`
+        // skewed so the reconstructed highlight is warm (R>G>B) rather than neutral.
+        //
+        // The retired split-body+excess `render_hdr_image` reconstructed the highlight by
+        // clamping each channel to its `[0,1]` SDR body and adding back the RAW excess
+        // above 1.0 unprocessed, with no shoulder — so a deep-enough highlight sailed
+        // straight past `HDR_HEADROOM` (2.5) with no ceiling at all. Verified against that
+        // retired implementation with this exact fixture: it produced `[3.5, 2.5, 1.75]`
+        // (blowing past 2.5), where `finish_image_hdr` produces a bounded `[2.44, 1.74, 1.22]`
+        // — `hdr_finish`'s tanh shoulder asymptotically approaches but never reaches
+        // `HDR_HEADROOM`. The `m <= HDR_HEADROOM` bound below is the property that
+        // distinguishes the two: it holds for the new finish and fails for the old one.
+        use crate::commands_test_support::sample_invert_params;
+        let mut params = sample_invert_params();
+        params.wb_baseline = [1.4, 1.0, 0.7]; // warm skew: brighten R, dim B
+        let src = film_core::Image {
+            width: 1,
+            height: 1,
+            pixels: vec![[1e-4, 1e-4, 1e-4]], // far below base=1.0 → dense → bright highlight
+            ir: None,
+        };
+        let base = [1.0, 1.0, 1.0];
+        let ip = resolve_params(&params, &src, effective_base(&params, base));
+        let finish = finish_from(&params);
+        let inv = invert_dust_ir(&src, &ip, mode_from(&params.mode), &[], &IrRemoval::default());
+        let hdr = finish_image_hdr(&inv, &finish);
+        let px = hdr.pixels[0];
+        assert!(px[0] > px[1] && px[1] > px[2], "warm chroma lost: {px:?}");
+        let m = px[0].max(px[1]).max(px[2]);
+        assert!(m > 1.0, "expected super-white highlight, got {m}");
+        const HDR_HEADROOM: f32 = 2.5; // film_core::engine::HDR_HEADROOM (pub(crate), mirrored here)
+        assert!(m <= HDR_HEADROOM + 1e-3, "shoulder must cap at HDR_HEADROOM, got {m}");
     }
 
     #[test]
