@@ -110,10 +110,12 @@ impl Default for InversionParams {
 
 const EPS: f32 = 1e-5;
 /// HDR highlight expansion: output above this knee is remapped into [knee, HDR_HEADROOM].
-const HDR_KNEE: f32 = 0.8;
+/// `pub(crate)` so `finish::hdr_finalize` (the color-managed HDR finalize shoulder,
+/// the tested reference for the MSL finalize) shares the same knee.
+pub(crate) const HDR_KNEE: f32 = 0.8;
 /// HDR headroom ceiling (linear-ish display units, ~1.3 stops over SDR white).
-/// Tuned on real scans later; keep modest to avoid clipping.
-const HDR_HEADROOM: f32 = 2.5;
+/// Tuned on real scans later; keep modest to avoid clipping. `pub(crate)` — see `HDR_KNEE`.
+pub(crate) const HDR_HEADROOM: f32 = 2.5;
 /// Exposure → t-multiply. The exposure slider (EV) scales the normalised
 /// log-density `t` by `2^(EXPO_K·EV)`, pivoting at black (t=0 stays 0): brightening
 /// pushes tones up the filmic curve, darkening pulls them down. Highlight-preserving

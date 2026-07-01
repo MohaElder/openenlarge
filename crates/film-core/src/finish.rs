@@ -3,6 +3,7 @@
 //! per-pixel; texture (Task 2) is a spatial unsharp pass.
 
 use crate::curve::{curve_lut, sample_lut, LUT_SIZE};
+use crate::engine::{HDR_HEADROOM, HDR_KNEE};
 use crate::Image;
 use rayon::prelude::*;
 
@@ -536,6 +537,64 @@ fn tone_curve(v: f32, p: &FinishParams) -> f32 {
     } else {
         v.clamp(0.0, 1.0)
     }
+}
+
+/// HDR finalize: a color-managed soft tone-shoulder that maps the finished
+/// super-white body into `[HDR_KNEE, HDR_HEADROOM]` instead of the SDR hard clamp
+/// to `[0,1]` or the Faithful `display_finalize` roll-off to `1.0`. This is the
+/// TESTED REFERENCE the MSL (Metal) finalize shader mirrors, and lets the
+/// CPU/gain-map path use this principled curve instead of the old
+/// split-body+excess workaround.
+///
+/// Below `HDR_KNEE`: identity, so SDR-range tones are unchanged (matches the
+/// existing SDR/Faithful body exactly up to the knee). Above `HDR_KNEE`: a
+/// `tanh` roll-off compresses the (unbounded) remaining super-white range into
+/// `[HDR_KNEE, HDR_HEADROOM)` — monotonic, continuous AND C1-smooth at the knee
+/// (tanh'(0) = 1, matching the identity segment's slope, so there is no visible
+/// kink), and asymptotically approaches but never reaches `HDR_HEADROOM`.
+///
+/// This is a *scalar* building block operating on one channel (or a shared
+/// luminance/max-channel factor — see [`hdr_finalize_rgb`]). Curving each RGB
+/// channel independently with this function would skew hue in the highlights
+/// (each channel compresses by a different amount once channels diverge above
+/// the knee); callers that need hue-preserving highlights on real pixels MUST
+/// go through `hdr_finalize_rgb`, which applies this curve once to a shared
+/// ratio and scales all three channels by it together.
+///
+/// Not yet called from the runtime finalize path (that wiring — replacing the
+/// old split-body+excess CPU/gain-map workaround and mirroring in MSL — is a
+/// separate follow-up task); this is the tested reference for that work, so
+/// it is only exercised by tests today.
+#[inline]
+#[allow(dead_code)]
+pub(crate) fn hdr_finalize(v: f32) -> f32 {
+    if v <= HDR_KNEE {
+        v
+    } else {
+        let span = HDR_HEADROOM - HDR_KNEE;
+        HDR_KNEE + span * ((v - HDR_KNEE) / span).tanh()
+    }
+}
+
+/// Hue-preserving HDR finalize for a full RGB pixel: computes the compression
+/// ratio from the max channel (the highlight driver) via [`hdr_finalize`], then
+/// scales all three channels by that SAME ratio — so a super-white highlight
+/// compresses in brightness without any channel drifting relative to the
+/// others (no hue skew), unlike applying `hdr_finalize` independently per
+/// channel. Below the knee the ratio is exactly 1.0 (identity), matching
+/// `hdr_finalize`'s own identity segment. `max(rgb) <= 0` (black or negative)
+/// passes through unchanged — there is no highlight to compress.
+///
+/// Not yet called from the runtime finalize path; see [`hdr_finalize`]'s note.
+#[inline]
+#[allow(dead_code)]
+pub(crate) fn hdr_finalize_rgb(rgb: [f32; 3]) -> [f32; 3] {
+    let m = rgb[0].max(rgb[1]).max(rgb[2]);
+    if m <= EPS {
+        return rgb;
+    }
+    let ratio = hdr_finalize(m) / m;
+    std::array::from_fn(|c| rgb[c] * ratio)
 }
 
 // --- OKLab perceptual saturation (replaces the display-space cube stretch). ---
@@ -1566,6 +1625,48 @@ mod tests {
         let mut pf = FinishParams::default(); pf.finalize_body = true;
         let mut pu = FinishParams::default(); pu.finalize_body = false;
         assert!((tone_curve(1.1, &pf) - tone_curve(1.1, &pu)).abs() > 1e-3);
+    }
+
+    #[test]
+    fn hdr_finalize_preserves_and_ceilings_superwhite() {
+        // Below the knee: identity (matches SDR body).
+        assert!((hdr_finalize(0.5) - 0.5).abs() < 1e-6);
+        // At/above white: stays > 1.0 (super-white preserved), monotonic, and never exceeds the headroom ceiling.
+        let a = hdr_finalize(1.2);
+        let b = hdr_finalize(4.0);
+        assert!(a > 1.0, "1.2 -> {a}");
+        assert!(b > a, "monotonic: {a} !< {b}");
+        assert!(b <= HDR_HEADROOM + 1e-4, "ceiling: {b}");
+        // Continuity at the knee (no visible kink).
+        let k = HDR_KNEE;
+        assert!((hdr_finalize(k + 1e-4) - hdr_finalize(k - 1e-4)).abs() < 1e-2);
+    }
+
+    #[test]
+    fn hdr_finalize_rgb_is_identity_below_knee_and_hue_preserving_above() {
+        // Below the knee: exact identity (matches the scalar `hdr_finalize`, and
+        // matches the SDR/Faithful body for in-range tones).
+        let sdr = [0.2_f32, 0.5, 0.79];
+        assert_eq!(hdr_finalize_rgb(sdr), sdr);
+        // Above the knee: an off-white highlight (max channel drives the
+        // compression) must scale ALL channels by the identical ratio, so the
+        // per-channel proportions — and therefore hue — are unchanged.
+        let hi = [1.6_f32, 1.2, 0.4];
+        let m = hi.iter().cloned().fold(f32::MIN, f32::max);
+        let out = hdr_finalize_rgb(hi);
+        let ratio = hdr_finalize(m) / m;
+        for c in 0..3 {
+            assert!(
+                (out[c] - hi[c] * ratio).abs() < 1e-6,
+                "channel {c}: {} != {}",
+                out[c],
+                hi[c] * ratio
+            );
+        }
+        // The compression genuinely did something (max channel was above the knee).
+        assert!(ratio < 1.0, "ratio {ratio}");
+        // Black / non-positive-max input passes through unchanged (no highlight to compress).
+        assert_eq!(hdr_finalize_rgb([0.0, 0.0, 0.0]), [0.0, 0.0, 0.0]);
     }
 
     #[test]
