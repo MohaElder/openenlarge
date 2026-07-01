@@ -103,6 +103,26 @@ pub(crate) fn set_source(
         .map_err(|e| format!("with_webview failed: {e}"))
 }
 
+/// Per-frame update of the native EDR surface's uniforms + tone LUT, re-rendering
+/// the EXISTING source through invert→finish on the main thread — WITHOUT
+/// re-uploading the raw-negative texture. Shared entry so `commands::
+/// hdr_surface_set_uniforms` stays thin. No-op if the surface isn't created yet.
+#[cfg(target_os = "macos")]
+pub(crate) fn set_uniforms(
+    window: &tauri::WebviewWindow,
+    state: &HdrSurfaceState,
+    uniforms: uniforms::HdrUniforms,
+    lut_bytes: Vec<u8>,
+    rect: ViewportRect,
+) -> Result<(), String> {
+    let slot = state.surface.clone();
+    window
+        .with_webview(move |webview| {
+            macos::set_uniforms_on_main(webview, slot, uniforms, lut_bytes, rect);
+        })
+        .map_err(|e| format!("with_webview failed: {e}"))
+}
+
 /// Upload an `rgba16f` buffer to the native EDR surface and show it at `rect`.
 /// The buffer is LINEAR extended sRGB (BT.709 primaries) half-float (from
 /// `encode_hdr_raw`); it is uploaded verbatim (no re-linearization). Creates

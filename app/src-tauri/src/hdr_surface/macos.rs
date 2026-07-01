@@ -673,6 +673,42 @@ pub fn set_source_on_main(
     let _ = render_pipeline(surface);
 }
 
+/// Per-frame uniforms/LUT update: refresh the stored uniforms + LUT texture and
+/// re-render the EXISTING source through invert→finish. Does NOT touch the source
+/// texture. No-op if the surface hasn't been created yet (`set_source` first).
+pub fn set_uniforms_on_main(
+    webview: tauri::webview::PlatformWebview,
+    slot: SurfaceSlot,
+    uniforms: HdrUniforms,
+    lut_bytes: Vec<u8>,
+    rect: ViewportRect,
+) {
+    if MainThreadMarker::new().is_none() {
+        eprintln!("[hdr] set_uniforms closure not on main thread; ignoring");
+        return;
+    }
+    let wk_webview = webview.inner() as *mut AnyObject;
+    if wk_webview.is_null() {
+        return;
+    }
+    // SAFETY: WKWebView inherits NSView; valid for the window's lifetime and only
+    // used on the main thread.
+    let webview_view: &NSView = unsafe { &*(wk_webview as *const AnyObject as *const NSView) };
+
+    let mut guard = slot.lock().unwrap();
+    let Some(surface) = guard.as_mut() else {
+        return; // no surface yet — the frontend calls set_source first.
+    };
+    if let Err(e) = upload_lut_texture(surface, &lut_bytes) {
+        eprintln!("[hdr] LUT upload failed: {e}");
+        return;
+    }
+    surface.uniforms = Some(uniforms);
+    surface.view.setHidden(false);
+    position(webview_view, surface, rect);
+    let _ = render_pipeline(surface);
+}
+
 /// Upload the 256×1 composed tone-curve LUT (RGBA8, R=lut_r/G=lut_g/B=lut_b) as
 /// a Metal texture the finish stage samples per channel.
 fn upload_lut_texture(surface: &mut Surface, bytes: &[u8]) -> Result<(), String> {

@@ -1592,48 +1592,31 @@ pub async fn hdr_surface_set_source(
 ) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
-        use crate::hdr_surface::uniforms::{ClipState, HdrUniforms};
-        ensure_resident(&session, &id)?;
-        // Snapshot the raw working negative + the develop-time invert inputs.
-        let (working, dev_base, dev_dmax, dev_cam) = {
+        use crate::hdr_surface::uniforms::ClipState;
+        // Resolve uniforms + LUT (ensures the image is resident) exactly like the
+        // per-frame `hdr_surface_set_uniforms` does — via the shared resolver, so
+        // the two commands can't drift.
+        let (u, lut_bytes) =
+            resolve_surface_uniforms(&id, &params, &view, ClipState::default(), &session)?;
+        // Clone the (now resident) raw working negative and pack it (RGBA16Float,
+        // 8 bytes/px) off the async thread. Its dims match `capped_dims` (which the
+        // resolver used for `aspect`), so source texture + aspect stay consistent.
+        let working = {
             let images = session.images.lock().unwrap();
-            let dev = images
+            images
                 .get(&id)
                 .ok_or("unknown image id")?
                 .developed
                 .as_ref()
-                .ok_or("not developed")?;
-            (dev.working.clone(), dev.base, dev.d_max, dev.channel_balance)
+                .ok_or("not developed")?
+                .working
+                .clone()
         };
-        // Pack the raw negative (RGBA16Float, 8 bytes/px) off the async thread.
         let (sw, sh, bytes) = tauri::async_runtime::spawn_blocking(move || {
             crate::gpu_upload::pack_rgba16f(&working, crate::gpu_upload::MAX_GPU_EDGE)
         })
         .await
         .map_err(|e| e.to_string())?;
-
-        // Build invert+geometry uniforms. Inject the session base so the
-        // base-dependent resolution is correct, then override d_max /
-        // cam_balance / aspect (which the pure-params builder can't resolve),
-        // exactly like `encode_hdr_raw` resolves from the `Developed` record.
-        let mut p2 = params.clone();
-        p2.base_override = Some(effective_base(&params, dev_base));
-        let mut u = HdrUniforms::from_params(&p2, &view, &ClipState::default());
-        u.d_max = effective_dmax(&params, dev_dmax);
-        u.cam_balance = dev_cam.into();
-        u.aspect = oriented_aspect(sw, sh, view.rot90);
-
-        // Composed 256×1 tone-curve LUT (RGBA8: R=lut_r/G=lut_g/B=lut_b), the same
-        // curve the finish stage samples (matches the CPU `finish_pixel` sample_lut
-        // and the JS `toneLutBytes`).
-        let fp = finish_from(&params);
-        let mut lut_bytes = vec![0u8; 256 * 4];
-        for i in 0..256 {
-            lut_bytes[i * 4] = (fp.lut_r[i].clamp(0.0, 1.0) * 255.0).round() as u8;
-            lut_bytes[i * 4 + 1] = (fp.lut_g[i].clamp(0.0, 1.0) * 255.0).round() as u8;
-            lut_bytes[i * 4 + 2] = (fp.lut_b[i].clamp(0.0, 1.0) * 255.0).round() as u8;
-            lut_bytes[i * 4 + 3] = 255;
-        }
 
         crate::hdr_surface::set_source(&window, &state, bytes, sw, sh, u, lut_bytes, rect)
     }
@@ -1650,6 +1633,116 @@ pub async fn hdr_surface_set_source(
 fn oriented_aspect(w: u32, h: u32, rot90: u8) -> f32 {
     let (ow, oh) = if rot90 % 2 == 1 { (h, w) } else { (w, h) };
     (oh.max(1) as f32) / (ow.max(1) as f32)
+}
+
+/// Shared resolver for the native EDR surface's `HdrUniforms` + tone LUT bytes,
+/// used by BOTH `hdr_surface_set_source` and `hdr_surface_set_uniforms` so the
+/// two can't drift. Ensures the image is resident, snapshots the develop-time
+/// invert inputs from the session `Developed` record, and builds the full
+/// invert/finish/geometry uniforms:
+/// - `base` injected via `base_override` BEFORE `HdrUniforms::from_params` so the
+///   base-dependent matrix/WB resolution is correct (mirrors `encode_hdr_raw`);
+/// - `d_max`/`cam_balance` overridden from the session (the pure-params builder
+///   can't see them); `aspect` from the capped proxy dims (== the source texture
+///   dims `set_source` uploads).
+/// Returns `(uniforms, lut_rgba8_256x1)`.
+#[cfg(target_os = "macos")]
+fn resolve_surface_uniforms(
+    id: &str,
+    params: &InvertParams,
+    view: &ViewSpec,
+    clip: crate::hdr_surface::uniforms::ClipState,
+    session: &Session,
+) -> Result<(crate::hdr_surface::uniforms::HdrUniforms, Vec<u8>), String> {
+    use crate::hdr_surface::uniforms::HdrUniforms;
+    ensure_resident(session, id)?;
+    let (dev_base, dev_dmax, dev_cam, (sw, sh)) = {
+        let images = session.images.lock().unwrap();
+        let dev = images
+            .get(id)
+            .ok_or("unknown image id")?
+            .developed
+            .as_ref()
+            .ok_or("not developed")?;
+        (
+            dev.base,
+            dev.d_max,
+            dev.channel_balance,
+            crate::gpu_upload::capped_dims(&dev.working, crate::gpu_upload::MAX_GPU_EDGE),
+        )
+    };
+    let mut p2 = params.clone();
+    p2.base_override = Some(effective_base(params, dev_base));
+    let mut u = HdrUniforms::from_params(&p2, view, &clip);
+    u.d_max = effective_dmax(params, dev_dmax);
+    u.cam_balance = dev_cam.into();
+    u.aspect = oriented_aspect(sw, sh, view.rot90);
+    Ok((u, build_lut_bytes(params)))
+}
+
+/// Composed 256×1 tone-curve LUT as RGBA8 (R=lut_r/G=lut_g/B=lut_b, A=255) — the
+/// same curve the finish stage samples (matches CPU `finish_pixel`'s `sample_lut`
+/// and the JS `toneLutBytes`).
+#[cfg(target_os = "macos")]
+fn build_lut_bytes(params: &InvertParams) -> Vec<u8> {
+    let fp = finish_from(params);
+    let mut lut = vec![0u8; 256 * 4];
+    for i in 0..256 {
+        lut[i * 4] = (fp.lut_r[i].clamp(0.0, 1.0) * 255.0).round() as u8;
+        lut[i * 4 + 1] = (fp.lut_g[i].clamp(0.0, 1.0) * 255.0).round() as u8;
+        lut[i * 4 + 2] = (fp.lut_b[i].clamp(0.0, 1.0) * 255.0).round() as u8;
+        lut[i * 4 + 3] = 255;
+    }
+    lut
+}
+
+/// Clip-warning toggle state from the frontend (mirrors `HdrUniforms::from_params`'s
+/// clip fields). A plain `Deserialize` shim so the command can accept it (the
+/// native `ClipState` isn't `Deserialize`). Defined on all platforms so the
+/// `hdr_surface_set_uniforms` command signature is identical everywhere.
+#[derive(Debug, Clone, Copy, Default, Deserialize)]
+pub struct ClipArg {
+    #[serde(default)]
+    pub high: bool,
+    #[serde(default)]
+    pub low: bool,
+    #[serde(default)]
+    pub strict: bool,
+}
+
+/// Per-frame sibling of `hdr_surface_set_source`: update the native EDR surface's
+/// `HdrUniforms` (+ tone LUT) from live params and re-render the EXISTING source
+/// through invert→finish, WITHOUT re-uploading the raw-negative texture. Called
+/// every settle (params / crop / zoom change). If the surface doesn't exist yet
+/// (`set_source` not called), it's a no-op `Ok`. Only params/view/clip/rect cross
+/// IPC, never pixels. On non-macOS it is a no-op.
+#[tauri::command]
+pub fn hdr_surface_set_uniforms(
+    id: String,
+    params: InvertParams,
+    view: ViewSpec,
+    clip: ClipArg,
+    rect: crate::hdr_surface::ViewportRect,
+    session: State<Session>,
+    state: State<crate::hdr_surface::HdrSurfaceState>,
+    window: tauri::WebviewWindow,
+) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        use crate::hdr_surface::uniforms::ClipState;
+        let clip_state = ClipState {
+            high: clip.high,
+            low: clip.low,
+            strict: clip.strict,
+        };
+        let (u, lut_bytes) = resolve_surface_uniforms(&id, &params, &view, clip_state, &session)?;
+        crate::hdr_surface::set_uniforms(&window, &state, u, lut_bytes, rect)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = (id, params, view, clip, rect, &session, &state, &window);
+        Ok(())
+    }
 }
 
 /// The persistent per-image edits that shape a thumbnail's geometry and retouching.
