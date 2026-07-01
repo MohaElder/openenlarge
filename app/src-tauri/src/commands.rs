@@ -89,6 +89,8 @@ fn effective_metadata(
 const THUMB_EDGE: u32 = 320;
 const AUTOWB_EDGE: u32 = 256;
 const PREVIEW_JPEG_QUALITY: u8 = 88;
+/// JPEG quality for baked catalog thumbnails (SDR and HDR gain-map alike).
+const THUMB_QUALITY: u8 = 82;
 const CACHE_WORKING_CAP: u32 = 4096;
 /// Display-sized proxy cap (long edge) for the resident working buffer + fit-view GPU
 /// upload. Replaces the old Quality cap: crisp at fit on hi-DPI, small + fast to decode
@@ -1806,6 +1808,26 @@ pub async fn thumbnail(
     })
 }
 
+/// Encode one finished thumbnail to a JPEG data URL. When `params.hdr` is set,
+/// dual-render the SDR base (`finish_image`) and the chroma-preserving HDR
+/// rendition (`finish_image_hdr`, Sub-project C) from the SAME inverted buffer
+/// and mux them into a gain-map JPEG so the `<img>` glows on HDR displays; below
+/// that flag it is the plain SDR JPEG, byte-identical to the pre-HDR-thumbnail
+/// behavior. No separate `hdr=true` invert: `finish_image_hdr` derives its own
+/// super-white body from `inv` (headroom comes from the un-clamped Faithful body).
+fn encode_thumb(inv: &film_core::Image, params: &InvertParams) -> Result<String, String> {
+    let finish = finish_from(params);
+    let sdr = finish_image(inv, &finish);
+    if params.hdr {
+        let hdr = finish_image_hdr(inv, &finish);
+        let jpeg = crate::hdr::encode_gain_map_jpeg(&sdr, &hdr, THUMB_QUALITY)?;
+        let b64 = base64::engine::general_purpose::STANDARD.encode(&jpeg);
+        Ok(format!("data:image/jpeg;base64,{b64}"))
+    } else {
+        to_jpeg_b64(&sdr, false, THUMB_QUALITY)
+    }
+}
+
 /// Pure CPU render of one thumbnail: geometry (orient → straighten → persistent
 /// crop) → downscale → invert → dust/IR → finish → JPEG. Owned inputs so it runs
 /// in `spawn_blocking` without borrowing the `Session`. Each geometry stage borrows
@@ -1868,8 +1890,7 @@ fn thumbnail_compute(
             dust::apply_ir(&mut inv, ir, view.ir_removal.sensitivity);
         }
     }
-    let fin = finish_image(&inv, &finish_from(params));
-    to_jpeg_b64(&fin, false, 82)
+    encode_thumb(&inv, params)
 }
 
 /// Persist an image's edited-look thumbnail (the data URL the frontend rendered via
@@ -4196,6 +4217,51 @@ mod tests {
         assert!(m > 1.0, "expected super-white highlight, got {m}");
         const HDR_HEADROOM: f32 = 2.5; // film_core::engine::HDR_HEADROOM (pub(crate), mirrored here)
         assert!(m <= HDR_HEADROOM + 1e-3, "shoulder must cap at HDR_HEADROOM, got {m}");
+    }
+
+    // A gain-map JPEG carries either the ISO 21496-1 URN or Apple's `hdrgainmap`
+    // marker in its bytes (same detection the encoder's own test uses, hdr.rs).
+    fn has_gain_map(data_url: &str) -> bool {
+        use base64::Engine;
+        let b64 = data_url
+            .strip_prefix("data:image/jpeg;base64,")
+            .expect("thumbnail is a jpeg data url");
+        let bytes = base64::engine::general_purpose::STANDARD
+            .decode(b64)
+            .expect("valid base64");
+        let iso = b"urn:iso";
+        let apple = b"hdrgainmap";
+        bytes.windows(iso.len()).any(|w| w == iso)
+            || bytes.windows(apple.len()).any(|w| w == apple)
+    }
+
+    // A small warm-ish near-white positive (post-invert) buffer: bright enough that
+    // the Faithful finish pushes the highlight into headroom for a real gain map.
+    fn bright_inv() -> film_core::Image {
+        film_core::Image {
+            width: 8,
+            height: 8,
+            pixels: vec![[0.98, 0.90, 0.82]; 64],
+            ir: None,
+        }
+    }
+
+    #[test]
+    fn encode_thumb_with_hdr_flag_emits_gain_map() {
+        let mut params = crate::commands_test_support::sample_invert_params();
+        params.hdr = true;
+        let url = encode_thumb(&bright_inv(), &params).expect("encode");
+        assert!(url.starts_with("data:image/jpeg;base64,"), "not a jpeg data url");
+        assert!(has_gain_map(&url), "hdr thumbnail must carry a gain map");
+    }
+
+    #[test]
+    fn encode_thumb_without_hdr_flag_has_no_gain_map() {
+        let mut params = crate::commands_test_support::sample_invert_params();
+        params.hdr = false;
+        let url = encode_thumb(&bright_inv(), &params).expect("encode");
+        assert!(url.starts_with("data:image/jpeg;base64,"), "not a jpeg data url");
+        assert!(!has_gain_map(&url), "sdr thumbnail must not carry a gain map");
     }
 
     #[test]
