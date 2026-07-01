@@ -463,7 +463,20 @@
       lastRectGeomKey = geomKey;
       api.hdrSurfaceSetRect(canvasRect()).catch(() => {});
     }
+    // DEBUG: remove after HDR positioning fixed — refresh the lime DOM-canvas-box
+    // marker from the SAME rect canvasRect() feeds the native surface, in
+    // afterUpdate (settled layout). Change-guarded so re-assigning doesn't loop.
+    if (dbgShow) {
+      const r = canvasRect();
+      if (r.x !== dbgRect.x || r.y !== dbgRect.y || r.w !== dbgRect.w || r.h !== dbgRect.h) dbgRect = r;
+    }
   });
+
+  // DEBUG: remove after HDR positioning fixed — the lime marker shows exactly
+  // when the native EDR surface is up, so a single screenshot has both the DOM
+  // canvas box (lime) and the native magenta EDR frame for offset measurement.
+  $: dbgShow = allowHdrSurface && $hdrMode === "live-edr" && hdrShown;
+  let dbgRect = { x: 0, y: 0, w: 0, h: 0, dpr: 1 };
 
   // NOTE (Sub-project B/C): in live-edr mode the GPU-drawn clipping warning
   // (clip.ts) and on-image dust markers are baked into the now-hidden SDR canvas,
@@ -1084,9 +1097,23 @@
       <span>R {hoverRGB[0]}</span><span>G {hoverRGB[1]}</span><span>B {hoverRGB[2]}</span>
     </div>
   {/if}
+  <!-- DEBUG: remove after HDR positioning fixed — lime box marking the DOM canvas
+       bounds (position:fixed so it's viewport-relative like the rect); transparent
+       interior lets the native magenta EDR frame behind show through. -->
+  {#if dbgShow}
+    <div class="dbg-canvasbox"
+         style="left:{dbgRect.x}px; top:{dbgRect.y}px; width:{dbgRect.w}px; height:{dbgRect.h}px;">
+      <span class="dbg-label">DOM canvas box</span>
+    </div>
+  {/if}
 </div>
 
 <style>
+  /* DEBUG: remove after HDR positioning fixed — lime DOM-canvas-box marker. */
+  .dbg-canvasbox { position: fixed; border: 3px solid lime; box-sizing: border-box;
+    background: transparent; pointer-events: none; z-index: 99999; }
+  .dbg-canvasbox .dbg-label { position: absolute; left: 0; top: 0; font-size: 11px;
+    color: lime; background: rgba(0,0,0,0.7); padding: 1px 4px; white-space: nowrap; }
   .vp { position: relative; width: 100%; height: 100%; overflow: hidden; user-select: none;
     border-radius: 10px; }
   .vp.interactive { cursor: zoom-in; }
