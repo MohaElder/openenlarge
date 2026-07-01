@@ -297,15 +297,17 @@ fragment float4 invert_frag(VOut in [[stage_in]],
 /// color-mixer band centres + gains, the point-color tolerances, `HDR_KNEE=0.8`,
 /// `HDR_HEADROOM=2.5` (`engine.rs`).
 ///
-/// HDR-FINALIZE DESIGN (Task 4 + Task 6 fix): the creative color ops
+/// HDR-FINALIZE DESIGN (Task 4 + Task 6 fixes): the creative color ops
 /// (saturation/LUT/grade/mix/point) run on the **display-finalized** body
 /// `displayFinalize(toneBody)` — the Faithful shoulder + `lookS` contrast — EXACTLY
-/// as `finish_pixel` / GLSL `finalize_body=true` do, so the HDR surface matches the
-/// SDR contrast/look below white. The tone body's pre-finalize magnitude
-/// `mU=max(bodyU)` is retained: below white (`mU<=1`) the output IS the SDR
-/// finished color; above white the highlight is reattached to the graded color
-/// hue-preservingly and rolled off by `hdr_finalize_rgb` (port of
-/// `finish.rs::hdr_finalize_rgb`), so super-white survives as a highlight.
+/// as `finish_pixel` / GLSL `finalize_body=true` do, giving the SDR finished color
+/// `disp` in [0,1]. The HDR highlight is then a single hue-preserving GAIN on that
+/// SDR color: `gain = 1.0` for `mU <= HDR_KNEE` (so shadows/midtones and any pixel
+/// SDR did not shoulder are BYTE-IDENTICAL to SDR), and for `mU > HDR_KNEE`,
+/// `gain = hdr_finalize_scalar(mU) / displayFinalize(mU)` (clamped `>= 1`) — the HDR
+/// shoulder value over the SDR display value at the pre-finalize magnitude
+/// `mU = max(bodyU)`. So a highlight SDR compressed toward white is scaled up into
+/// the EDR headroom, while everything else equals SDR exactly.
 /// One deliberate deviation from the GLSL, flagged in the report: the blacks term
 /// uses `(1-v)^3` via multiplication (matching `finish.rs`'s `.powi(3)`), not
 /// `pow(1-v,3.0)` which is NaN for the super-white `v>1` case.
@@ -535,18 +537,12 @@ float lutSample(texture2d<float> lut, float x, int ch) {
     return ch == 0 ? v.r : (ch == 1 ? v.g : v.b);
 }
 
-// HDR finalize: tanh shoulder above HDR_KNEE, hue-preserving via the shared
-// max-channel ratio. Port of finish.rs::hdr_finalize_rgb (identity below knee).
+// HDR finalize scalar: tanh shoulder above HDR_KNEE, identity below. Port of
+// finish.rs::hdr_finalize (the scalar building block).
 float hdr_finalize_scalar(float v) {
     if (v <= HDR_KNEE) return v;
     float span = HDR_HEADROOM - HDR_KNEE;
     return HDR_KNEE + span * tanh((v - HDR_KNEE) / span);
-}
-float3 hdr_finalize_rgb(float3 rgb) {
-    float m = max(rgb.r, max(rgb.g, rgb.b));
-    if (m <= INV_EPS) return rgb;
-    float ratio = hdr_finalize_scalar(m) / m;
-    return rgb * ratio;
 }
 
 // Clipping overlay (detail-loss warning), on the finished display color.
@@ -581,19 +577,21 @@ fragment float4 finish_frag(VOut in [[stage_in]],
     float3 bodyFin = float3(displayFinalize(bodyU.r), displayFinalize(bodyU.g), displayFinalize(bodyU.b));
     float3 s = oklabSaturate(bodyFin, u);
     float3 cu = float3(lutSample(lut, s.r, 0), lutSample(lut, s.g, 1), lutSample(lut, s.b, 2));
-    float3 disp = pointColor(colorMixer(colorGrade(cu, u), u), u);
-    // Below white (pre-finalize body max <= 1): output the SDR finished color
-    // EXACTLY. Above white: reattach the super-white highlight magnitude to the
-    // graded color (hue-preserving) and roll it off with the HDR shoulder.
+    float3 disp = pointColor(colorMixer(colorGrade(cu, u), u), u);   // == the SDR finished color, in [0,1]
+    // HDR highlight = a single hue-preserving GAIN on the SDR finished color.
+    // The gain is EXACTLY 1.0 below HDR_KNEE, so shadows / midtones / any pixel SDR
+    // did NOT shoulder toward white are BYTE-IDENTICAL to the SDR output. Above
+    // HDR_KNEE the gain is the HDR shoulder value over the SDR display value at the
+    // pre-finalize magnitude `mU`, so a highlight SDR compressed toward 1.0 is
+    // scaled up into the EDR headroom instead. `max(gain,1)` keeps it monotone at
+    // the knee. Hue-preserving: one scalar applied to all three channels.
     float mU = max(bodyU.r, max(bodyU.g, bodyU.b));
-    float3 outc;
-    if (mU <= 1.0) {
-        outc = disp;
-    } else {
-        float mC = max(disp.r, max(disp.g, disp.b));
-        float3 hdrRGB = (mC > INV_EPS) ? disp * (mU / mC) : disp;
-        outc = hdr_finalize_rgb(hdrRGB);
+    float gain = 1.0;
+    if (mU > HDR_KNEE) {
+        gain = hdr_finalize_scalar(mU) / max(displayFinalize(mU), INV_EPS);
+        gain = max(gain, 1.0);
     }
+    float3 outc = disp * gain;
     // Clipping overlay tests the finished display color (disp), matching the GLSL.
     int code = clipCode(disp, u);
     return float4(clipOverlay(outc, code, u), 1.0);

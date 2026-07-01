@@ -1586,8 +1586,7 @@ pub async fn hdr_surface_set_source(
     id: String,
     params: InvertParams,
     view: ViewSpec,
-    view_off: [f64; 2],
-    view_scale: [f64; 2],
+    geom: GeomArg,
     rect: crate::hdr_surface::ViewportRect,
     session: State<'_, Session>,
     state: State<'_, crate::hdr_surface::HdrSurfaceState>,
@@ -1599,15 +1598,8 @@ pub async fn hdr_surface_set_source(
         // Resolve uniforms + LUT (ensures the image is resident) exactly like the
         // per-frame `hdr_surface_set_uniforms` does — via the shared resolver, so
         // the two commands can't drift.
-        let (u, lut_bytes) = resolve_surface_uniforms(
-            &id,
-            &params,
-            &view,
-            ClipState::default(),
-            view_off,
-            view_scale,
-            &session,
-        )?;
+        let (u, lut_bytes) =
+            resolve_surface_uniforms(&id, &params, &view, ClipState::default(), &geom, &session)?;
         // Clone the (now resident) raw working negative and pack it (RGBA16Float,
         // 8 bytes/px) off the async thread. Its dims match `capped_dims` (which the
         // resolver used for `aspect`), so source texture + aspect stay consistent.
@@ -1632,17 +1624,33 @@ pub async fn hdr_surface_set_source(
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (id, params, view, view_off, view_scale, rect, &session, &state, &window);
+        let _ = (id, params, view, geom, rect, &session, &state, &window);
         Ok(())
     }
 }
 
-/// Oriented-image aspect (height / width) for the invert straighten uniform:
-/// rot90 of 1 or 3 swaps width/height.
-#[cfg(target_os = "macos")]
-fn oriented_aspect(w: u32, h: u32, rot90: u8) -> f32 {
-    let (ow, oh) = if rot90 % 2 == 1 { (h, w) } else { (w, h) };
-    (oh.max(1) as f32) / (ow.max(1) as f32)
+/// Exact output→source geometry the WebGL renderer receives via
+/// `renderer.setGeometry(g)`. The EDR surface takes this verbatim (rather than
+/// re-deriving from `ViewSpec`) so the native window matches WebGL by
+/// construction. All fields are the same normalized quantities the GL
+/// `INVERT_FRAG` geometry uniforms consume. Defined on all platforms so the
+/// command signatures are identical everywhere.
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct GeomArg {
+    /// Persistent-crop origin in oriented-image UV (`u_crop_off`).
+    pub crop_off: [f64; 2],
+    /// Persistent-crop size in oriented-image UV (`u_crop_scale`).
+    pub crop_scale: [f64; 2],
+    /// Deep-zoom visible-window origin, displayed-image UV (`u_view_off`).
+    pub view_off: [f64; 2],
+    /// Deep-zoom visible-window size, displayed-image UV (`u_view_scale`).
+    pub view_scale: [f64; 2],
+    /// Straighten angle, radians (`u_angle`).
+    pub angle: f64,
+    /// Oriented-image height/width, for pixel-space straighten (`u_aspect`).
+    pub aspect: f64,
+    /// Oriented-UV → source-UV 2×2 (column-major), undoes rot90/flip (`u_orient`).
+    pub orient: [f64; 4],
 }
 
 /// Shared resolver for the native EDR surface's `HdrUniforms` + tone LUT bytes,
@@ -1653,23 +1661,22 @@ fn oriented_aspect(w: u32, h: u32, rot90: u8) -> f32 {
 /// - `base` injected via `base_override` BEFORE `HdrUniforms::from_params` so the
 ///   base-dependent matrix/WB resolution is correct (mirrors `encode_hdr_raw`);
 /// - `d_max`/`cam_balance` overridden from the session (the pure-params builder
-///   can't see them); `aspect` from the capped proxy dims (== the source texture
-///   dims `set_source` uploads).
+///   can't see them); the GEOMETRY (crop/view/angle/aspect/orient) is taken
+///   verbatim from `geom` (the exact values the WebGL renderer gets), replacing
+///   `from_params`'s `ViewSpec`-derived geometry so the EDR view matches WebGL.
 /// Returns `(uniforms, lut_rgba8_256x1)`.
 #[cfg(target_os = "macos")]
-#[allow(clippy::too_many_arguments)]
 fn resolve_surface_uniforms(
     id: &str,
     params: &InvertParams,
     view: &ViewSpec,
     clip: crate::hdr_surface::uniforms::ClipState,
-    view_off: [f64; 2],
-    view_scale: [f64; 2],
+    geom: &GeomArg,
     session: &Session,
 ) -> Result<(crate::hdr_surface::uniforms::HdrUniforms, Vec<u8>), String> {
     use crate::hdr_surface::uniforms::HdrUniforms;
     ensure_resident(session, id)?;
-    let (dev_base, dev_dmax, dev_cam, (sw, sh)) = {
+    let (dev_base, dev_dmax, dev_cam) = {
         let images = session.images.lock().unwrap();
         let dev = images
             .get(id)
@@ -1677,23 +1684,30 @@ fn resolve_surface_uniforms(
             .developed
             .as_ref()
             .ok_or("not developed")?;
-        (
-            dev.base,
-            dev.d_max,
-            dev.channel_balance,
-            crate::gpu_upload::capped_dims(&dev.working, crate::gpu_upload::MAX_GPU_EDGE),
-        )
+        (dev.base, dev.d_max, dev.channel_balance)
     };
     let mut p2 = params.clone();
     p2.base_override = Some(effective_base(params, dev_base));
     let mut u = HdrUniforms::from_params(&p2, view, &clip);
+    // INVERSION params stay resolved from params/session:
     u.d_max = effective_dmax(params, dev_dmax);
     u.cam_balance = dev_cam.into();
-    u.aspect = oriented_aspect(sw, sh, view.rot90);
-    // Deep-zoom window (the visible sub-rect of the displayed image), from the
-    // frontend. Identity ([0,0]/[1,1]) = whole image; the invert MSL applies these.
-    u.view_off = [view_off[0] as f32, view_off[1] as f32].into();
-    u.view_scale = [view_scale[0] as f32, view_scale[1] as f32].into();
+    // GEOMETRY comes verbatim from the same `geom` the WebGL renderer gets
+    // (`renderer.setGeometry`), so the EDR window matches WebGL by construction —
+    // replacing `from_params`'s image_crop/rot90/aspect derivation entirely.
+    u.crop_off = [geom.crop_off[0] as f32, geom.crop_off[1] as f32].into();
+    u.crop_scale = [geom.crop_scale[0] as f32, geom.crop_scale[1] as f32].into();
+    u.view_off = [geom.view_off[0] as f32, geom.view_off[1] as f32].into();
+    u.view_scale = [geom.view_scale[0] as f32, geom.view_scale[1] as f32].into();
+    u.angle = geom.angle as f32;
+    u.aspect = geom.aspect as f32;
+    u.orient = [
+        geom.orient[0] as f32,
+        geom.orient[1] as f32,
+        geom.orient[2] as f32,
+        geom.orient[3] as f32,
+    ]
+    .into();
     Ok((u, build_lut_bytes(params)))
 }
 
@@ -1740,8 +1754,7 @@ pub fn hdr_surface_set_uniforms(
     params: InvertParams,
     view: ViewSpec,
     clip: ClipArg,
-    view_off: [f64; 2],
-    view_scale: [f64; 2],
+    geom: GeomArg,
     rect: crate::hdr_surface::ViewportRect,
     session: State<Session>,
     state: State<crate::hdr_surface::HdrSurfaceState>,
@@ -1755,20 +1768,13 @@ pub fn hdr_surface_set_uniforms(
             low: clip.low,
             strict: clip.strict,
         };
-        let (u, lut_bytes) = resolve_surface_uniforms(
-            &id,
-            &params,
-            &view,
-            clip_state,
-            view_off,
-            view_scale,
-            &session,
-        )?;
+        let (u, lut_bytes) =
+            resolve_surface_uniforms(&id, &params, &view, clip_state, &geom, &session)?;
         crate::hdr_surface::set_uniforms(&window, &state, u, lut_bytes, rect)
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (id, params, view, clip, view_off, view_scale, rect, &session, &state, &window);
+        let _ = (id, params, view, clip, geom, rect, &session, &state, &window);
         Ok(())
     }
 }
