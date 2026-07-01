@@ -35,7 +35,7 @@ use objc2::rc::{Allocated, Retained};
 use objc2::runtime::{AnyObject, ProtocolObject};
 use objc2::{define_class, msg_send, MainThreadOnly};
 
-use objc2_app_kit::{NSView, NSWindow, NSWindowOrderingMode};
+use objc2_app_kit::{NSAutoresizingMaskOptions, NSView, NSWindow, NSWindowOrderingMode};
 use objc2_core_foundation::CGSize;
 use objc2_core_graphics::{kCGColorSpaceExtendedLinearDisplayP3, CGColorSpace};
 use objc2_foundation::{MainThreadMarker, NSNumber, NSPoint, NSRect, NSSize, NSString};
@@ -362,6 +362,11 @@ fn create_surface(
     view.setLayer(Some(&layer));
     view.setWantsLayer(true);
     view.setHidden(true);
+    // Pin the view: no autoresizing. It must stay exactly where `position()`'s
+    // `setFrame` puts it — an inherited `ViewWidthSizable | ViewHeightSizable`
+    // mask would let AppKit reflow it on a later layout pass (relative to stale
+    // margins), which was dragging the layer to the lower-left.
+    view.setAutoresizingMask(NSAutoresizingMaskOptions::empty());
 
     // Insert directly BELOW the webview so the DOM composites in front and the
     // surface shows only through the transparent viewport hole.
@@ -529,6 +534,16 @@ fn position(window: &NSWindow, webview_view: &NSView, surface: &Surface, rect: V
 /// Draw the uploaded texture into the layer's next drawable (scaled to fill).
 /// A nil drawable or missing texture is a no-op (no panic).
 fn render(surface: &Surface) -> Result<(), String> {
+    // Log the frame at render time: if this differs from what `position()` set,
+    // the view drifted after `setFrame` (autoresizing/layout reflow).
+    let vf = surface.view.frame();
+    let lf = surface.layer.frame();
+    eprintln!(
+        "[hdr] render_frame: view=({:.1},{:.1},{:.1},{:.1}) layer=({:.1},{:.1},{:.1},{:.1})",
+        vf.origin.x, vf.origin.y, vf.size.width, vf.size.height,
+        lf.origin.x, lf.origin.y, lf.size.width, lf.size.height
+    );
+
     let Some(texture) = surface.texture.as_ref() else {
         return Ok(());
     };
