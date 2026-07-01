@@ -523,6 +523,65 @@ fn position(window: &NSWindow, webview_view: &NSView, surface: &Surface, rect: V
         edr_screen.origin.x, edr_screen.origin.y, edr_screen.size.width, edr_screen.size.height,
         wv_screen.origin.x, wv_screen.origin.y, wv_screen.size.width, wv_screen.size.height
     );
+
+    // One-time native view-hierarchy dump: walk WKWebView -> ... -> contentView
+    // and EDR view -> ... -> contentView, printing each view's class, frame and
+    // isFlipped. Reveals whether the webview sits inside an offset container the
+    // EDR view doesn't share (which would explain a constant placement offset).
+    static HIER_DUMPED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    if !HIER_DUMPED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+        dump_hierarchy(window, webview_view, &surface.view);
+    }
+}
+
+/// Objective-C runtime class name of a view (e.g. "WKWebView", "NSView").
+fn view_class_name(view: &NSView) -> String {
+    let obj: &AnyObject = view;
+    obj.class().name().to_string_lossy().into_owned()
+}
+
+/// Log one view's class, frame and flipped flag on a `[hdr] hier:` line.
+fn log_view(tag: &str, idx: usize, view: &NSView) {
+    let f = view.frame();
+    eprintln!(
+        "[hdr] hier: {tag}[{idx}] class={} frame=({:.1},{:.1},{:.1},{:.1}) flipped={}",
+        view_class_name(view),
+        f.origin.x,
+        f.origin.y,
+        f.size.width,
+        f.size.height,
+        view.isFlipped()
+    );
+}
+
+/// Walk `start` up its superview chain, logging each view.
+fn dump_chain(tag: &str, start: &NSView) {
+    log_view(tag, 0, start);
+    let mut idx = 1;
+    // SAFETY: called on the main thread; `superview` walks the live hierarchy.
+    let mut cur = unsafe { start.superview() };
+    while let Some(v) = cur {
+        log_view(tag, idx, &v);
+        idx += 1;
+        cur = unsafe { v.superview() };
+    }
+}
+
+fn dump_hierarchy(window: &NSWindow, webview_view: &NSView, edr_view: &NSView) {
+    let wf = window.frame();
+    let clr = window.contentLayoutRect();
+    let (cv_class, cvf) = window
+        .contentView()
+        .map(|v| (view_class_name(&v), v.frame()))
+        .unwrap_or_else(|| ("<none>".to_string(), NSRect::new(NSPoint::new(0.0, 0.0), NSSize::new(0.0, 0.0))));
+    eprintln!(
+        "[hdr] hier: window frame=({:.1},{:.1},{:.1},{:.1}) contentLayoutRect=({:.1},{:.1},{:.1},{:.1}) contentView class={} frame=({:.1},{:.1},{:.1},{:.1})",
+        wf.origin.x, wf.origin.y, wf.size.width, wf.size.height,
+        clr.origin.x, clr.origin.y, clr.size.width, clr.size.height,
+        cv_class, cvf.origin.x, cvf.origin.y, cvf.size.width, cvf.size.height
+    );
+    dump_chain("WEBVIEW", webview_view);
+    dump_chain("EDR", edr_view);
 }
 
 /// Draw the uploaded texture into the layer's next drawable (scaled to fill).
