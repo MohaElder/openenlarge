@@ -7,7 +7,7 @@
 </script>
 
 <script lang="ts">
-  import { onMount, afterUpdate, createEventDispatcher } from "svelte";
+  import { onMount, createEventDispatcher } from "svelte";
   import { api, type InvertParams } from "../api";
   import type { IrRemoval } from "../api";
   import { previewSrc, previewById, cachePreview, hdrMode } from "../store";
@@ -256,7 +256,8 @@
       renderer = null;
       // live-edr: never leave the native surface showing (or the body transparent)
       // behind an unmounted Viewport — e.g. navigating away from Develop mid-HDR.
-      if (hdrUsesSurface) { api.hdrSurfaceHide().catch(() => {}); hdrUsesSurface = false; }
+      // Also cancels any pending per-frame uniforms rAF.
+      hideHdrSurface();
       if (typeof document !== "undefined") document.body.classList.remove("hdr-edr-hole");
     };
   });
@@ -358,18 +359,25 @@
   // When params.hdr is on, once an edit settles we show a full-frame HDR preview
   // over the live SDR canvas. Two backends, chosen by $hdrMode:
   //  - "gainmap-fallback": render a gain-map JPEG via api.encodeHdr and crossfade
-  //    it in as an <img> overlay (unchanged from before live-edr existed).
-  //  - "live-edr" (macOS): render straight to the native EDR compositing surface
-  //    (hdr_surface_render_show) — no JS-side pixel buffer. The surface sits
-  //    BEHIND the webview, so the SDR canvas is hidden (`edrhole` class below)
-  //    and a transparent hole is punched through the DOM down to it (see the
-  //    `hdr-edr-hole` body class + comment in the style block below).
-  // During an active gesture (any params/geometry change) the overlay/surface
-  // hides so the live SDR is visible; it reappears once things settle.
+  //    it in as an <img> overlay, SETTLE-debounced; during an active gesture the
+  //    overlay hides so the live SDR shows through, then fades back in on settle.
+  //    (Unchanged from before live-edr existed.)
+  //  - "live-edr" (macOS): drive the native EDR compositing surface PER-FRAME —
+  //    no settle, no gesture crutch. A rare SOURCE upload (raw-negative pixels)
+  //    on image/develop/tier changes, then per-frame UNIFORMS pushes (throttled
+  //    to rAF) on every edit; the full invert→finish→HDR pipeline runs on the
+  //    native surface. The surface sits BEHIND the webview, so the SDR canvas is
+  //    hidden (`edrhole` class below) and a transparent hole is punched through
+  //    the DOM down to it (see the `hdr-edr-hole` body class + comment in the
+  //    style block below). The SDR WebGL canvas KEEPS rendering (for the
+  //    histogram's toDataURL) even while hidden.
   let hdrSrc = "";
   let hdrShown = false;
   let hdrTimer: ReturnType<typeof setTimeout> | null = null;
   let hdrPrevId: string | null = null;
+  // live-edr for THIS mount: opt-in + capable + toggled on. Gates the per-frame
+  // source/uniforms drivers; the gain-map settle path runs when this is false.
+  $: liveEdr = allowHdrSurface && $hdrMode === "live-edr" && !!canvas;
   // True once the live-edr native surface (not the gain-map <img>) is the active
   // overlay — gates the canvas-hiding CSS class, the body transparent-hole class,
   // and rect-sync, so a gainmap-fallback frame (or a live-edr frame that fell back
@@ -420,72 +428,130 @@
     return { x: r.left, y: r.top, w: r.width, h: r.height, dpr };
   }
 
+  // ---- gain-map fallback path (settle-debounced <img>) ----------------------
+  // ONLY used when !liveEdr (gainmap-fallback mode, or a non-opt-in mount like
+  // FramePreview). live-edr never runs this — it drives the surface per-frame.
   async function encodeHdr() {
-    if (!params.hdr || !id || !imgW || !vpW) return;
+    if (!params.hdr || !id || !imgW || !vpW || liveEdr) return;
     const curId = id;
     try {
-      // Only mounts that opt in via `allowHdrSurface` drive the native surface
-      // (the develop viewport). Other Viewport instances — notably the Roll
-      // "view frame" (FramePreview), which is also interactive AND mounts a
-      // WebGL canvas but sits under its own opaque #111 overlay that would block
-      // the layer — keep the default false and fall through to the gain-map path.
-      if (allowHdrSurface && $hdrMode === "live-edr" && canvas) {
-        await api.hdrSurfaceRenderShow(id, params, hdrViewSpec(), canvasRect());
-        if (id !== curId || !params.hdr) return; // image switched or toggled off mid-encode
-        hdrUsesSurface = true;
-        hdrShown = true; // hides the SDR canvas via the `edrhole` class below
-      } else {
-        const data = await api.encodeHdr(id, params, hdrViewSpec());
-        if (id !== curId || !params.hdr) return;
-        hdrUsesSurface = false;
-        hdrSrc = data;
-        hdrShown = true;
-      }
+      const data = await api.encodeHdr(id, params, hdrViewSpec());
+      if (id !== curId || !params.hdr) return; // image switched or toggled off mid-encode
+      hdrUsesSurface = false;
+      hdrSrc = data;
+      hdrShown = true;
     } catch (e) {
       // "not developed" etc. are expected; swallow like seed()/reanalyze().
       if (!(typeof e === "string" && e === "not developed")) console.error("encodeHdr failed", e);
     }
   }
 
-  // Any edit (params/geometry change) hides the overlay immediately (live SDR shows
-  // through), then debounces an encode that fades HDR back in once things settle.
+  // Any edit hides the gain-map overlay immediately (live SDR shows through), then
+  // debounces an encode that fades HDR back in once things settle. Fallback only.
   function scheduleHdr() {
     hdrShown = false; // live SDR while dragging
-    if (hdrUsesSurface) { api.hdrSurfaceHide().catch(() => {}); hdrUsesSurface = false; } // reveal the SDR canvas for the gesture
     if (hdrTimer) clearTimeout(hdrTimer);
     if (!params.hdr || !id) return;
     hdrTimer = setTimeout(encodeHdr, 200);
   }
 
-  // Clear the overlay on image switch so a stale HDR frame never shows for the wrong photo.
+  // ---- live-edr path (per-frame native surface) -----------------------------
+  // Split the drivers into a RARE source upload and a per-frame uniforms push.
+  //  - Source (raw-negative pixels): changes only on image id / develop revision /
+  //    proxy↔hi-res tier — the exact inputs the WebGL source upload keys off
+  //    (`currentUploadKey` uses id|developRev|tier for the non-bake path). set_source
+  //    also resolves + renders the current uniforms, so it produces a correct first
+  //    frame on its own.
+  //  - Uniforms (per-frame): invert + geometry (crop/zoom/pan) + finish/tone/color +
+  //    clip toggles — reuses invKey|geomKey|finishKey. Throttled to rAF so multiple
+  //    param changes in a frame coalesce into a single IPC call.
+  let hdrRaf: number | null = null;
+  let sourceSeq = 0;
+  // Guards against re-uploading the source on every edit: the source reactive block
+  // re-runs whenever `params` is reassigned (its `params.hdr` gate), but the pixels
+  // only change when `hdrSourceKey` does. Set optimistically BEFORE the await so
+  // rapid edits within one upload don't double-fire; reset to "" on hide/failure so
+  // re-enabling HDR (or a retry after "not developed") re-uploads.
+  let lastHdrSourceKey = "";
+  function cancelHdrRaf() {
+    if (hdrRaf !== null) { cancelAnimationFrame(hdrRaf); hdrRaf = null; }
+  }
+  function clipArg() { return { high: clipHigh, low: clipLow, strict: clipStrict }; }
+
+  // Upload (or re-upload) the raw-negative source; on success mark the surface live
+  // and push one uniforms update to reconcile any edits made during the async gap.
+  async function pushHdrSource() {
+    if (!liveEdr || !params.hdr || !id || !imgW || !vpW) return;
+    if (hdrSourceKey === lastHdrSourceKey) return; // source pixels unchanged
+    lastHdrSourceKey = hdrSourceKey;
+    const curId = id;
+    const myseq = ++sourceSeq;
+    try {
+      await api.hdrSurfaceSetSource(id, params, hdrViewSpec(), canvasRect());
+      if (myseq !== sourceSeq || id !== curId || !params.hdr || !liveEdr) return; // superseded
+      hdrUsesSurface = true;
+      hdrShown = true; // hides the SDR canvas via the `edrhole` class below
+      // The source render used params-at-call-time; sync to the latest uniforms in
+      // case the user kept editing while the pixels were packing/uploading.
+      pushHdrUniforms();
+    } catch (e) {
+      lastHdrSourceKey = ""; // allow a retry (e.g. transient "not developed")
+      if (!(typeof e === "string" && e === "not developed")) console.error("hdrSurfaceSetSource failed", e);
+    }
+  }
+
+  // Fire one uniforms update now (no throttle). No-op on the backend until a source
+  // exists, so a stray early call is harmless.
+  function pushHdrUniforms() {
+    if (!liveEdr || !params.hdr || !id || !imgW || !vpW) return;
+    api.hdrSurfaceSetUniforms(id, params, hdrViewSpec(), clipArg(), canvasRect()).catch((e) => {
+      if (!(typeof e === "string" && e === "not developed")) console.error("hdrSurfaceSetUniforms failed", e);
+    });
+  }
+
+  // Per-frame uniforms push, coalesced to one call per animation frame. A newer
+  // edit within the same frame cancels the pending rAF and reschedules.
+  function scheduleHdrUniforms() {
+    if (!liveEdr || !params.hdr || !id) return;
+    cancelHdrRaf();
+    hdrRaf = requestAnimationFrame(() => { hdrRaf = null; pushHdrUniforms(); });
+  }
+
+  // Hide the native surface + tear down live-edr driving state (shared by image
+  // switch, HDR-off, and unmount). Safe to call when no surface is active.
+  function hideHdrSurface() {
+    cancelHdrRaf();
+    lastHdrSourceKey = ""; // re-enabling / next image must re-upload the source
+    if (hdrUsesSurface) { api.hdrSurfaceHide().catch(() => {}); hdrUsesSurface = false; }
+  }
+
+  // Clear the overlay on image switch so a stale HDR frame never shows for the wrong
+  // photo. (The live-edr source key includes `id`, so a new source uploads next.)
   $: if (id !== hdrPrevId) {
     hdrPrevId = id; hdrSrc = ""; hdrShown = false;
     if (hdrTimer) clearTimeout(hdrTimer);
-    if (hdrUsesSurface) { api.hdrSurfaceHide().catch(() => {}); hdrUsesSurface = false; }
+    hideHdrSurface();
   }
 
-  // Re-run on any input that changes the rendered frame, plus the HDR toggle itself.
+  // ---- reactive triggers ----------------------------------------------------
+  // Fallback: one settle-debounced encode on any frame-affecting change.
   $: hdrKey = `${id}|${params.hdr}|${developRev}|${invKey}|${finishKey}|${geomKey}|${dustRev}|${irRemoval.enabled}|${irRemoval.sensitivity}|${vpW > 0}`;
-  $: if (params.hdr) { hdrKey; if (id && vpW && imgW) scheduleHdr(); }
+  $: if (params.hdr && !liveEdr) { hdrKey; if (id && vpW && imgW) scheduleHdr(); }
+
+  // live-edr: source key (rare) and uniforms key (per-frame). The uniforms key is
+  // the invert + geometry + finish/clip composite (finishKey already folds in the
+  // clip toggles). vpW>0 guards against firing before the canvas is laid out.
+  $: hdrSourceKey = `${id}|${developRev}|${hiTier ? 'hi' : 'lo'}`;
+  $: hdrUniformsKey = `${invKey}|${geomKey}|${finishKey}`;
+  $: if (params.hdr && liveEdr && id && imgW && vpW > 0) { hdrSourceKey; pushHdrSource(); }
+  $: if (params.hdr && liveEdr && id && imgW && vpW > 0) { hdrUniformsKey; scheduleHdrUniforms(); }
+
+  // HDR toggled off: hide the surface (the native CAMetalLayer would otherwise stay
+  // shown with a frozen frame; the CSS self-heals off hdrShown) and clear fallback.
   $: if (!params.hdr) {
     hdrShown = false; if (hdrTimer) clearTimeout(hdrTimer);
-    // CSS self-heals (canvas re-shows, body opaque) off hdrShown, but the native
-    // CAMetalLayer would stay shown with a frozen frame — hide it explicitly.
-    if (hdrUsesSurface) { api.hdrSurfaceHide().catch(() => {}); hdrUsesSurface = false; }
+    hideHdrSurface();
   }
-
-  // Keep the native surface's rect in sync with pan/zoom/resize while it's shown
-  // (settled). Diffed against `geomKey` (not a plain `$:` reactive call) so the
-  // getBoundingClientRect() read happens in `afterUpdate` — AFTER Svelte has
-  // patched the canvas's left/top/width/height style — instead of mid-flush
-  // against stale layout.
-  let lastRectGeomKey = "";
-  afterUpdate(() => {
-    if (hdrUsesSurface && hdrShown && geomKey !== lastRectGeomKey) {
-      lastRectGeomKey = geomKey;
-      api.hdrSurfaceSetRect(canvasRect()).catch(() => {});
-    }
-  });
 
   // NOTE (Sub-project B/C): in live-edr mode the GPU-drawn clipping warning
   // (clip.ts) and on-image dust markers are baked into the now-hidden SDR canvas,
