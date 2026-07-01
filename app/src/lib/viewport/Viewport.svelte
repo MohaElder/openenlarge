@@ -21,7 +21,7 @@
   import { hiTierAction } from "./hiTier";
   import { pickPixel, sampleRobust, nextWbRing } from "../develop/colorPick";
   import { orientUVMatrix, displayToSourceUV } from "../crop/transforms";
-  import { viewWindow, type ViewWindow } from "./view";
+  import { viewWindow, deriveView, type ViewWindow } from "./view";
   import { t } from "$lib/i18n";
 
   export let id: string | null;
@@ -376,17 +376,30 @@
   // because there's no GL canvas) never hides the SDR canvas under it.
   let hdrUsesSurface = false;
 
-  // Build the SAME ViewSpec the live render uses for the current frame (geometry,
-  // persistent crop, dust/IR). HDR is a settled full-frame preview, so we render at
-  // the fit-scaled image dims (capped) like render() does — no zoom/pan view crop.
+  // Build the ViewSpec matching EXACTLY what the SDR canvas is currently showing
+  // (geometry, persistent crop, dust/IR), at every zoom level — so the EDR texture
+  // is the on-screen view, not the whole image stretched to fill the canvas box.
   function hdrViewSpec(): import("../api").ViewSpec {
+    const geom = {
+      image_crop: imageCrop, rot90, flip_h: flipH, flip_v: flipV, angle,
+      dust, ir_removal: irRemoval,
+    };
+    // Deep-zoom windowed path: the SDR canvas renders only the visible crop-window
+    // into a viewport-sized box (`vw0`). Mirror it via deriveView (same visible-
+    // region math as viewWindow) so `crop`/`out_w`/`out_h` match the on-screen
+    // window; the surface is positioned at that same canvas box (canvasRect), so
+    // the EDR aligns with the SDR at any zoom. At fit deriveView yields the whole
+    // image ([0,0,imgW,imgH]) — identical to the pre-zoom behavior.
+    if (vw0) {
+      const v = deriveView(eff, cx, cy, imgW, imgH, vpW, vpH, raw);
+      return { ...v, finish: true, ...geom };
+    }
+    // No windowed render (bake mode / non-GPU): the canvas shows the full image at
+    // its display box, so render the whole image — the original fit-view path.
     const rscale = Math.min(eff, CAP / Math.max(imgW, imgH));
     const out_w = Math.max(1, Math.round(imgW * rscale));
     const out_h = Math.max(1, Math.round(imgH * rscale));
-    return {
-      crop: [0, 0, imgW, imgH], out_w, out_h, raw, finish: true,
-      image_crop: imageCrop, rot90, flip_h: flipH, flip_v: flipV, angle, dust, ir_removal: irRemoval,
-    };
+    return { crop: [0, 0, imgW, imgH], out_w, out_h, raw, finish: true, ...geom };
   }
 
   // The native surface is positioned at the WebGL canvas's on-screen box (CSS px,
