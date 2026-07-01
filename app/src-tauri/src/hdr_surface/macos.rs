@@ -1,6 +1,6 @@
 //! macOS EDR (extended dynamic range) compositing surface — production version.
 //!
-//! A native `CAMetalLayer` (RGBA16Float, extended-linear Display-P3, reference
+//! A native `CAMetalLayer` (RGBA16Float, extended-linear sRGB, reference
 //! EDR) hosted by an `NSView` that sits *behind* the WKWebView. The frontend
 //! punches a transparent hole in the DOM over the image viewport; this layer
 //! shows through it and can draw pixels brighter than SDR white (1.0) that a
@@ -37,7 +37,7 @@ use objc2::{define_class, msg_send, MainThreadOnly};
 
 use objc2_app_kit::{NSAutoresizingMaskOptions, NSView, NSWindow, NSWindowOrderingMode};
 use objc2_core_foundation::CGSize;
-use objc2_core_graphics::{kCGColorSpaceExtendedLinearDisplayP3, CGColorSpace};
+use objc2_core_graphics::{kCGColorSpaceExtendedLinearSRGB, CGColorSpace};
 use objc2_foundation::{MainThreadMarker, NSNumber, NSPoint, NSRect, NSSize, NSString};
 use objc2_metal::{
     MTLClearColor, MTLCommandBuffer, MTLCommandEncoder, MTLCommandQueue,
@@ -51,7 +51,7 @@ use objc2_quartz_core::{CAMetalDrawable, CAMetalLayer};
 use super::ViewportRect;
 
 /// Metal Shading Language: a textured fullscreen triangle (no vertex buffers).
-/// The fragment stage samples the uploaded image (linear extended-Display-P3,
+/// The fragment stage samples the uploaded image (linear extended sRGB,
 /// already linearized) with linear filtering so it scales to fill the layer.
 /// Alpha is forced to 1.0 so the surface stays opaque behind the punched hole.
 const EDR_SHADER_SRC: &str = r#"
@@ -339,12 +339,18 @@ fn create_surface(
     layer.setFramebufferOnly(true);
     layer.setWantsExtendedDynamicRangeContent(true);
     // edrMetadata left nil == reference EDR.
-    // SAFETY: `kCGColorSpaceExtendedLinearDisplayP3` is a framework constant.
-    let cs_name = unsafe { kCGColorSpaceExtendedLinearDisplayP3 };
+    // Extended-linear sRGB (BT.709 primaries), NOT Display-P3: the buffer comes
+    // from film-core, which outputs sRGB/BT.709 primaries (matching the gain-map
+    // encoder's `UHDR_CG_BT_709` tag). Tagging the layer P3 would reinterpret
+    // linear BT.709 values as linear P3, stretching them into the wider gamut —
+    // visible as a cyan cast in the highlights. Extended-linear sRGB still
+    // carries >1.0 EDR values.
+    // SAFETY: `kCGColorSpaceExtendedLinearSRGB` is a framework constant.
+    let cs_name = unsafe { kCGColorSpaceExtendedLinearSRGB };
     if let Some(cs) = CGColorSpace::with_name(Some(cs_name)) {
         layer.setColorspace(Some(&cs));
     } else {
-        eprintln!("[hdr] could not create extended-linear Display-P3 colorspace");
+        eprintln!("[hdr] could not create extended-linear sRGB colorspace");
     }
 
     // Layer-hosting view, positioned later by `show`/`set_rect`.
@@ -390,8 +396,8 @@ fn create_surface(
 }
 
 /// Upload the `rgba16f` buffer into a fresh RGBA16Float texture on the surface.
-/// The buffer is LINEAR extended-Display-P3 half-float — uploaded verbatim, no
-/// re-linearization.
+/// The buffer is LINEAR extended sRGB (BT.709 primaries) half-float — uploaded
+/// verbatim, no re-linearization.
 fn upload_texture(
     surface: &mut Surface,
     rgba16f: &[u16],
