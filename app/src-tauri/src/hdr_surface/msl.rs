@@ -297,22 +297,28 @@ fragment float4 invert_frag(VOut in [[stage_in]],
 /// color-mixer band centres + gains, the point-color tolerances, `HDR_KNEE=0.8`,
 /// `HDR_HEADROOM=2.5` (`engine.rs`).
 ///
-/// HDR-FINALIZE DESIGN (see task-4-report for the full rationale): the tone body
-/// preserves super-white; the creative color ops (saturation/LUT/grade/mix/point)
-/// are display-domain [0,1] operations and run on the CLAMPED body; the highlight
-/// magnitude is then reattached hue-preservingly and rolled off by
-/// `hdr_finalize_rgb` (port of `finish.rs::hdr_finalize_rgb`). Two deliberate
-/// deviations from the GLSL, flagged in the report: (1) the blacks term uses
-/// `(1-v)^3` via multiplication (matching `finish.rs`'s `.powi(3)`), not
-/// `pow(1-v,3.0)` which is NaN for the super-white `v>1` case; (2) the SDR
-/// `display_finalize` look/shoulder is replaced by `hdr_finalize_rgb` per the
-/// brief (drops the Faithful `lookS` contrast on the HDR path).
+/// HDR-FINALIZE DESIGN (Task 4 + Task 6 fix): the creative color ops
+/// (saturation/LUT/grade/mix/point) run on the **display-finalized** body
+/// `displayFinalize(toneBody)` — the Faithful shoulder + `lookS` contrast — EXACTLY
+/// as `finish_pixel` / GLSL `finalize_body=true` do, so the HDR surface matches the
+/// SDR contrast/look below white. The tone body's pre-finalize magnitude
+/// `mU=max(bodyU)` is retained: below white (`mU<=1`) the output IS the SDR
+/// finished color; above white the highlight is reattached to the graded color
+/// hue-preservingly and rolled off by `hdr_finalize_rgb` (port of
+/// `finish.rs::hdr_finalize_rgb`), so super-white survives as a highlight.
+/// One deliberate deviation from the GLSL, flagged in the report: the blacks term
+/// uses `(1-v)^3` via multiplication (matching `finish.rs`'s `.powi(3)`), not
+/// `pow(1-v,3.0)` which is NaN for the super-white `v>1` case.
 pub const FINISH_FRAG_MSL: &str = r#"
 // ---- finish stage: port of FRAG (shaders.ts) / finish.rs::finish_pixel ----
 constant float FIN_PI = 3.14159265358979;
 constant float FIN_BRIGHTNESS_RANGE = 0.5;      // MUST equal finish.rs BRIGHTNESS_DENSITY_RANGE
 constant float HDR_KNEE = 0.8;                  // MUST equal engine.rs HDR_KNEE
 constant float HDR_HEADROOM = 2.5;              // MUST equal engine.rs HDR_HEADROOM
+// Faithful display-finalize (shoulder + lookS contrast) — MUST equal engine.rs
+// display_finalize / shaders.ts. FAITHFUL_GAMMA is already declared by the invert stage.
+constant float FAITHFUL_KNEE = 0.892;
+constant float LOOK_K = 2.0;
 // OKLab saturation constants (MUST equal finish.rs).
 constant float SAT_C_REF = 0.20;
 constant float SAT_C_NEUTRAL = 0.025;
@@ -362,6 +368,21 @@ float toneBody(float v, constant HdrUniforms& u) {
     v = 0.5 + (v - 0.5) * (1.0 + u.contrast);
     return v;
 }
+
+// Faithful SDR display-finalize (shoulder roll-off to 1.0 + lookS contrast), the
+// tail of the Faithful body. MUST equal engine.rs display_finalize /
+// shaders.ts displayFinalize (recovery retired → hi=lo=0). The creative color ops
+// run on THIS (so the HDR surface matches the SDR contrast below white).
+float shoulderOnly(float raw, float ceil_val) {
+    if (raw <= FAITHFUL_KNEE) return min(raw, ceil_val);
+    float k = FAITHFUL_KNEE;
+    float scale = (1.0 - k);                 // hi_recovery retired → 0
+    return k + (ceil_val - k) * (1.0 - exp(-(raw - k) / scale));
+}
+float lookS(float v) {                       // lo_recovery retired → 0
+    return clamp(0.5 + 0.5 * tanh(LOOK_K * (v - 0.5)) / tanh(LOOK_K * 0.5), 0.0, 1.0);
+}
+float displayFinalize(float v) { return lookS(shoulderOnly(v, 1.0)); }
 
 float3 colorGrade(float3 rgb, constant HdrUniforms& u) {
     float L = dot(rgb, float3(0.2126, 0.7152, 0.0722));
@@ -551,20 +572,28 @@ fragment float4 finish_frag(VOut in [[stage_in]],
     float3 raw = src.sample(smp, in.uv).rgb;
     // Per-zone WB (first op) + brightness/density gain (super-white preserved).
     float3 c = applyPerZoneWb(raw, u) * pow(10.0, u.brightness * FIN_BRIGHTNESS_RANGE);
-    // Tone body (unclamped): carries super-white into the HDR finalize.
+    // Tone body (unclamped): carries super-white for the highlight reattach below.
     float3 bodyU = float3(toneBody(c.r, u), toneBody(c.g, u), toneBody(c.b, u));
-    // Creative color ops are display-domain [0,1] — run on the clamped body.
-    float3 bodyC = clamp(bodyU, 0.0, 1.0);
-    float3 s = oklabSaturate(bodyC, u);
+    // Creative color ops run on the DISPLAY-FINALIZED body (Faithful shoulder +
+    // lookS contrast) — EXACTLY as finish_pixel / GLSL finalize_body=true do — so
+    // the HDR surface has the same contrast/look as SDR below white. displayFinalize
+    // maps [0,∞) -> [0,1] (its shoulder handles the super-white body), matching SDR.
+    float3 bodyFin = float3(displayFinalize(bodyU.r), displayFinalize(bodyU.g), displayFinalize(bodyU.b));
+    float3 s = oklabSaturate(bodyFin, u);
     float3 cu = float3(lutSample(lut, s.r, 0), lutSample(lut, s.g, 1), lutSample(lut, s.b, 2));
     float3 disp = pointColor(colorMixer(colorGrade(cu, u), u), u);
-    // HDR reattach: scale the graded color up to carry the super-white highlight
-    // magnitude (hue-preserving), then roll off with the shoulder. Below 1.0 the
-    // graded color passes straight to the (identity-below-knee) shoulder.
+    // Below white (pre-finalize body max <= 1): output the SDR finished color
+    // EXACTLY. Above white: reattach the super-white highlight magnitude to the
+    // graded color (hue-preserving) and roll it off with the HDR shoulder.
     float mU = max(bodyU.r, max(bodyU.g, bodyU.b));
-    float mC = max(disp.r, max(disp.g, disp.b));
-    float3 hdrRGB = (mU > 1.0 && mC > INV_EPS) ? disp * (mU / mC) : disp;
-    float3 outc = hdr_finalize_rgb(hdrRGB);
+    float3 outc;
+    if (mU <= 1.0) {
+        outc = disp;
+    } else {
+        float mC = max(disp.r, max(disp.g, disp.b));
+        float3 hdrRGB = (mC > INV_EPS) ? disp * (mU / mC) : disp;
+        outc = hdr_finalize_rgb(hdrRGB);
+    }
     // Clipping overlay tests the finished display color (disp), matching the GLSL.
     int code = clipCode(disp, u);
     return float4(clipOverlay(outc, code, u), 1.0);

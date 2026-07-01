@@ -1581,10 +1581,13 @@ pub fn hdr_surface_render_show(
 /// `Developed` record (which `HdrUniforms::from_params` can't see), mirroring
 /// `encode_hdr_raw`'s resolve; `aspect` comes from the packed source dims.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn hdr_surface_set_source(
     id: String,
     params: InvertParams,
     view: ViewSpec,
+    view_off: [f64; 2],
+    view_scale: [f64; 2],
     rect: crate::hdr_surface::ViewportRect,
     session: State<'_, Session>,
     state: State<'_, crate::hdr_surface::HdrSurfaceState>,
@@ -1596,8 +1599,15 @@ pub async fn hdr_surface_set_source(
         // Resolve uniforms + LUT (ensures the image is resident) exactly like the
         // per-frame `hdr_surface_set_uniforms` does — via the shared resolver, so
         // the two commands can't drift.
-        let (u, lut_bytes) =
-            resolve_surface_uniforms(&id, &params, &view, ClipState::default(), &session)?;
+        let (u, lut_bytes) = resolve_surface_uniforms(
+            &id,
+            &params,
+            &view,
+            ClipState::default(),
+            view_off,
+            view_scale,
+            &session,
+        )?;
         // Clone the (now resident) raw working negative and pack it (RGBA16Float,
         // 8 bytes/px) off the async thread. Its dims match `capped_dims` (which the
         // resolver used for `aspect`), so source texture + aspect stay consistent.
@@ -1622,7 +1632,7 @@ pub async fn hdr_surface_set_source(
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (id, params, view, rect, &session, &state, &window);
+        let _ = (id, params, view, view_off, view_scale, rect, &session, &state, &window);
         Ok(())
     }
 }
@@ -1647,11 +1657,14 @@ fn oriented_aspect(w: u32, h: u32, rot90: u8) -> f32 {
 ///   dims `set_source` uploads).
 /// Returns `(uniforms, lut_rgba8_256x1)`.
 #[cfg(target_os = "macos")]
+#[allow(clippy::too_many_arguments)]
 fn resolve_surface_uniforms(
     id: &str,
     params: &InvertParams,
     view: &ViewSpec,
     clip: crate::hdr_surface::uniforms::ClipState,
+    view_off: [f64; 2],
+    view_scale: [f64; 2],
     session: &Session,
 ) -> Result<(crate::hdr_surface::uniforms::HdrUniforms, Vec<u8>), String> {
     use crate::hdr_surface::uniforms::HdrUniforms;
@@ -1677,6 +1690,10 @@ fn resolve_surface_uniforms(
     u.d_max = effective_dmax(params, dev_dmax);
     u.cam_balance = dev_cam.into();
     u.aspect = oriented_aspect(sw, sh, view.rot90);
+    // Deep-zoom window (the visible sub-rect of the displayed image), from the
+    // frontend. Identity ([0,0]/[1,1]) = whole image; the invert MSL applies these.
+    u.view_off = [view_off[0] as f32, view_off[1] as f32].into();
+    u.view_scale = [view_scale[0] as f32, view_scale[1] as f32].into();
     Ok((u, build_lut_bytes(params)))
 }
 
@@ -1717,11 +1734,14 @@ pub struct ClipArg {
 /// (`set_source` not called), it's a no-op `Ok`. Only params/view/clip/rect cross
 /// IPC, never pixels. On non-macOS it is a no-op.
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub fn hdr_surface_set_uniforms(
     id: String,
     params: InvertParams,
     view: ViewSpec,
     clip: ClipArg,
+    view_off: [f64; 2],
+    view_scale: [f64; 2],
     rect: crate::hdr_surface::ViewportRect,
     session: State<Session>,
     state: State<crate::hdr_surface::HdrSurfaceState>,
@@ -1735,12 +1755,20 @@ pub fn hdr_surface_set_uniforms(
             low: clip.low,
             strict: clip.strict,
         };
-        let (u, lut_bytes) = resolve_surface_uniforms(&id, &params, &view, clip_state, &session)?;
+        let (u, lut_bytes) = resolve_surface_uniforms(
+            &id,
+            &params,
+            &view,
+            clip_state,
+            view_off,
+            view_scale,
+            &session,
+        )?;
         crate::hdr_surface::set_uniforms(&window, &state, u, lut_bytes, rect)
     }
     #[cfg(not(target_os = "macos"))]
     {
-        let _ = (id, params, view, clip, rect, &session, &state, &window);
+        let _ = (id, params, view, clip, view_off, view_scale, rect, &session, &state, &window);
         Ok(())
     }
 }
