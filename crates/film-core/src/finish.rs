@@ -509,6 +509,18 @@ fn brightness_gain(b: f32) -> f32 {
     10f32.powf(b * BRIGHTNESS_DENSITY_RANGE)
 }
 
+/// The tone-slider math (Whites/Blacks/Highlights/Shadows/Contrast) — the body of
+/// `tone_curve` WITHOUT the finalize/clamp. Shared by `tone_curve` and
+/// `finish_pixel_hdr` so they can't drift.
+fn tone_body(v: f32, p: &FinishParams) -> f32 {
+    let mut v = v;
+    v += p.whites * 0.20 * v.powi(3);
+    v += p.blacks * 0.20 * (1.0 - v).powi(3);
+    v += p.highlights * 0.18 * smoothstep(0.5, 1.0, v);
+    v += p.shadows * 0.18 * (1.0 - smoothstep(0.0, 0.5, v));
+    0.5 + (v - 0.5) * (1.0 + p.contrast)
+}
+
 /// Per-channel parametric tone curve. Behavior controlled by `p.finalize_body`:
 ///
 /// * `true` (Faithful-SDR-negative default): input is the Faithful gamma BODY (may
@@ -526,16 +538,10 @@ fn tone_curve(v: f32, p: &FinishParams) -> f32 {
     // finalize_body=false: input is ALREADY a display value (positive passthrough / HDR
     // rendition / non-Faithful) — reproduce the pre-headroom tone_curve EXACTLY (leading
     // clamp + trailing clamp, no display_finalize) so those paths are byte-identical to before.
-    let mut v = if p.finalize_body { v } else { v.clamp(0.0, 1.0) };
-    v += p.whites * 0.20 * v.powi(3);
-    v += p.blacks * 0.20 * (1.0 - v).powi(3);
-    v += p.highlights * 0.18 * smoothstep(0.5, 1.0, v);
-    v += p.shadows * 0.18 * (1.0 - smoothstep(0.0, 0.5, v));
-    v = 0.5 + (v - 0.5) * (1.0 + p.contrast);
     if p.finalize_body {
-        crate::engine::display_finalize(v)
+        crate::engine::display_finalize(tone_body(v, p))
     } else {
-        v.clamp(0.0, 1.0)
+        tone_body(v.clamp(0.0, 1.0), p).clamp(0.0, 1.0)
     }
 }
 
@@ -868,6 +874,45 @@ pub fn finish_image(img: &Image, p: &FinishParams) -> Image {
         apply_texture(&toned, p.texture)
     } else {
         toned
+    }
+}
+
+/// HDR-mode per-pixel finish: the byte-identical SDR result PLUS a chroma-preserving
+/// highlight extension via [`hdr_finish`]. `body` is the per-channel pre-shoulder tone
+/// body (super-white-capable — carries the real highlight chroma the SDR shoulder
+/// discards); `sdr` is the unmodified `finish_pixel` output. Below the HDR knee
+/// `hdr_finish` returns `sdr` exactly, so this only diverges from `finish_pixel` once a
+/// pixel's tone body clears the knee.
+pub fn finish_pixel_hdr(rgb: [f32; 3], p: &FinishParams) -> [f32; 3] {
+    let sdr = finish_pixel(rgb, p); // unmodified SDR (byte-identical)
+    let wb = apply_per_zone_wb(rgb, &p.per_zone);
+    let g = brightness_gain(p.brightness);
+    let body = [
+        tone_body(wb[0] * g, p),
+        tone_body(wb[1] * g, p),
+        tone_body(wb[2] * g, p),
+    ];
+    hdr_finish(body, sdr)
+}
+
+/// HDR-mode whole-image finish: mirrors `finish_image`'s per-pixel map but calls
+/// [`finish_pixel_hdr`] instead of `finish_pixel`.
+///
+/// Unlike `finish_image`, this SKIPS the USM/texture spatial pass — the live EDR
+/// preview surface has no USM pass either, so this keeps the CPU HDR export in parity
+/// with what the user actually saw. Wiring the texture slider onto the HDR path is a
+/// documented follow-up, not an oversight.
+pub fn finish_image_hdr(img: &Image, p: &FinishParams) -> Image {
+    let pixels = img
+        .pixels
+        .par_iter()
+        .map(|&px| finish_pixel_hdr(px, p))
+        .collect();
+    Image {
+        width: img.width,
+        height: img.height,
+        pixels,
+        ir: img.ir.clone(),
     }
 }
 
@@ -1337,6 +1382,44 @@ mod tests {
         let sdr = [0.8, 0.6, 0.4];
         let out = hdr_finish(body, sdr);
         for c in 0..3 { assert!((out[c] - sdr[c]).abs() < 1e-2, "kink at knee: {out:?} vs {sdr:?}"); }
+    }
+
+    /// Neutral FinishParams matching the existing finish/tone tests' defaults:
+    /// `finalize_body: true`, all sliders at identity.
+    fn test_finish_params() -> FinishParams {
+        FinishParams::default()
+    }
+
+    #[test]
+    fn tone_body_extraction_keeps_tone_curve_identical() {
+        // tone_curve must be byte-identical after extracting tone_body.
+        let p = test_finish_params(); // finalize_body = true
+        for v in [0.0f32, 0.3, 0.7, 0.892, 1.0, 1.6, 2.4] {
+            let got = tone_curve(v, &p);
+            // display_finalize(tone_body(v)) is the finalize_body=true definition:
+            let expect = crate::engine::display_finalize(tone_body(v, &p));
+            assert!((got - expect).abs() < 1e-6, "v={v}: {got} != {expect}");
+        }
+    }
+
+    #[test]
+    fn finish_pixel_hdr_below_knee_equals_finish_pixel() {
+        // A dark/mid pixel whose tone body stays under the knee → HDR == SDR exactly.
+        let p = test_finish_params();
+        let rgb = [0.2, 0.18, 0.15];
+        assert_eq!(finish_pixel_hdr(rgb, &p), finish_pixel(rgb, &p));
+    }
+
+    #[test]
+    fn finish_pixel_hdr_extends_bright_highlight() {
+        // A super-white input (blown highlight) → HDR output exceeds 1.0 (SDR clamps ~1).
+        let p = test_finish_params();
+        let rgb = [2.2, 1.6, 1.0];
+        let hdr = finish_pixel_hdr(rgb, &p);
+        let sdr = finish_pixel(rgb, &p);
+        let mh = hdr[0].max(hdr[1]).max(hdr[2]);
+        let ms = sdr[0].max(sdr[1]).max(sdr[2]);
+        assert!(mh > 1.0 && mh > ms, "hdr {mh} should exceed sdr {ms} and 1.0");
     }
 
     #[test]
