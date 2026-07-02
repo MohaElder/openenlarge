@@ -1,8 +1,8 @@
 {
-  "tag": "v0.6.0-alpha.4",
+  "tag": "v0.6.0-alpha.5",
   "assets": {
-    "macos": "https://download.aako.world/v0.6.0-alpha.4/OpenEnlarge_0.6.0-alpha.4_aarch64.dmg",
-    "windows": "https://download.aako.world/v0.6.0-alpha.4/OpenEnlarge_0.6.0-alpha.4_x64-setup.exe",
-    "linux": "https://download.aako.world/v0.6.0-alpha.4/OpenEnlarge_0.6.0-alpha.4_amd64.AppImage"
+    "macos": "https://download.aako.world/v0.6.0-alpha.5/OpenEnlarge_0.6.0-alpha.5_aarch64.dmg",
+    "windows": "https://download.aako.world/v0.6.0-alpha.5/OpenEnlarge_0.6.0-alpha.5_x64-setup.exe",
+    "linux": "https://download.aako.world/v0.6.0-alpha.5/OpenEnlarge_0.6.0-alpha.5_amd64.AppImage"
   }
 }
