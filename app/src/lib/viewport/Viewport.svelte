@@ -462,7 +462,7 @@
       }
       // HDR (or live-edr itself) may have been toggled off while the async
       // create() was in flight — don't adopt/leak a GPU device nobody wants.
-      if (!isWinLiveEdr || !params.hdr || gpuRenderer) { r.dispose(); return; }
+      if (!isWinLiveEdr || !params.hdr || gpuRenderer || !renderer) { r.dispose(); return; }
       gpuRenderer = r;
       // Catch the new renderer up to the CURRENT state so its first frame is
       // correct without waiting for the next edit. Uses the exact same cached
