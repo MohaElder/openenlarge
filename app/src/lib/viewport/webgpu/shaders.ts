@@ -322,7 +322,7 @@ fn fs_invert(in: VOut) -> @location(0) vec4f {
   if (suv.x < 0.0 || suv.x > 1.0 || suv.y < 0.0 || suv.y > 1.0) {
     return vec4f(0.0, 0.0, 0.0, 1.0);               // outside source (straighten corners) = black
   }
-  let rgb = textureSample(src, smp, suv).rgb;
+  let rgb = textureSampleLevel(src, smp, suv, 0.0).rgb;
   if (u.raw != 0) {                                    // output the scan (display gamma), no inversion
     return vec4f(pow(clamp(rgb, vec3f(0.0), vec3f(1.0)), vec3f(1.0 / 2.2)), 1.0);
   }
@@ -499,9 +499,9 @@ fn colorMixer(rgb: vec3f, u: HdrUniforms) -> vec3f {
 fn pcTol(base: f32, variance: f32) -> f32 {
   return max(0.02, base * (1.0 + (variance / 100.0) * PC_VAR_SPAN));
 }
-fn pcHueWeight(h: f32, target: f32, range: f32) -> f32 {
+fn pcHueWeight(h: f32, tgt: f32, range: f32) -> f32 {
   let hw = PC_RANGE_MIN_DEG + (range / 100.0) * (PC_RANGE_MAX_DEG - PC_RANGE_MIN_DEG);
-  let d = abs(wrap180(h - target));
+  let d = abs(wrap180(h - tgt));
   if (d >= hw) { return 0.0; }
   return 0.5 * (1.0 + cos(FIN_PI * d / hw));
 }
@@ -595,7 +595,7 @@ fn oklabSaturate(rgb: vec3f, u: HdrUniforms) -> vec3f {
 // (WGSL texture/sampler bindings live at module scope, unlike MSL's per-call
 // constexpr sampler + texture argument).
 fn lutSample(x: f32, ch: i32) -> f32 {
-  let v = textureSample(lut, smp, vec2f(x, 0.5));
+  let v = textureSampleLevel(lut, smp, vec2f(x, 0.5), 0.0);
   if (ch == 0) { return v.r; }
   if (ch == 1) { return v.g; }
   return v.b;
@@ -658,7 +658,7 @@ fn srgbToLinearExt3(c: vec3f) -> vec3f {
 
 @fragment
 fn fs_finish(in: VOut) -> @location(0) vec4f {
-  let raw = textureSample(src, smp, in.uv).rgb;
+  let raw = textureSampleLevel(src, smp, in.uv, 0.0).rgb;
   // Per-zone WB (first op) + brightness/density gain (super-white preserved).
   let c = applyPerZoneWb(raw, u) * pow(10.0, u.brightness * FIN_BRIGHTNESS_RANGE);
   // Tone body (unclamped): carries super-white for the highlight reattach below.

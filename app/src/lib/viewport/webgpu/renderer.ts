@@ -116,6 +116,10 @@ export class WebGPUFinishRenderer {
         toneMapping: { mode: "extended" },
       });
 
+      // WGSL compile / pipeline-validation errors are surfaced asynchronously
+      // (they don't throw), so scope them: on any error, return null and let the
+      // caller fall back to the gain-map path instead of showing a black canvas.
+      device.pushErrorScope("validation");
       const invertModule = device.createShaderModule({ code: INVERT_WGSL });
       const finishModule = device.createShaderModule({ code: FINISH_WGSL });
       const invertPipeline = device.createRenderPipeline({
@@ -130,6 +134,12 @@ export class WebGPUFinishRenderer {
         fragment: { module: finishModule, entryPoint: "fs_finish", targets: [{ format: SURFACE_FORMAT }] },
         primitive: { topology: "triangle-list" },
       });
+      const pipelineErr = await device.popErrorScope();
+      if (pipelineErr) {
+        console.error("WebGPUFinishRenderer: shader/pipeline validation failed:", pipelineErr.message);
+        device.destroy();
+        return null;
+      }
 
       const sampler = device.createSampler({
         magFilter: "linear", minFilter: "linear",
