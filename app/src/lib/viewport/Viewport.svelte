@@ -13,9 +13,11 @@
   import { previewSrc, previewById, cachePreview, hdrMode } from "../store";
   import { FinishRenderer, webgl2Available, float16RenderTargetSupported } from "./gl/renderer";
   import { finishUniforms } from "./gl/uniforms";
-  import { toInversionUniforms } from "./gl/invert";
+  import { toInversionUniforms, type InversionUniforms } from "./gl/invert";
   import { clipUniforms } from "./gl/clip";
   import { toneLutBytes, colorGrade, colorMix, perZoneWb } from "../develop/finish";
+  import { WebGPUFinishRenderer } from "./webgpu/renderer";
+  import { detectOs } from "./hdrCapability";
   import { screenRadius, strokeCentroid, type DustStroke } from "../develop/dust";
   import { marqueeZoom } from "./marquee";
   import { hiTierAction } from "./hiTier";
@@ -83,6 +85,28 @@
   let renderer: FinishRenderer | null = null;
   // GPU path: only the interactive, non-raw develop canvas, when WebGL2 exists.
   const useGL = interactive && !raw && webgl2Available();
+
+  // ---- Windows live-edr: WebGPU renderer + sibling canvas -------------------
+  // Mirrors the WebGL `canvas`/`renderer` pair. Only ever driven when
+  // `isWinLiveEdr` below is true (macOS keeps using the native `api.hdrSurface*`
+  // path unchanged). Created lazily on first need and kept alive across image
+  // switches/edits — every setX() below is called at the SAME call sites that
+  // feed the WebGL `renderer`, with the SAME resolved values, so the two stay
+  // in lockstep by construction.
+  let gpuCanvas: HTMLCanvasElement | null = null;
+  let gpuRenderer: WebGPUFinishRenderer | null = null;
+  let gpuCreating = false;
+  // Set once WebGPU init fails at runtime for this session — never retried;
+  // the fallback below forces $hdrMode to "gainmap-fallback" so `liveEdr`
+  // (and thus `isWinLiveEdr`) goes false and the existing gain-map path takes over.
+  let gpuFailed = false;
+  // Last-known-good inputs, cached so a freshly-created gpuRenderer can be
+  // brought up to date without re-fetching from the backend (the WebGL
+  // renderer already has them; a lazy WebGPU create must not force a re-render
+  // of the WebGL canvas or a duplicate backend round-trip).
+  let lastSourceBuf: Uint16Array | null = null;
+  let lastSourceW = 0, lastSourceH = 0;
+  let lastInvUniforms: InversionUniforms | null = null;
 
   let src = "";
   let vpW = 0, vpH = 0;
@@ -342,13 +366,30 @@
 
   function drawGL() {
     if (!renderer) return;
-    renderer.setUniforms(finishUniforms(params));
-    renderer.setLut(toneLutBytes(params));
-    renderer.setColorGrade(colorGrade(params));
-    renderer.setPerZoneWb(perZoneWb(params));
-    renderer.setColorMix(colorMix(params));
-    renderer.setClip(clipUniforms({ high: clipHigh, low: clipLow, strict: clipStrict }));
+    const fu = finishUniforms(params);
+    const lut = toneLutBytes(params);
+    const cg = colorGrade(params);
+    const pz = perZoneWb(params);
+    const cm = colorMix(params);
+    const clip = clipUniforms({ high: clipHigh, low: clipLow, strict: clipStrict });
+    renderer.setUniforms(fu);
+    renderer.setLut(lut);
+    renderer.setColorGrade(cg);
+    renderer.setPerZoneWb(pz);
+    renderer.setColorMix(cm);
+    renderer.setClip(clip);
     renderer.draw();
+    // Windows live-edr: mirror the SAME resolved values to the WebGPU renderer,
+    // then render it — guarantees the two stay pixel-parity by construction.
+    if (isWinLiveEdr && gpuRenderer) {
+      gpuRenderer.setUniforms(fu);
+      gpuRenderer.setLut(lut);
+      gpuRenderer.setColorGrade(cg);
+      gpuRenderer.setPerZoneWb(pz);
+      gpuRenderer.setColorMix(cm);
+      gpuRenderer.setClip(clip);
+      gpuRenderer.render();
+    }
     // Publish a snapshot for the histogram (debounced; toDataURL is cheap-ish). Also
     // stash it as this image's fit-view preview so a later switch back shows it
     // instantly (skip while zoomed — a zoomed crop is a poor switch-in preview).
@@ -396,6 +437,59 @@
   // and rect-sync, so a gainmap-fallback frame (or a live-edr frame that fell back
   // because there's no GL canvas) never hides the SDR canvas under it.
   let hdrUsesSurface = false;
+
+  // Windows has no native EDR compositing surface — live-edr there is driven by
+  // the in-webview WebGPU renderer instead (see the gpu* state above). Same
+  // `liveEdr` gate, OS-branched drive target only; macOS behavior is untouched.
+  $: isWinLiveEdr = liveEdr && detectOs() === "windows";
+  // True once the WebGPU preview is the active on-screen surface — gates the
+  // canvas swap below (mirrors `hdrUsesSurface && hdrShown` for the mac path).
+  $: gpuShown = isWinLiveEdr && params.hdr && !!gpuRenderer;
+
+  /** Lazily creates the WebGPU renderer on first need. Never throws (create()
+   *  itself never throws); on a runtime WebGPU failure, permanently fall back
+   *  to gainmap for this session so this mount (and every other Viewport)
+   *  re-renders on the existing, working gain-map path instead of a blank view. */
+  async function ensureGpuRenderer() {
+    if (!gpuCanvas || gpuRenderer || gpuCreating || gpuFailed) return;
+    gpuCreating = true;
+    try {
+      const r = await WebGPUFinishRenderer.create(gpuCanvas);
+      if (!r) {
+        gpuFailed = true;
+        hdrMode.set("gainmap-fallback");
+        return;
+      }
+      // HDR (or live-edr itself) may have been toggled off while the async
+      // create() was in flight — don't adopt/leak a GPU device nobody wants.
+      if (!isWinLiveEdr || !params.hdr || gpuRenderer) { r.dispose(); return; }
+      gpuRenderer = r;
+      // Catch the new renderer up to the CURRENT state so its first frame is
+      // correct without waiting for the next edit. Uses the exact same cached
+      // inputs / functions that feed the WebGL renderer (no recomputation).
+      if (lastSourceBuf) gpuRenderer.setSourceFloat(lastSourceBuf, lastSourceW, lastSourceH);
+      if (lastInvUniforms) gpuRenderer.setInversion(lastInvUniforms);
+      const g = buildGeometry();
+      if (g) gpuRenderer.setGeometry(g);
+      drawGL(); // re-applies finish/LUT/CG/CM/PZ/clip to both renderers and renders this frame
+    } finally {
+      gpuCreating = false;
+    }
+  }
+  $: if (isWinLiveEdr && params.hdr && gpuCanvas) ensureGpuRenderer();
+
+  /** Tears down the WebGPU renderer (mirrors the mac `hideHdrSurface` teardown:
+   *  HDR off / image switch / unmount). Safe to call when none is active. */
+  function disposeGpuRenderer() {
+    gpuRenderer?.dispose();
+    gpuRenderer = null;
+    // Deliberately keep lastSourceBuf/lastInvUniforms cached (not cleared here):
+    // a bare HDR off→on toggle on the SAME image re-runs this dispose/recreate
+    // cycle without re-triggering uploadWorking()/refreshInversion() (their keys
+    // are unrelated to params.hdr), so a fresh gpuRenderer needs them to render
+    // a correct first frame instead of sitting blank until the next edit. A real
+    // id switch resets texW/uploadKey and re-populates them anyway.
+  }
 
   // Build the ViewSpec matching EXACTLY what the SDR canvas is currently showing
   // (geometry, persistent crop, dust/IR), at every zoom level — so the EDR texture
@@ -564,6 +658,7 @@
     cancelHdrRaf();
     lastHdrSourceKey = ""; // re-enabling / next image must re-upload the source
     if (hdrUsesSurface) { api.hdrSurfaceHide(++hdrEpoch).catch(() => {}); hdrUsesSurface = false; }
+    disposeGpuRenderer(); // Windows: tear down the WebGPU preview on the same triggers
   }
 
   // Clear the overlay on image switch so a stale HDR frame never shows for the wrong
@@ -677,16 +772,24 @@
         const info = await api.workingBakedInfo(id, spec, hiTier);
         const buf = await api.workingBakedPixels(id, spec, params, hiTier);
         if (!renderer || currentUploadKey() !== k) return; // stale (params changed mid-fetch)
-        if (!renderer.setSourceFloat(new Uint16Array(buf), info.w, info.h)) { dropHiTier(); return; }
+        const u16 = new Uint16Array(buf);
+        if (!renderer.setSourceFloat(u16, info.w, info.h)) { dropHiTier(); return; }
         texW = info.w; texH = info.h;
+        // Windows live-edr: same source pixels, cached so a lazily-created
+        // gpuRenderer can catch up without re-fetching from the backend.
+        lastSourceBuf = u16; lastSourceW = info.w; lastSourceH = info.h;
+        if (isWinLiveEdr) gpuRenderer?.setSourceFloat(u16, info.w, info.h);
         if (spec.migan) dispatch("aierased"); // MI-GAN apply bake finished → clear the button spinner
         if (spec.auto_dust.enabled) dispatch("autodusted"); // auto-dust heal bake finished → clear toggle spinner
       } else {
         const info = await api.workingInfo(id, hiTier);
         const buf = await api.workingPixels(id, hiTier);
         if (!renderer || currentUploadKey() !== k) return; // image changed mid-fetch
-        if (!renderer.setSourceFloat(new Uint16Array(buf), info.w, info.h)) { dropHiTier(); return; }
+        const u16 = new Uint16Array(buf);
+        if (!renderer.setSourceFloat(u16, info.w, info.h)) { dropHiTier(); return; }
         texW = info.w; texH = info.h;
+        lastSourceBuf = u16; lastSourceW = info.w; lastSourceH = info.h;
+        if (isWinLiveEdr) gpuRenderer?.setSourceFloat(u16, info.w, info.h);
       }
       uploadKey = k;
       await refreshInversion();
@@ -715,7 +818,12 @@
     const myseq = ++invSeq;
     const res = await api.resolvedInversion(id, params);
     if (myseq !== invSeq || id !== curId || !renderer) return; // superseded by a newer resolve
-    renderer.setInversion(toInversionUniforms(res));
+    const inv = toInversionUniforms(res);
+    renderer.setInversion(inv);
+    // Windows live-edr: same resolved uniforms, cached so a lazily-created
+    // gpuRenderer can catch up without a second resolvedInversion round-trip.
+    lastInvUniforms = inv;
+    if (isWinLiveEdr) gpuRenderer?.setInversion(inv);
   }
 
   // The EXACT geometry object handed to the WebGL renderer for the current view —
@@ -765,6 +873,9 @@
     const g = buildGeometry();
     if (!g) return; // no texture uploaded yet
     renderer.setGeometry(g);
+    // Windows live-edr: the EXACT same geometry object, so the WebGPU invert
+    // reproduces the identical view by construction (crop/orient/zoom window).
+    if (isWinLiveEdr) gpuRenderer?.setGeometry(g);
     drawGL();
     frameReady = true; // correct frame for the current image is now on screen
   }
@@ -1153,7 +1264,14 @@
 >
   {#if useGL}
     <canvas
-      bind:this={canvas} class:anim={animating} class:edrhole={hdrUsesSurface && hdrShown}
+      bind:this={canvas} class:anim={animating} class:edrhole={(hdrUsesSurface && hdrShown) || gpuShown}
+      style="position:absolute; left:{vw0 ? vw0.css.left : left}px; top:{vw0 ? vw0.css.top : top}px; width:{vw0 ? vw0.css.width : dispW}px; height:{vw0 ? vw0.css.height : dispH}px;"
+    ></canvas>
+    <!-- Windows live-edr: WebGPU preview, same box as the WebGL canvas, hidden
+         unless it's the active surface (see `gpuShown`). Kept mounted (not
+         {#if}'d) so the WebGPU context/device survive a toggle off/on. -->
+    <canvas
+      bind:this={gpuCanvas} class:edrhole={!gpuShown}
       style="position:absolute; left:{vw0 ? vw0.css.left : left}px; top:{vw0 ? vw0.css.top : top}px; width:{vw0 ? vw0.css.width : dispW}px; height:{vw0 ? vw0.css.height : dispH}px;"
     ></canvas>
     {#if switchPreview}
