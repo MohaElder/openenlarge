@@ -6,6 +6,7 @@ import {
   OFF_D_MAX, OFF_MODE, OFF_CAM_BALANCE, OFF_CROP_OFF, OFF_ORIENT, OFF_VIEW_SCALE,
   type HdrUniformsInput,
 } from "./uniforms";
+import { WGSL_UNIFORMS } from "./shaders";
 
 const IDENT3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
 const ZERO8 = new Float32Array(8);
@@ -138,5 +139,18 @@ describe("packHdrUniforms", () => {
     expect(f[OFF_ORIENT / 4 + 3]).toBeCloseTo(0);
     expect(f[OFF_VIEW_SCALE / 4]).toBeCloseTo(2);
     expect(f[OFF_VIEW_SCALE / 4 + 1]).toBeCloseTo(3);
+  });
+});
+
+describe("WGSL_UNIFORMS / packer layout parity (drift guard)", () => {
+  it("every vec3f in WGSL_UNIFORMS is @size(16) (matches the 16-byte packer layout)", () => {
+    const vec3Count = (WGSL_UNIFORMS.match(/:\s*vec3f\b/g) || []).length;
+    const sizedVec3 = (WGSL_UNIFORMS.match(/@size\(16\)\s*\w+\s*:\s*vec3f\b/g) || []).length;
+    expect(sizedVec3).toBe(vec3Count);
+    expect(vec3Count).toBe(10);
+  });
+
+  it("HDR_UNIFORMS_BYTES matches the pinned Rust size_of", () => {
+    expect(HDR_UNIFORMS_BYTES).toBe(864);
   });
 });

@@ -79,10 +79,10 @@ struct HdrUniforms {
   texel: vec2f,                // 1/out_w, 1/out_h
 
   // Color grading (finish.rs::ColorGrade / colorGrade()).
-  cg_sh_off: vec3f,
-  cg_mid_off: vec3f,
-  cg_hi_off: vec3f,
-  cg_glob_off: vec3f,
+  @size(16) cg_sh_off: vec3f,
+  @size(16) cg_mid_off: vec3f,
+  @size(16) cg_hi_off: vec3f,
+  @size(16) cg_glob_off: vec3f,
   cg_sh_lum: f32,
   cg_mid_lum: f32,
   cg_hi_lum: f32,
@@ -109,9 +109,9 @@ struct HdrUniforms {
 
   // Per-zone WB neutralizer (finish.rs::PerZoneWb / perZoneWb()).
   pz_enabled: i32,
-  pz_sh: vec3f,
-  pz_mid: vec3f,
-  pz_hi: vec3f,
+  @size(16) pz_sh: vec3f,
+  @size(16) pz_mid: vec3f,
+  @size(16) pz_hi: vec3f,
 
   // Clip-warning overlay (B1) — enables + the shared soft-clip knee.
   clip_high_on: f32,
@@ -123,8 +123,8 @@ struct HdrUniforms {
   finalize_body: f32,         // 1.0 = Faithful body finalize, 0.0 = already display-referred
 
   // --- invert (engine.rs::InversionParams / shaders.ts INVERT_FRAG) ---
-  base: vec3f,
-  wb: vec3f,
+  @size(16) base: vec3f,
+  @size(16) wb: vec3f,
   m_pre: mat3x3<f32>,
   m_post: mat3x3<f32>,
   exposure: f32,
@@ -141,7 +141,7 @@ struct HdrUniforms {
   tone_mode: i32,               // 0 = filmic, 1 = faithful (always 1 today)
   hi_recovery: f32,
   lo_recovery: f32,
-  cam_balance: vec3f,
+  @size(16) cam_balance: vec3f,
 
   // --- geometry: output UV -> source UV mapping ---
   crop_off: vec2f,
@@ -354,7 +354,7 @@ const HDR_KNEE: f32 = 0.8;                  // MUST equal engine.rs HDR_KNEE
 const HDR_HEADROOM: f32 = 2.5;              // MUST equal engine.rs HDR_HEADROOM
 const HDR_W_HI: f32 = 1.2;                  // MUST equal finish.rs HDR_W_HI (blend top)
 // Faithful display-finalize (shoulder + lookS contrast) — MUST equal engine.rs
-// display_finalize / shaders.ts. FAITHFUL_GAMMA is already declared by the invert stage.
+// display_finalize / shaders.ts.
 const FAITHFUL_KNEE: f32 = 0.892;
 const LOOK_K: f32 = 2.0;
 // OKLab saturation constants (MUST equal finish.rs).

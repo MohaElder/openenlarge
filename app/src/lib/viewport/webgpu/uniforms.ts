@@ -11,7 +11,17 @@
 // `uniforms.rs`'s `hdr_uniforms_layout_matches_msl` test:
 //   - scalar (f32/i32): 4 bytes, align 4.
 //   - vec2f: 8 bytes, align 8.
-//   - vec3f: 16 bytes (12 data + 4 pad), align 16 — same size/align as vec4f.
+//   - vec3f: align 16, but per the WGSL spec its bare SIZE is only 12 bytes —
+//     a scalar following a bare vec3f would get packed into that 4-byte gap
+//     instead of landing at +16 like the MSL/Rust `float3` (which is
+//     `#[repr(C, align(16))]` with an explicit `_pad: f32`). To make the two
+//     match, every `vec3f` member in `WGSL_UNIFORMS` (shaders.ts) MUST carry
+//     an explicit `@size(16)` attribute, forcing it to occupy the full 16
+//     bytes (12 data + 4 pad) like vec4f. Don't add a bare `vec3f` field to
+//     that struct without it, and don't drop `@size(16)` from an existing
+//     one — either breaks this parity silently. See
+//     `uniforms.test.ts`'s drift-guard test, which asserts every `vec3f` in
+//     `WGSL_UNIFORMS` has a matching `@size(16)`.
 //   - mat3x3<f32>: 3 columns of vec3f = 48 bytes, align 16.
 //   - mat2x2<f32>: 2 columns of vec2f = 16 bytes, align 8.
 //   - array<f32, 8>: storage-space arrays of a 4-byte-aligned scalar pack
