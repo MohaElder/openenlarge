@@ -34,20 +34,22 @@ export function detectOs(): HdrEnv["os"] {
 /** True iff WebGPU is present AND an rgba16float canvas can be configured with
  *  toneMapping:'extended' (the EDR mechanism). Environment-touching; never throws. */
 export async function probeWebGpuExtended(): Promise<boolean> {
+  if (typeof navigator === "undefined" || !("gpu" in navigator) || !navigator.gpu) return false;
+  let device: GPUDevice | undefined;
   try {
-    if (typeof navigator === "undefined" || !("gpu" in navigator) || !navigator.gpu) return false;
     const adapter = await navigator.gpu.requestAdapter();
     if (!adapter) return false;
-    const device = await adapter.requestDevice();
+    device = await adapter.requestDevice();
     const cv = typeof OffscreenCanvas !== "undefined" ? new OffscreenCanvas(2, 2) : null;
     const ctx = cv?.getContext("webgpu") as GPUCanvasContext | null;
-    if (!ctx) { device.destroy?.(); return false; }
-    ctx.configure({ device, format: "rgba16float", alphaMode: "opaque", toneMapping: { mode: "extended" } } as GPUCanvasConfiguration);
+    if (!ctx) return false;
+    ctx.configure({ device, format: "rgba16float", alphaMode: "opaque", toneMapping: { mode: "extended" } });
     ctx.unconfigure?.();
-    device.destroy?.();
     return true;
   } catch {
     return false;
+  } finally {
+    device?.destroy?.();
   }
 }
 
