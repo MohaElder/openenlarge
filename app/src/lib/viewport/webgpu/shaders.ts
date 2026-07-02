@@ -44,21 +44,25 @@
 //    the required named sub-functions, and factoring it makes the parity
 //    with the Rust source (the documented "single source of truth") explicit.
 //
-// KNOWN ON-DEVICE RISK (flagged, not fixed here — see task report): the
-// `cm_*`/`pc_*` fields are `array<f32, 8>` inside a `var<uniform>`-address-
-// space struct. WGSL requires array element stride to be a multiple of 16
-// bytes for the uniform address space, so a literal `array<f32, 8>` field
-// here is expected to fail real WebGPU shader-module validation (unlike
-// MSL's `constant` buffers, which pack scalar arrays tightly at 4 bytes).
-// This file cannot be compiled in this environment to confirm; the fix
-// belongs to whichever task owns the buffer/bind-group wiring (either widen
-// these arrays to `array<vec4f, 2>` groups with index-math, or bind
-// `HdrUniforms` as a `storage` buffer instead of `uniform`, which has no such
-// restriction and would in fact pack identically to the tight MSL layout).
+// UNIFORM ADDRESS-SPACE FIX: the `cm_*`/`pc_*` fields are `array<f32, 8>`.
+// WGSL requires array element stride to be a multiple of 16 bytes in the
+// `uniform` address space, so a literal `array<f32, 8>` field would fail
+// real WebGPU shader-module validation there (unlike MSL's `constant`
+// buffers, which pack scalar arrays tightly at 4 bytes). To avoid that,
+// `HdrUniforms` is bound below as a **read-only storage buffer**
+// (`var<storage, read>`, not `var<uniform>`), where `array<f32, 8>` has a
+// legal 4-byte stride — so the arrays are kept as-is (no `vec4` repacking)
+// and every `arr[i]` index expression in this file is unchanged. This file
+// cannot be compiled in this environment to confirm on-device; whichever
+// task owns the buffer/bind-group wiring must create the buffer with
+// `GPUBufferUsage.STORAGE` and a `read-only-storage` bind-group-layout
+// entry, and pack field offsets per WGSL's storage layout rules (vec3
+// fields aligned to 16 bytes, `f32` arrays at 4-byte stride).
 
 /** WGSL mirror of `HDR_UNIFORMS_STRUCT_MSL` — same field names, same order,
- * so a later JS packer can walk the two side by side. See the KNOWN ON-DEVICE
- * RISK note above re: the `cm_*`/`pc_*` scalar-array fields. */
+ * so a later JS packer can walk the two side by side. See the UNIFORM
+ * ADDRESS-SPACE FIX note above re: the `cm_*`/`pc_*` scalar-array fields
+ * and the `var<storage, read>` binding. */
 export const WGSL_UNIFORMS = `
 struct HdrUniforms {
   // --- finish (finish.rs::FinishParams / shaders.ts FRAG) ---
@@ -193,7 +197,7 @@ export const INVERT_WGSL =
   WGSL_UNIFORMS +
   VERTEX_WGSL +
   `
-@group(0) @binding(0) var<uniform> u: HdrUniforms;
+@group(0) @binding(0) var<storage, read> u: HdrUniforms;
 @group(0) @binding(1) var smp: sampler;
 @group(0) @binding(2) var src: texture_2d<f32>;
 
@@ -338,7 +342,7 @@ export const FINISH_WGSL =
   WGSL_UNIFORMS +
   VERTEX_WGSL +
   `
-@group(0) @binding(0) var<uniform> u: HdrUniforms;
+@group(0) @binding(0) var<storage, read> u: HdrUniforms;
 @group(0) @binding(1) var smp: sampler;
 @group(0) @binding(2) var src: texture_2d<f32>;
 @group(0) @binding(3) var lut: texture_2d<f32>;
