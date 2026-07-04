@@ -95,6 +95,11 @@ confirmDevelop.cancel,Cancel,取消,取消,キャンセル,취소,src/lib/overla
 confirmDevelop.confirm,Develop all,全部显影,全部顯影,すべて現像,전체 현상,src/lib/overlay/ConfirmDevelop.svelte,button
 confirmDevelop.filmStock,Film stock,胶片型号,底片型號,フィルムストック,필름 종류,src/lib/overlay/ConfirmDevelop.svelte,label
 confirmDevelop.filmStockOptional,optional,可选,可選,任意,선택 사항,src/lib/overlay/ConfirmDevelop.svelte,hint
+confirmDevelop.filmType,Film type,胶卷类型,底片類型,フィルムタイプ,필름 유형,src/lib/overlay/ConfirmDevelop.svelte,label
+confirmDevelop.filmTypeTitle,Override the per-frame negative/positive auto-detection for the whole roll,整卷覆盖逐帧的负片/正片自动识别,整卷覆蓋逐幀的負片/正片自動識別,ロール全体でネガ/ポジの自動判別を上書きします,롤 전체에서 네거티브/포지티브 자동 감지를 재정의합니다,src/lib/overlay/ConfirmDevelop.svelte,tooltip
+confirmDevelop.filmType.auto,Auto-detect,自动识别,自動識別,自動判別,자동 감지,src/lib/overlay/ConfirmDevelop.svelte,option
+confirmDevelop.filmType.negative,Negative,负片,負片,ネガ,네거티브,src/lib/overlay/ConfirmDevelop.svelte,option
+confirmDevelop.filmType.positive,Positive (slide),正片（反转片）,正片（幻燈片）,ポジ（スライド）,포지티브(슬라이드),src/lib/overlay/ConfirmDevelop.svelte,option
 confirmApply.copyTitle,Copy which settings?,复制哪些设置？,複製哪些設定？,どの設定をコピーしますか？,어떤 설정을 복사할까요?,src/lib/overlay/ConfirmApplySettings.svelte,heading
 confirmApply.copySub,Choose what travels when you paste these settings onto other frames.,选择粘贴到其他照片时要携带的设置。,選擇貼上至其他照片時要帶上的設定。,他のフレームに貼り付けるときに引き継ぐ設定を選択してください。,다른 프레임에 붙여넣을 때 함께 적용할 설정을 선택하세요.,src/lib/overlay/ConfirmApplySettings.svelte,paragraph
 confirmApply.copyConfirm,Copy,复制,複製,コピー,복사,src/lib/overlay/ConfirmApplySettings.svelte,button
