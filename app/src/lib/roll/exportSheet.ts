@@ -2,13 +2,17 @@
 import { get } from "svelte/store";
 import { save } from "@tauri-apps/plugin-dialog";
 import { api, defaultParams, type ExportFormat } from "$lib/api";
-import { editsById, cropById, rollFilmEdge, rollEdgeText, rollFilmFormat } from "$lib/store";
+import {
+  editsById, cropById, rollFilmEdge, rollEdgeText, rollFilmFormat,
+  sheetHeaderPhotographer, sheetHeaderCamera, sheetHeaderFilm, sheetHeaderDate,
+} from "$lib/store";
 import { developedFolderImages } from "$lib/export/eligible";
 import { withEffectiveBase } from "$lib/develop/base";
 import { imageDir } from "$lib/library/folderScope";
 import { draftThumbView } from "./livePreview";
 import { pickTileAspect, fitContain } from "./contactSheet";
 import { perfLayout, type PerfLayout } from "./sprockets";
+import { paperPx, paginateStrips, pagePath, PAGE_MARGIN_MM, type PaperSize } from "./printLayout";
 
 // ─── Layout constants (match on-screen filmstrip) ────────────────────────────
 // Exported so Roll.svelte derives its sprocket geometry from the SAME design
@@ -102,11 +106,15 @@ function drawBarcode(
 /** Resolution + output-format options chosen in the export dialog. `scale`
  *  uniformly enlarges the whole sheet (canvas + fonts + strokes); `thumbEdge` is
  *  the long-edge cap requested for each frame render so the tiles stay sharp at
- *  the larger size; `format` is the on-disk encoding. */
+ *  the larger size; `format` is the on-disk encoding. `paper` (issue #24,
+ *  upstream) selects the canvas shape: "strip" hugs the content (historic
+ *  behaviour); "a4"/"letter" produce print-ready pages — on paper, `scale`
+ *  doubles as print quality (1 = 150dpi, 2 = 300dpi, 4 = 600dpi). */
 export interface ExportSheetOpts {
   scale: number;       // 1 = standard (260px/frame), 2 = high, 4 = print
   thumbEdge: number;   // per-frame render long-edge cap (px)
   format: ExportFormat;
+  paper?: PaperSize;   // default "strip"
 }
 
 const DEFAULT_OPTS: ExportSheetOpts = {
@@ -173,55 +181,29 @@ export async function exportContactSheet(opts: ExportSheetOpts = DEFAULT_OPTS): 
   const REBATE_TOP_H = SPROCKET_H + FRAME_NUM_H;
   const REBATE_BOT_H = BARCODE_INFO_H + SPROCKET_H;
 
-  // ── Compute canvas geometry ───────────────────────────────────────────────
+  // ── Compute sheet geometry (design space, 1×) ─────────────────────────────
   // Strip width: 6 frames + gaps + padding on both sides
   const stripContentW = STRIP_SIZE * FRAME_W + (STRIP_SIZE - 1) * FRAME_GAP + 2 * FRAME_PAD;
+  // One strip block's height in design px (both modes are constant-height rows).
+  const perStripH = filmEdge
+    ? REBATE_TOP_H + FRAME_H + REBATE_BOT_H
+    : PROOF_PADDING * 2 + FRAME_H + PROOF_CAPTION_H;
 
-  let canvasW: number;
-  let canvasH: number;
-
-  if (filmEdge) {
-    // Each strip: rebate-top + frames-row (FRAME_H) + rebate-bottom
-    const perStripH = REBATE_TOP_H + FRAME_H + REBATE_BOT_H;
-    const totalStripsH = strips.length * perStripH + Math.max(0, strips.length - 1) * STRIP_GAP;
-    canvasW = 2 * OUTER_MARGIN + stripContentW;
-    canvasH = 2 * OUTER_MARGIN + totalStripsH;
-  } else {
-    // Each proof strip: proof-frame (PROOF_PADDING*2 + FRAME_H) + caption
-    const perStripH = PROOF_PADDING * 2 + FRAME_H + PROOF_CAPTION_H;
-    const totalStripsH = strips.length * perStripH + Math.max(0, strips.length - 1) * STRIP_GAP;
-    canvasW = 2 * OUTER_MARGIN + stripContentW;
-    canvasH = 2 * OUTER_MARGIN + totalStripsH;
-  }
-
-  // ── Create canvas ─────────────────────────────────────────────────────────
-  // The layout above is computed in base (1×) coordinates; `scale` enlarges the
-  // backing store and a one-shot ctx.scale() draws everything — frames, fonts,
-  // strokes — proportionally larger for a higher-resolution sheet.
-  const scale = Math.max(1, opts.scale || 1);
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(canvasW * scale);
-  canvas.height = Math.round(canvasH * scale);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("Could not get 2D canvas context");
-  ctx.scale(scale, scale);
-
-  // Background
-  ctx.fillStyle = "#0b0b0c";
-  ctx.fillRect(0, 0, canvasW, canvasH);
-
-  // ── Draw strips ───────────────────────────────────────────────────────────
-  let cursorY = OUTER_MARGIN;
-  const leftX = OUTER_MARGIN;
-
-  for (let si = 0; si < strips.length; si++) {
-    const strip = strips[si];
+  // ── Draw ONE strip block at (leftX, topY) in design coordinates ───────────
+  // Shared by the roll-strip canvas and the paginated paper pages (issue #24,
+  // upstream), so paper layouts can never drift from the classic export.
+  function drawStrip(
+    ctx: CanvasRenderingContext2D,
+    strip: { imgs: HTMLImageElement[]; nums: string[]; padCount: number },
+    leftX: number,
+    topY: number,
+  ): void {
     const rowH = FRAME_H; // fixed landscape tile height for every strip
+    let cursorY = topY;
 
     if (filmEdge) {
       // ── FILMSTRIP mode ──────────────────────────────────────────────────
       const stripW = stripContentW;
-      const stripH = REBATE_TOP_H + rowH + REBATE_BOT_H;
 
       // TOP REBATE (background #131210)
       ctx.fillStyle = "#131210";
@@ -300,9 +282,6 @@ export async function exportContactSheet(opts: ExportSheetOpts = DEFAULT_OPTS): 
       // Sprocket holes — bottom band
       drawPerfBand(ctx, leftX, cursorY + BARCODE_INFO_H, stripW, perf);
 
-      cursorY += REBATE_BOT_H;
-      cursorY += STRIP_GAP;
-
     } else {
       // ── PROOF GRID mode ─────────────────────────────────────────────────
       // Each cell: proof-frame (shadow + #d8d3c4 bg + 3px padding + image at true aspect) + caption below
@@ -345,20 +324,154 @@ export async function exportContactSheet(opts: ExportSheetOpts = DEFAULT_OPTS): 
         }
         // Pad cells: leave empty (background shows through)
       }
-
-      cursorY += proofFrameH + PROOF_CAPTION_H;
-      cursorY += STRIP_GAP;
     }
   }
 
-  // ── Encode the canvas as a lossless PNG intermediate ──────────────────────
+  const scale = Math.max(1, opts.scale || 1);
+  const paper: PaperSize = opts.paper ?? "strip";
+  const pageCanvases: HTMLCanvasElement[] = [];
+
+  if (paper === "strip") {
+    // ── ROLL STRIP (historic behaviour): one canvas hugging the content ─────
+    // The layout is computed in base (1×) coordinates; `scale` enlarges the
+    // backing store and a one-shot ctx.scale() draws everything — frames,
+    // fonts, strokes — proportionally larger for a higher-resolution sheet.
+    const totalStripsH = strips.length * perStripH + Math.max(0, strips.length - 1) * STRIP_GAP;
+    const canvasW = 2 * OUTER_MARGIN + stripContentW;
+    const canvasH = 2 * OUTER_MARGIN + totalStripsH;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(canvasW * scale);
+    canvas.height = Math.round(canvasH * scale);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Could not get 2D canvas context");
+    ctx.scale(scale, scale);
+
+    // Background
+    ctx.fillStyle = "#0b0b0c";
+    ctx.fillRect(0, 0, canvasW, canvasH);
+
+    for (let si = 0; si < strips.length; si++) {
+      drawStrip(ctx, strips[si], OUTER_MARGIN, OUTER_MARGIN + si * (perStripH + STRIP_GAP));
+    }
+    pageCanvases.push(canvas);
+
+  } else {
+    // ── A4 / US LETTER pages (issue #24, upstream) ──────────────────────────
+    // Fixed paper-shaped canvases at print density; strips scale to the
+    // printable width and paginate top-to-bottom. Header (user prefs) on page 1
+    // only; "OpenEnlarge" footer + page number on every page.
+    const { w: pageW, h: pageH, pxPerMm } = paperPx(paper, scale);
+    const margin = PAGE_MARGIN_MM * pxPerMm;
+    const printableW = pageW - 2 * margin;
+    const k = printableW / stripContentW; // design px → page px for strip blocks
+    const stripHpx = perStripH * k;
+    const gapPx = STRIP_GAP * k;
+
+    // Header content — free-text prefs; empty fields drop out of the block.
+    const mono = "'Spline Sans Mono', ui-monospace, monospace";
+    const photographer = get(sheetHeaderPhotographer).trim();
+    const detail = [get(sheetHeaderCamera), get(sheetHeaderFilm), get(sheetHeaderDate)]
+      .map((s) => s.trim()).filter(Boolean).join(" · ");
+    // TODO(issue #24): optional PNG logo/signature next to the header. Skipped
+    // for now — the webview can't read an arbitrary local file without a new
+    // Rust command (no fs plugin, no asset protocol; reference_thumb re-encodes
+    // to a tiny lossy JPEG). Revisit when a byte-accurate file-read API lands.
+    const titleFont = 4.2 * pxPerMm;   // ≈12pt at any print density
+    const detailFont = 3.0 * pxPerMm;
+    const footerFont = 2.8 * pxPerMm;
+    const titleLineH = titleFont * 1.5;
+    const detailLineH = detailFont * 1.8;
+    let headerH = (photographer ? titleLineH : 0) + (detail ? detailLineH : 0);
+    if (headerH > 0) headerH += 4 * pxPerMm; // rule + air below the block
+    const footerH = 6 * pxPerMm;
+
+    // Strips-per-page: page 1 loses the header's height, later pages don't.
+    const pageCounts = paginateStrips(
+      strips.length, stripHpx, gapPx,
+      pageH - 2 * margin - footerH - headerH,
+      pageH - 2 * margin - footerH,
+    );
+
+    let stripIdx = 0;
+    for (let pi = 0; pi < pageCounts.length; pi++) {
+      const canvas = document.createElement("canvas");
+      canvas.width = pageW;
+      canvas.height = pageH;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Could not get 2D canvas context");
+
+      // Background — same darkroom paper as the strip export
+      ctx.fillStyle = "#0b0b0c";
+      ctx.fillRect(0, 0, pageW, pageH);
+
+      let yPx = margin;
+
+      // Header block — page 1 only
+      if (pi === 0 && headerH > 0) {
+        ctx.textAlign = "left";
+        ctx.textBaseline = "top";
+        let hy = yPx;
+        if (photographer) {
+          ctx.fillStyle = "#d8cfb8";
+          ctx.font = `600 ${titleFont}px ${mono}`;
+          ctx.letterSpacing = "0.06em";
+          ctx.fillText(photographer, margin, hy);
+          hy += titleLineH;
+        }
+        if (detail) {
+          ctx.fillStyle = "#968f7c";
+          ctx.font = `600 ${detailFont}px ${mono}`;
+          ctx.letterSpacing = "0.12em";
+          ctx.fillText(detail, margin, hy);
+          hy += detailLineH;
+        }
+        ctx.letterSpacing = "0px";
+        // Hairline rule under the block, spanning the printable width
+        ctx.strokeStyle = "rgba(216,207,184,0.25)";
+        ctx.lineWidth = Math.max(1, 0.15 * pxPerMm);
+        ctx.beginPath();
+        ctx.moveTo(margin, hy + 1 * pxPerMm);
+        ctx.lineTo(pageW - margin, hy + 1 * pxPerMm);
+        ctx.stroke();
+        yPx += headerH;
+      }
+
+      // Strips — drawn in design coordinates through a uniform scale transform
+      for (let n = 0; n < pageCounts[pi]; n++, stripIdx++) {
+        ctx.setTransform(k, 0, 0, k, margin, yPx);
+        drawStrip(ctx, strips[stripIdx], 0, 0);
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        yPx += stripHpx + gapPx;
+      }
+
+      // Footer — every page: dim wordmark, plus page number when paginated
+      ctx.fillStyle = "#7a7464";
+      ctx.font = `600 ${footerFont}px ${mono}`;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.letterSpacing = "0.24em";
+      const footer = pageCounts.length > 1
+        ? `OpenEnlarge · ${pi + 1}/${pageCounts.length}`
+        : "OpenEnlarge";
+      ctx.fillText(footer, pageW / 2, pageH - margin - footerH / 2);
+      ctx.letterSpacing = "0px";
+
+      pageCanvases.push(canvas);
+    }
+  }
+
+  // ── Encode each page as a lossless PNG intermediate ───────────────────────
   // Always hand the backend lossless pixels; it re-encodes to the chosen format
   // (JPEG quality / PNG) — encoding JPEG here first would double-compress.
-  const dataUrl = canvas.toDataURL("image/png");
-  const comma = dataUrl.indexOf(",");
-  const base64 = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
+  const base64s = pageCanvases.map((c) => {
+    const dataUrl = c.toDataURL("image/png");
+    const comma = dataUrl.indexOf(",");
+    return comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
+  });
 
-  // ── OS save dialog ────────────────────────────────────────────────────────
+  // ── OS save dialog — ONE dialog for the base name; extra pages save as
+  // -p1/-p2/… siblings next to it (issue #24, upstream) ──────────────────────
   const isJpeg = opts.format.kind === "jpeg";
   const ext = isJpeg ? "jpg" : "png";
   const path = await save({
@@ -369,5 +482,7 @@ export async function exportContactSheet(opts: ExportSheetOpts = DEFAULT_OPTS): 
 
   // Write via the same Rust command used by AiEnhancePanel: it decodes the PNG
   // and re-encodes to opts.format (JPEG quality or PNG).
-  await api.saveEnhanced(path, base64, opts.format);
+  for (let i = 0; i < base64s.length; i++) {
+    await api.saveEnhanced(pagePath(path, i + 1, base64s.length), base64s[i], opts.format);
+  }
 }

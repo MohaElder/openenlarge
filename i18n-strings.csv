@@ -165,6 +165,15 @@ roll.export.formatJpeg,JPEG,JPEG,JPEG,JPEG,JPEG,src/lib/overlay/ExportSheetDialo
 roll.export.formatPng,PNG,PNG,PNG,PNG,PNG,src/lib/overlay/ExportSheetDialog.svelte,option
 roll.export.quality,Quality,质量,品質,画質,품질,src/lib/overlay/ExportSheetDialog.svelte,label
 roll.export.confirm,Export,导出,匯出,書き出し,내보내기,src/lib/overlay/ExportSheetDialog.svelte,button
+roll.export.paper,Paper,纸张,紙張,用紙,용지,src/lib/overlay/ExportSheetDialog.svelte,label
+roll.export.paperStrip,Roll strip,胶卷长条,底片長條,ロールストリップ,롤 스트립,src/lib/overlay/ExportSheetDialog.svelte,option
+roll.export.paperA4,A4,A4,A4,A4,A4,src/lib/overlay/ExportSheetDialog.svelte,option
+roll.export.paperLetter,US Letter,US Letter,US Letter,USレター,US 레터,src/lib/overlay/ExportSheetDialog.svelte,option
+roll.export.header,Header,页眉,頁首,ヘッダー,헤더,src/lib/overlay/ExportSheetDialog.svelte,label
+roll.export.photographer,Photographer,摄影师,攝影師,撮影者,촬영자,src/lib/overlay/ExportSheetDialog.svelte,placeholder
+roll.export.camera,Camera,相机,相機,カメラ,카메라,src/lib/overlay/ExportSheetDialog.svelte,placeholder
+roll.export.filmStock,Film stock,胶片型号,底片型號,フィルム銘柄,필름 종류,src/lib/overlay/ExportSheetDialog.svelte,placeholder
+roll.export.date,Date,日期,日期,日付,날짜,src/lib/overlay/ExportSheetDialog.svelte,placeholder
 roll.edgeText,Edge text,片边文字,片邊文字,エッジテキスト,엣지 텍스트,src/lib/tabs/Roll.svelte,label
 roll.edgeTextPlaceholder,Film edge marking,片边标记文字,片邊標記文字,フィルムエッジの文字,필름 엣지 표시 문자,src/lib/tabs/Roll.svelte,placeholder
 roll.close,Close,关闭,關閉,閉じる,닫기,src/lib/roll/FramePreview.svelte,button

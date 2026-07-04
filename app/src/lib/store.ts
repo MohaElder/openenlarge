@@ -232,6 +232,15 @@ export const rollEdgeText = writable<string>("KODAK 400TX · SAFETY FILM · 5063
  * `roll_film_format`. */
 export const rollFilmFormat = writable<"135" | "120">("135");
 
+/** Contact-sheet print header fields (photographer / camera / film stock /
+ * date), shown on page 1 of A4 / US Letter exports — issue #24 (upstream).
+ * Free text; empty fields are omitted from the header. Persisted via prefs as
+ * `sheet_header_photographer` / `_camera` / `_film` / `_date`. */
+export const sheetHeaderPhotographer = writable<string>("");
+export const sheetHeaderCamera = writable<string>("");
+export const sheetHeaderFilm = writable<string>("");
+export const sheetHeaderDate = writable<string>("");
+
 /** Film-base recalibration: armed from the Basic panel's Film Base section. While
  * true the viewport shows the drag-to-sample overlay (the sidebar stays in edit
  * mode). `sampledBase` holds the most recently sampled linear base, or null. */
