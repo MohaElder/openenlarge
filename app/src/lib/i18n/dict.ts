@@ -2480,7 +2480,7 @@ export const dict: Record<string, Record<string, string>> = {
     "histogram.clipStrictHint": "엄격한 253/2 임계값",
     "roll.adjust.heading": "롤 톤",
     "roll.proof.label": "임시 밀착 인화",
-    "roll.proof.title": "각 프레임을 자체 자동 노출/자동 색상으로 미리 보고, 롤 슬라이더는 그 기준에 상대적으로 적용됩니다. 표시 전용 — 저장된 프레임 편집은 변경되지 않습니다",
+    "roll.proof.title": "각 프레임을 자체 자동 노출/자동 색상으로 미리 보고 롤 슬라이더는 그 기준에 상대적으로 적용됩니다. 표시 전용 — 저장된 프레임 편집은 변경되지 않습니다",
     "roll.proof.autoExposure": "프레임별 자동 노출",
     "roll.proof.autoColor": "자동 색상",
     "roll.proof.solving": "측광 중…",
