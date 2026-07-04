@@ -114,6 +114,7 @@ pub(crate) fn default_invert_params() -> InvertParams {
         hdr: false,
         positive: false,
         meter_border: "auto".to_string(),
+        meter_anchor: "highlight".to_string(),
         contrast: 0.0,
         highlights: 0.0,
         shadows: 0.0,
@@ -2592,13 +2593,19 @@ pub fn auto_brightness(
     Ok(AutoBrightness { exposure })
 }
 
-/// Solve the exposure (EV) that maps the `AUTO_PCT`-th luminance percentile of the
-/// FINISHED display positive (the user's full look — contrast, tone curve, brightness)
-/// to `AUTO_TARGET`, so the auto value suits the final image. The metric is monotonic
-/// non-decreasing in EV and saturates at 1.0 once a strong Contrast clamps the brights,
-/// so we BISECT for the target rather than fit a secant: the secant's derivative step
-/// stalls in that flat clamped region and froze at its seed (a fixed ~-0.32 EV) when
-/// contrast was high. A few cheap invert+finish passes on the small proxy.
+/// Solve the exposure (EV) that maps a luminance percentile of the FINISHED display
+/// positive (the user's full look — contrast, tone curve, brightness) to a fixed
+/// target, so the auto value suits the final image. Which (percentile, target) pair
+/// is used depends on `params.meter_anchor`:
+///   - "highlight" (default): 90th-pct luminance → 0.80 ("balanced" bright content).
+///   - "midgray": median luminance → ≈0.46 display (18% gray through the sRGB
+///     transfer) — a fixed mid-gray normalization so frames shot at different
+///     exposures land on comparable brightness (issue #29).
+/// The metric is monotonic non-decreasing in EV and saturates at 1.0 once a strong
+/// Contrast clamps the brights, so we BISECT for the target rather than fit a secant:
+/// the secant's derivative step stalls in that flat clamped region and froze at its
+/// seed (a fixed ~-0.32 EV) when contrast was high. A few cheap invert+finish passes
+/// on the small proxy.
 pub(crate) fn auto_brightness_value(
     src: &film_core::Image,
     params: &InvertParams,
@@ -2608,8 +2615,18 @@ pub(crate) fn auto_brightness_value(
 ) -> f32 {
     const AUTO_TARGET: f32 = 0.80; // display [0,1] anchor for bright content ("balanced")
     const AUTO_PCT: f32 = 0.90; // 90th-pct luminance — below speculars / rebate bleed
+    const MID_TARGET: f32 = 0.46; // sRGB-encoded 18% gray (0.18 linear ≈ 0.461 display)
+    const MID_PCT: f32 = 0.50; // median luminance — the classic "expose for midtone"
     const TOL: f32 = 0.01;
-    const EV_CLAMP: f32 = 3.0;
+    // Matches the UI Exposure slider (−5..+5). Was ±3, which left a standard-density
+    // negative rendering ~2 EV bright with only 1 EV of downward latitude (issue #28).
+    const EV_CLAMP: f32 = 5.0;
+
+    let (pct, target) = if params.meter_anchor == "midgray" {
+        (MID_PCT, MID_TARGET)
+    } else {
+        (AUTO_PCT, AUTO_TARGET)
+    };
 
     // Finished-positive luminance percentile at a candidate exposure (the FULL look,
     // so the target reflects what the user actually sees).
@@ -2620,36 +2637,36 @@ pub(crate) fn auto_brightness_value(
         ip.d_max = effective_dmax(params, dev_dmax);
         let inv = invert_image_core(src, &ip, mode_from(&params.mode));
         let pos = finish_image(&inv, &finish_from(params)); // current contrast/curve/brightness
-        percentile_luma(&pos, AUTO_PCT, mask)
+        percentile_luma(&pos, pct, mask)
     };
 
     // Bracket the achievable range at the EV clamp. `measure` is monotonic in EV, so
     // these bound the percentile; the target lives between them in the normal case.
     let y_lo = measure(-EV_CLAMP); // darkest
-    if y_lo >= AUTO_TARGET {
+    if y_lo >= target {
         return -EV_CLAMP; // even the darkest allowed exposure is already too bright
     }
     let y_hi = measure(EV_CLAMP); // brightest
     if y_hi < 1e-4 {
         return 0.0; // degenerate / near-black frame — don't crank exposure on noise
     }
-    if y_hi <= AUTO_TARGET {
+    if y_hi <= target {
         return EV_CLAMP; // can't reach the target even at the brightest allowed exposure
     }
 
     // Bisection: the first midpoint is EV 0, so an already-balanced frame returns ~0.
     // Monotonic metric ⇒ the target stays bracketed by [lo, hi] throughout. ~14 steps
-    // resolve well below the 0.01-EV slider step over the ±3 EV range.
+    // resolve well below the 0.01-EV slider step over the ±5 EV range.
     let mut lo = -EV_CLAMP;
     let mut hi = EV_CLAMP;
     let mut e = 0.0f32;
     for _ in 0..14 {
         e = 0.5 * (lo + hi);
         let y = measure(e);
-        if (y - AUTO_TARGET).abs() <= TOL {
+        if (y - target).abs() <= TOL {
             break;
         }
-        if y < AUTO_TARGET {
+        if y < target {
             lo = e;
         } else {
             hi = e;
@@ -3705,6 +3722,63 @@ mod tests {
             (evc - (-0.32)).abs() > 0.02,
             "evc {evc} looks like the old frozen secant seed"
         );
+    }
+
+    #[test]
+    fn auto_brightness_midgray_anchor_normalizes_median() {
+        // meter_anchor="midgray" (issue #29) must land the FINISHED median near the
+        // 18%-gray display value (0.46), independent of the highlight anchor — a
+        // fixed-luminance normalization for cross-frame color comparison.
+        use film_core::Image;
+        let w = 256usize;
+        let pixels: Vec<[f32; 3]> = (0..w)
+            .map(|i| {
+                let v = 0.10 + 0.45 * (i as f32 / (w as f32 - 1.0)); // negative density ramp
+                [v, v, v]
+            })
+            .collect();
+        let neg = Image { width: w, height: 1, pixels, ir: None };
+        let base = [0.7f32, 0.7, 0.7];
+        let dmax = 2.0f32;
+
+        let mut pm = default_invert_params();
+        pm.meter_anchor = "midgray".to_string();
+        let evm = auto_brightness_value(&neg, &pm, base, dmax, None);
+
+        pm.exposure = evm;
+        let mut ip = resolve_params(&pm, &neg, effective_base(&pm, base));
+        ip.d_max = effective_dmax(&pm, dmax);
+        let inv = invert_image_core(&neg, &ip, mode_from(&pm.mode));
+        let pos = finish_image(&inv, &finish_from(&pm));
+        let p50 = percentile_luma(&pos, 0.50, None);
+        assert!(
+            (p50 - 0.46).abs() < 0.05,
+            "median {p50} should sit near the 0.46 mid-gray target (evm={evm})"
+        );
+
+        // The two anchors are genuinely different solves on this ramp.
+        let evh = auto_brightness_value(&neg, &default_invert_params(), base, dmax, None);
+        assert!(
+            (evm - evh).abs() > 0.05,
+            "midgray ({evm}) and highlight ({evh}) anchors should differ on a ramp"
+        );
+    }
+
+    #[test]
+    fn auto_brightness_uses_full_slider_latitude() {
+        // The solver's clamp must match the ±5 EV Exposure slider (issue #28): a frame
+        // that is still too bright at −3 EV must keep going down instead of pinning at
+        // the old −3 floor. A dense (heavily exposed) negative renders very bright:
+        // d = log10(0.7/0.02) ≈ 1.54 → linear scene ≈ 34× — several stops over target.
+        use film_core::Image;
+        let neg = Image { width: 64, height: 1, pixels: vec![[0.02f32, 0.02, 0.02]; 64], ir: None };
+        let base = [0.7f32, 0.7, 0.7];
+        let ev = auto_brightness_value(&neg, &default_invert_params(), base, 2.0, None);
+        assert!(
+            ev < -3.0 - 0.05,
+            "a dense negative should solve below the old −3 EV floor (got {ev})"
+        );
+        assert!(ev > -5.0 - 1e-3, "must stay within the slider clamp (got {ev})");
     }
 
     #[test]

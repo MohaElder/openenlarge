@@ -94,6 +94,9 @@ export interface InvertParams {
   positive: boolean;
   /** Spoke/border metering mode: "auto" | "exclude" | "include". */
   meter_border: string;
+  /** Auto-exposure anchor: "highlight" (p90 → 0.80, default) | "midgray"
+   *  (median → 18% gray ≈ 0.46 display — fixed-luminance normalization, #29). */
+  meter_anchor: string;
 
   // --- Per-zone white-balance neutralizer (Task 7 apply layer) ---
   /** Enable/disable per-zone WB correction. */
@@ -491,6 +494,7 @@ export const defaultParams = (): InvertParams => ({
   pc_samples: [],
   positive: false,
   meter_border: "auto",
+  meter_anchor: "highlight",
   pz_enabled: true, pz_strength: 0.7,
   pz_sh: [1, 1, 1], pz_mid: [1, 1, 1], pz_hi: [1, 1, 1],
 });

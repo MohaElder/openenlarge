@@ -275,6 +275,12 @@
     remeterActiveExposure(true);
   }
 
+  function setMeterAnchor(anchor: "highlight" | "midgray") {
+    params.update((p) => ({ ...p, meter_anchor: anchor }));
+    commitActive();
+    remeterActiveExposure(true);
+  }
+
   // "Apply to whole roll": open the shared picker, then push the active frame's
   // selected settings onto every developed frame in the current folder.
   let rollApplyIds: string[] | null = null;
@@ -341,6 +347,12 @@
           <button class="auto" class:on={$params.meter_border === "include"}
                   on:click={() => setMeterBorder($params.meter_border === "include" ? "auto" : "include")}
                   >{$t('basic.meterBorder.include')}</button>
+          <!-- Exposure anchor override: auto-exposure normalizes the median to 18% gray
+               instead of driving the highlights to 0.80 (issue #29). Toggle off = default. -->
+          <button class="auto" class:on={$params.meter_anchor === "midgray"}
+                  title={$t('basic.meterAnchorTitle')}
+                  on:click={() => setMeterAnchor($params.meter_anchor === "midgray" ? "highlight" : "midgray")}
+                  >{$t('basic.meterAnchor.midgray')}</button>
         </span>
       </div>
 
