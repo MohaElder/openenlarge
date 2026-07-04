@@ -219,6 +219,10 @@ source.developed,developed,已显影,已顯影,現像済み,현상됨,src/lib/pa
 source.developAll,Develop all,全部显影,全部顯影,すべて現像,전체 현상,src/lib/panels/Source.svelte,button
 source.filterFilmScans,Film scans,胶片扫描,底片掃描,フィルムスキャン,필름 스캔,src/lib/panels/Source.svelte,label
 develop.notDevelopedYet,Not developed yet,尚未显影,尚未顯影,まだ現像されていません,아직 현상되지 않음,src/lib/tabs/Develop.svelte,hint
+develop.page.all,All,全部,全部,すべて,전체,src/lib/tabs/Develop.svelte,tab
+develop.page.basic,Basic,基础,基礎,基本,기본,src/lib/tabs/Develop.svelte,tab
+develop.page.curves,Curves,曲线,曲線,カーブ,커브,src/lib/tabs/Develop.svelte,tab
+develop.page.color,Color,色彩,色彩,カラー,색상,src/lib/tabs/Develop.svelte,tab
 toolbar.edit,Edit,编辑,編輯,編集,편집,src/lib/develop/Toolbar.svelte,title
 toolbar.crop,Crop,裁剪,裁切,クロップ,자르기,src/lib/develop/Toolbar.svelte,title
 toolbar.eraser,Eraser,橡皮擦,橡皮擦,消しゴム,지우개,src/lib/develop/Toolbar.svelte,title
