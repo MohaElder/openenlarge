@@ -460,6 +460,11 @@ histogram.clipHigh,Highlight clipping (right-click: 253),高光裁切（右键�
 histogram.clipLow,Shadow clipping (right-click: 2),暗部裁切（右键：2）,暗部截斷（右鍵：2）,シャドウクリッピング（右クリック：2）,섀도 클리핑 (우클릭: 2),src/lib/viewport/Histogram.svelte,tooltip
 histogram.clipStrictHint,Strict 253/2 threshold,严格 253/2 阈值,嚴格 253/2 閾值,厳密な 253/2 しきい値,엄격한 253/2 임계값,src/lib/viewport/Histogram.svelte,tooltip
 roll.adjust.heading,Roll look,整卷色调,整卷色調,ロールの色調,롤 톤,src/lib/roll/RollAdjust.svelte,heading
+roll.proof.label,Temporary proof,临时印样,臨時印樣,仮コンタクトシート,임시 밀착 인화,src/lib/roll/RollAdjust.svelte,toggle
+roll.proof.title,Preview every frame at its own auto exposure/color; the roll sliders apply relative to those baselines. Display-only — stored per-frame edits are untouched,预览时每帧使用各自的自动曝光/自动颜色，整卷滑块在其基准上相对叠加。仅用于显示——不会修改任何单帧的已存编辑,預覽時每幀使用各自的自動曝光/自動顏色，整卷滑桿在其基準上相對疊加。僅用於顯示——不會修改任何單幀的已存編輯,各フレームを独自の自動露出/自動カラーでプレビューし、ロールのスライダーはその基準に相対的に適用されます。表示のみ——保存済みの編集は変更されません,각 프레임을 자체 자동 노출/자동 색상으로 미리 보고 롤 슬라이더는 그 기준에 상대적으로 적용됩니다. 표시 전용 — 저장된 프레임 편집은 변경되지 않습니다,src/lib/roll/RollAdjust.svelte,tooltip
+roll.proof.autoExposure,Auto exposure,单张自动曝光,單張自動曝光,コマごとの自動露出,프레임별 자동 노출,src/lib/roll/RollAdjust.svelte,toggle
+roll.proof.autoColor,Auto color,自动颜色,自動顏色,自動カラー,자동 색상,src/lib/roll/RollAdjust.svelte,toggle
+roll.proof.solving,metering…,测光中…,測光中…,測光中…,측광 중…,src/lib/roll/RollAdjust.svelte,hint
 roll.adjust.whitePoint,White point,白点,白點,ホワイトポイント,화이트 포인트,src/lib/roll/RollAdjust.svelte,label
 toast.developFailed,Develop failed for {count} image(s) — {detail},显影失败 {count} 张 — {detail},顯影失敗 {count} 張 — {detail},{count} 枚の現像に失敗しました — {detail},{count}개 이미지 현상 실패 — {detail},src/lib/workflow.ts,toast
 toast.undo,Undo: {what},撤销：{what},復原：{what},元に戻す：{what},실행 취소: {what},src/lib/develop/historyStore.ts,toast
