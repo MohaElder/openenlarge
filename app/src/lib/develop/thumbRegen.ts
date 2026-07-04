@@ -34,10 +34,19 @@ export async function regenOne(img: ImageEntry): Promise<boolean> {
       params = withEffectiveBase(saved, dir);
     } else {
       const seed = withEffectiveBase({ ...defaultParams(), positive: img.positive }, dir);
-      const wb = await api.asShotWb(img.id, seed, null, { rot90: 0, flip_h: false, flip_v: false, angle: 0 });
+      // Auto-WB is crop-dependent: meter the frame's stored crop (like seedFrame /
+      // Basic.svelte's seed) so the baked thumbnail matches what Develop will show.
+      const c = get(cropById)[img.id] ?? null;
+      const crop = c
+        ? ([c.rect.x, c.rect.y, c.rect.w, c.rect.h] as [number, number, number, number])
+        : null;
+      const geom = c
+        ? { rot90: c.rot90, flip_h: c.flipH, flip_v: c.flipV, angle: c.angle }
+        : { rot90: 0, flip_h: false, flip_v: false, angle: 0 };
+      const wb = await api.asShotWb(img.id, seed, crop, geom);
       params = applyAsShotWb(seed, wb);
       try {
-        const pz = await api.perZoneWb(img.id, params, null, { rot90: 0, flip_h: false, flip_v: false, angle: 0 });
+        const pz = await api.perZoneWb(img.id, params, crop, geom);
         params = { ...params, pz_sh: pz.sh, pz_mid: pz.mid, pz_hi: pz.hi };
       } catch { /* keep identity pz on failure */ }
     }
