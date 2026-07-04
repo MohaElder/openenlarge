@@ -24,7 +24,7 @@
   <!-- These rows are copied VERBATIM from Basic.svelte (lines ~248-272), with only
        `$params` swapped for `$ps`. Same label keys / min / max / step / scale /
        gradient / format so the roll look matches per-image Tune exactly. -->
-  <Slider label={$t('basic.temp')} min={2000} max={15000} step={0.5} scale="reciprocal" scrubStep={10}
+  <Slider label={$t('basic.temp')} min={2000} max={25000} step={0.5} scale="reciprocalCentered" scrubStep={10}
     bind:value={$ps.temp} def={5500} gradient={TEMP_GRADIENT} format={(v) => relKelvin(v - 5500)} on:input={markWbManual} />
   <Slider label={$t('basic.tint')} min={-150} max={150} step={1}
     bind:value={$ps.tint} def={0} gradient={TINT_GRADIENT} format={signed} on:input={markWbManual} />

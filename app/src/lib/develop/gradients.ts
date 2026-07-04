@@ -1,10 +1,10 @@
 // CSS linear-gradient track backgrounds for sliders.
-// Temp runs on a reciprocal (mired) scale over 2000–15000 K (matches the engine's
-// auto-WB CCT bounds — see Basic.svelte). Neutral 5500 K sits ~73% along the track
-// (warm now reaches 2000 K), so the grey midpoint is placed at 73% to stay under
-// the neutral thumb rather than the geometric centre.
+// Temp runs on the CENTERED piecewise-mired scale over 2000–25000 K (matches the
+// engine's auto-WB CCT bounds — see Basic.svelte / sliderScale.ts): neutral 5500 K
+// is pinned to the geometric middle (issue #17), so the grey midpoint sits at 50%
+// under the resting thumb.
 export const TEMP_GRADIENT =
-  "linear-gradient(90deg, #4a90ff 0%, #cfd8e6 73%, #ffd24a 100%)";
+  "linear-gradient(90deg, #4a90ff 0%, #cfd8e6 50%, #ffd24a 100%)";
 export const TINT_GRADIENT =
   "linear-gradient(90deg, #4ad24a 0%, #cfcfcf 50%, #ff4af0 100%)";
 export const SAT_GRADIENT =

@@ -177,11 +177,11 @@
   // coarse step; holding Shift gives the 1/10 fine step. Steps mirror the retuned I2
   // slider ranges. Temp is nudged in mireds (1e6/K) so a press moves the white point
   // by an even perceptual amount across the reciprocal track, then clamped to the same
-  // 2000–15000 K range as the slider. WB nudges mark wb_manual (so the auto-reseed
+  // 2000–25000 K range as the slider. WB nudges mark wb_manual (so the auto-reseed
   // won't clobber them); every nudge commits one undo step. See lib/keymap/hotkeys.ts
   // for the default key→parameter map (1·temp, 2·tint, q·exposure, w·contrast,
   // a·highlights, s·shadows, z·whites, x·blacks) and the user's rebindings.
-  const TEMP_MIN = 2000, TEMP_MAX = 15000;
+  const TEMP_MIN = 2000, TEMP_MAX = 25000;
   // Coarse step per parameter (Shift → ×0.1). Temp is in mireds; the ±100 tone
   // sliders share one step; exposure (±5) is finer.
   const NUDGE: Record<AdjustParam, number> = {
