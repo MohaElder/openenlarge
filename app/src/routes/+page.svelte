@@ -35,6 +35,8 @@
   import { t } from "$lib/i18n";
   import { isMac } from "$lib/keymap/hotkeys";
   import { api } from "$lib/api";
+  import { initTourAutoStart } from "$lib/onboarding/tour";
+  import { tourTarget } from "$lib/onboarding/tourTarget";
   import { save } from "@tauri-apps/plugin-dialog";
   import { flushDebugQueue } from "$lib/debug";
   import { showToast } from "$lib/toast";
@@ -51,16 +53,20 @@
 
   onMount(() => {
     let flush: (() => void) | undefined;
+    let stopTour: (() => void) | undefined;
     hydrate().finally(() => {
       flush = initPersistence();
       runAutoCheck();
       hydrated = true;
+      // First-run tour (issue #21 upstream): armed only AFTER hydration so the
+      // persisted onboarding_done pref (and a restored module) is respected.
+      stopTour = initTourAutoStart();
       track("app_launched"); // no-op unless the user has opted in
     });
     initRollBaseMigration();
     // Start an undo/redo timeline for each image the moment it becomes active.
     const unseed = activeId.subscribe(() => seedActive());
-    return () => { flush?.(); unseed(); };
+    return () => { flush?.(); unseed(); stopTour?.(); };
   });
 
   let confirmCount = 0;
@@ -155,7 +161,9 @@
         {$t('app.tab.develop')}
         {#if $undevelopedCount > 0}<span class="badge">{$undevelopedCount}</span>{/if}
       </button>
-      <button class:active={$module === "develop"} disabled={!$hasImages} on:click={gotoDevelop}>
+      <!-- Tour step 3 (issue #21 upstream): points the user at per-frame finishing. -->
+      <button class:active={$module === "develop"} disabled={!$hasImages} on:click={gotoDevelop}
+              use:tourTarget={"tune-tab"}>
         {$t('app.tab.tune')}
         {#if $undevelopedCount > 0}<span class="badge">{$undevelopedCount}</span>{/if}
       </button>

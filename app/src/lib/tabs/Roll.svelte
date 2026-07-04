@@ -33,6 +33,7 @@
   import { developRev, dustById } from "$lib/store";
   import Icon from "$lib/icons/Icon.svelte";
   import QualityMenu from "$lib/viewport/QualityMenu.svelte";
+  import { tourTarget } from "$lib/onboarding/tourTarget";
 
   // Fresh roll draft each time the section opens (seed from defaults per spec).
   onMount(() => {
@@ -640,17 +641,20 @@
         <div class="tool-row">
           <!-- Film Base comes before Crop: calibrate the base first (no rotation), then
                crop+rotate last so re-entering an un-rotated base view never disorients. -->
+          <!-- Tour steps 1+2 (issue #21 upstream): the action pulses the button while
+               its step is active; entering the tool (click) advances the tour, and the
+               next step's highlight appears once the user returns to this sheet. -->
           <div class="tool">
             <button class="tool-btn" class:on={(editMode as string) === "base"}
                     on:click={enterBaseMode} disabled={$developedFolderImages.length === 0}
-                    aria-label={$t('roll.base.heading')}>
+                    aria-label={$t('roll.base.heading')} use:tourTarget={"base-tool"}>
               <Icon name="droplet" size={20} />
             </button>
             <span class="tool-label">{$t('roll.base.heading')}</span>
           </div>
           <div class="tool">
             <button class="tool-btn" on:click={enterCropMode} disabled={$developedFolderImages.length === 0}
-                    aria-label={$t('roll.crop.tool')}>
+                    aria-label={$t('roll.crop.tool')} use:tourTarget={"crop-tool"}>
               <Icon name="crop" size={20} />
             </button>
             <span class="tool-label">{$t('roll.crop.tool')}</span>

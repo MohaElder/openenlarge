@@ -12,6 +12,7 @@ import {
 import { locale, LOCALES, type Locale } from "./i18n";
 import { installDebugHooks } from "./debug";
 import { startThumbRegen } from "./develop/thumbRegen";
+import { onboardingDone } from "./onboarding/tour";
 
 /** A debounced function with a `flush()` that fires any pending call now. */
 export interface Debounced<A extends unknown[]> {
@@ -86,6 +87,10 @@ export function applySnapshot(snap: CatalogSnapshot): void {
       if (b && typeof b === "object") hotkeyBindings.set(b);
     } catch { /* skip malformed */ }
   }
+  // First-run tour — issue #21 (upstream): "true" = finished/skipped. Absent =
+  // never seen, so the tour auto-starts on the first Roll entry (lib/onboarding/tour.ts).
+  if (snap.prefs.onboarding_done !== undefined)
+    onboardingDone.set(snap.prefs.onboarding_done === "true");
   // Analytics: "on"/"off" = a recorded choice; absent = undecided (the first-run
   // prompt shows and telemetryEnabled stays false until they answer).
   if (snap.prefs.telemetry === "on") { telemetryEnabled.set(true); telemetryDecided.set(true); }
@@ -207,8 +212,9 @@ export function initPersistence(): () => void {
   wireRecord(dustById, dust.save);
   wireRecord(metaById, meta.save);
 
-  let first = { loc: true, sf: true, gz: true, mod: true, aid: true, usv: true, ulc: true, oak: true, opj: true, rfe: true, ret: true, uid: true, hkb: true };
+  let first = { loc: true, sf: true, gz: true, mod: true, aid: true, usv: true, ulc: true, oak: true, opj: true, rfe: true, ret: true, uid: true, hkb: true, obd: true };
   locale.subscribe((l) => { if (first.loc) { first.loc = false; return; } prefs.save("locale", l); });
+  onboardingDone.subscribe((b) => { if (first.obd) { first.obd = false; return; } prefs.save("onboarding_done", String(b)); });
   openaiApiKey.subscribe((k) => { if (first.oak) { first.oak = false; return; } prefs.save("openai_api_key", k); });
   hotkeyBindings.subscribe((b) => { if (first.hkb) { first.hkb = false; return; } prefs.save("hotkey_bindings", JSON.stringify(b)); });
   omitPreviewJpgs.subscribe((b) => { if (first.opj) { first.opj = false; return; } prefs.save("omit_preview_jpgs", String(b)); });
