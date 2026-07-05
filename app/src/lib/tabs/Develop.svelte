@@ -2,7 +2,7 @@
   import { t } from "$lib/i18n";
   import { fade } from "svelte/transition";
   import { cubicOut } from "svelte/easing";
-  import { activeId, params, images, folderImages, tool, cropById, activeCrop, dustById, activeDust, deleteTarget, dustRev, developRev, folderBaseByPath, baseSampling, sampledBase, selectAll, deleteSelectionIds, setActive, previewSrc, clipWarn, hotkeyBindings, autodustSpotsById, activeAutodustSpots, selectedSpot } from "../store";
+  import { activeId, params, images, folderImages, tool, cropById, activeCrop, dustById, activeDust, deleteTarget, dustRev, developRev, folderBaseByPath, baseSampling, sampledBase, selectAll, deleteSelectionIds, setActive, previewSrc, clipWarn, hotkeyBindings, autodustSpotsById, activeAutodustSpots, selectedSpot, editPage, type EditPage } from "../store";
   import { get } from "svelte/store";
   import { onMount } from "svelte";
   import { createPreviewPrefetcher } from "../develop/previewPrefetch";
@@ -517,11 +517,28 @@
       {#key $tool}
         <div class="toolpane" in:fade={{ duration: 160, easing: cubicOut }}>
           {#if $tool === "edit"}
-            <Basic onWbPick={toggleWbPick} wbPicking={pickTarget === "wb"} imageCrop={imageCrop}
-                   geom={{ rot90: cRot, flip_h: committed?.flipH ?? false, flip_v: committed?.flipV ?? false, angle: committed?.angle ?? 0 }} />
-            <TonalCurve />
-            <ColorGrading />
-            <ColorMixer onPick={togglePcPick} picking={pickTarget === "pc"} />
+            <!-- Workflow pages (upstream #22): edit panels grouped by editing order —
+                 Basic (correction + exposure/tone) → Curves → Color — with "All"
+                 keeping the classic stacked layout. Selection persists via prefs. -->
+            <div class="pagestrip" role="tablist">
+              {#each ["all", "basic", "curves", "color"] as pg}
+                <button class="page" class:on={$editPage === pg} role="tab"
+                        aria-selected={$editPage === pg}
+                        on:click={() => editPage.set(pg as EditPage)}
+                        >{$t(`develop.page.${pg}`)}</button>
+              {/each}
+            </div>
+            {#if $editPage === "all" || $editPage === "basic"}
+              <Basic onWbPick={toggleWbPick} wbPicking={pickTarget === "wb"} imageCrop={imageCrop}
+                     geom={{ rot90: cRot, flip_h: committed?.flipH ?? false, flip_v: committed?.flipV ?? false, angle: committed?.angle ?? 0 }} />
+            {/if}
+            {#if $editPage === "all" || $editPage === "curves"}
+              <TonalCurve />
+            {/if}
+            {#if $editPage === "all" || $editPage === "color"}
+              <ColorGrading />
+              <ColorMixer onPick={togglePcPick} picking={pickTarget === "pc"} />
+            {/if}
           {:else if $tool === "crop"}
             <CropPanel bind:aspect bind:orientation bind:angle
                        on:preset={(e) => onPreset(e.detail)} on:swap={onSwap} on:reset={onReset}
@@ -579,6 +596,11 @@
   .layout { display: grid; height: 100%; gap: 12px;
     grid-template-columns: 1fr 300px; grid-template-rows: 1fr 88px;
     grid-template-areas: "center right" "bottom right"; }
+  /* Workflow page strip (#22): compact tabs over the edit panels. */
+  .pagestrip { display: flex; gap: 4px; padding: 8px 10px 0; }
+  .page { flex: 1; background: transparent; border: 1px solid var(--glass-brd);
+    color: var(--text-dim); border-radius: 6px; padding: 3px 0; font-size: 11px; cursor: pointer; }
+  .page.on { color: var(--text); border-color: rgba(244,157,78,0.5); background: rgba(244,157,78,0.12); }
   .right { grid-area: right; min-height: 0; position: relative; overflow-y: auto;
     scrollbar-width: none; -ms-overflow-style: none; }
   .right::-webkit-scrollbar { width: 0; height: 0; }
