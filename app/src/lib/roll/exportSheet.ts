@@ -2,26 +2,27 @@
 import { get } from "svelte/store";
 import { save } from "@tauri-apps/plugin-dialog";
 import { api, defaultParams, type ExportFormat } from "$lib/api";
-import { editsById, cropById, rollFilmEdge, rollEdgeText } from "$lib/store";
+import { editsById, cropById, rollFilmEdge, rollEdgeText, rollFilmFormat } from "$lib/store";
 import { developedFolderImages } from "$lib/export/eligible";
 import { withEffectiveBase } from "$lib/develop/base";
 import { imageDir } from "$lib/library/folderScope";
 import { draftThumbView } from "./livePreview";
 import { pickTileAspect, fitContain } from "./contactSheet";
+import { perfLayout, type PerfLayout } from "./sprockets";
 
 // ─── Layout constants (match on-screen filmstrip) ────────────────────────────
-const STRIP_SIZE = 6;     // frames per strip row
-const FRAME_W = 260;      // frame width in pixels
+// Exported so Roll.svelte derives its sprocket geometry from the SAME design
+// space and the two renderers stay visually identical — issue #23 (upstream).
+const STRIP_SIZE = 6;            // frames per strip row
+export const FRAME_W = 260;      // frame width in pixels
 
-// Filmstrip rebate/spacing (pixels, scaled to frame size)
-const SPROCKET_H = 8;
+// Filmstrip rebate/spacing (pixels, scaled to frame size). The sprocket band
+// height is no longer a constant: it comes from perfLayout() per film format.
 const FRAME_NUM_H = 26;
-const REBATE_TOP_H = SPROCKET_H + FRAME_NUM_H;
 const BARCODE_INFO_H = 26;
-const REBATE_BOT_H = BARCODE_INFO_H + SPROCKET_H;
 const EDGE_REPEATS = 3; // edge marking copies distributed across the strip
-const FRAME_GAP = 7;      // gap between frames within a strip
-const FRAME_PAD = 6;      // left+right padding inside the black frames row
+export const FRAME_GAP = 7;      // gap between frames within a strip
+export const FRAME_PAD = 6;      // left+right padding inside the black frames row
 const STRIP_GAP = 16;     // vertical gap between strips
 const OUTER_MARGIN = 24;  // canvas edge margin on all sides
 
@@ -31,27 +32,46 @@ const PROOF_PADDING = 3;
 const PROOF_CAPTION_H = 8 + 12; // 8px gap + 12px text line
 
 
-// ─── Helper: draw sprocket holes (faint vertical ticks) ─────────────────────
-function drawSprocketBand(
+// ─── Helper: rounded-rect path with a fallback for engines without roundRect ─
+function pathRoundRect(
   ctx: CanvasRenderingContext2D,
-  x: number, y: number, w: number, h: number,
+  x: number, y: number, w: number, h: number, r: number,
 ) {
-  // Replicate: repeating-linear-gradient(90deg, transparent 0-9px, rgba(216,207,184,.16) 9px-15px, transparent 15px-20px)
-  // Tick every 20px, tick width 6px starting at offset 9px
-  const tickW = 6;
-  const period = 20;
-  const offsetInPeriod = 9;
-  ctx.fillStyle = "rgba(216,207,184,0.16)";
-  let dx = x;
-  while (dx < x + w) {
-    const tickX = dx + offsetInPeriod;
-    if (tickX + tickW > x && tickX < x + w) {
-      const clampedX = Math.max(tickX, x);
-      const clampedW = Math.min(tickX + tickW, x + w) - clampedX;
-      ctx.fillRect(clampedX, y, clampedW, h);
-    }
-    dx += period;
+  if (typeof ctx.roundRect === "function") {
+    ctx.roundRect(x, y, w, h, r);
+    return;
   }
+  // arcTo fallback — WebView2 ships roundRect, but keep exports working anywhere
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+// ─── Helper: draw one sprocket-hole band (KS-1870 rounded rects) ─────────────
+// Mirrors the CSS repeat-x SVG tile in Roll.svelte (issue #23, upstream): holes
+// slightly brighter than the #131210 rebate — backlit — clipped at strip edges
+// exactly like the CSS background is.
+function drawPerfBand(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number,
+  perf: PerfLayout,
+) {
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, perf.bandH);
+  ctx.clip();
+  ctx.fillStyle = "rgba(216,207,184,0.16)";
+  const holeY = y + (perf.bandH - perf.perfH) / 2;
+  // First hole centred pitch/2 into its tile; tiles start at x + offset.
+  for (let cx = x + perf.offset + perf.pitch / 2; cx - perf.perfW / 2 < x + w; cx += perf.pitch) {
+    ctx.beginPath();
+    pathRoundRect(ctx, cx - perf.perfW / 2, holeY, perf.perfW, perf.perfH, perf.radius);
+    ctx.fill();
+  }
+  ctx.restore();
 }
 
 // ─── Helper: draw barcode (approximate the CSS gradient) ─────────────────────
@@ -145,6 +165,14 @@ export async function exportContactSheet(opts: ExportSheetOpts = DEFAULT_OPTS): 
   );
   const FRAME_H = Math.round(FRAME_W / tileAspect);
 
+  // ── Perforation geometry (issue #23, upstream) ────────────────────────────
+  // Shared with Roll.svelte's CSS tile; "120" scales from the frame short edge
+  // so it must wait for FRAME_H. The rebate heights grow with the band.
+  const perf = perfLayout(get(rollFilmFormat), FRAME_W, FRAME_H, FRAME_GAP, FRAME_PAD);
+  const SPROCKET_H = perf.bandH;
+  const REBATE_TOP_H = SPROCKET_H + FRAME_NUM_H;
+  const REBATE_BOT_H = BARCODE_INFO_H + SPROCKET_H;
+
   // ── Compute canvas geometry ───────────────────────────────────────────────
   // Strip width: 6 frames + gaps + padding on both sides
   const stripContentW = STRIP_SIZE * FRAME_W + (STRIP_SIZE - 1) * FRAME_GAP + 2 * FRAME_PAD;
@@ -200,7 +228,7 @@ export async function exportContactSheet(opts: ExportSheetOpts = DEFAULT_OPTS): 
       ctx.fillRect(leftX, cursorY, stripW, REBATE_TOP_H);
 
       // Sprocket holes — top band
-      drawSprocketBand(ctx, leftX, cursorY, stripW, SPROCKET_H);
+      drawPerfBand(ctx, leftX, cursorY, stripW, perf);
 
       // Frame numbers
       ctx.fillStyle = "#a39a82";
@@ -270,7 +298,7 @@ export async function exportContactSheet(opts: ExportSheetOpts = DEFAULT_OPTS): 
       ctx.letterSpacing = "0px";
 
       // Sprocket holes — bottom band
-      drawSprocketBand(ctx, leftX, cursorY + BARCODE_INFO_H, stripW, SPROCKET_H);
+      drawPerfBand(ctx, leftX, cursorY + BARCODE_INFO_H, stripW, perf);
 
       cursorY += REBATE_BOT_H;
       cursorY += STRIP_GAP;

@@ -158,6 +158,7 @@ export.imageSingular,image,张照片,張,枚,장,src/lib/export/ExportModal.svel
 export.imagePlural,images,张照片,張,枚,장,src/lib/export/ExportModal.svelte,plural unit
 roll.empty,No developed frames in this folder yet.,此文件夹中还没有已显影的胶片。,此資料夾中還沒有已顯影的底片。,このフォルダにはまだ現像済みのフレームがありません。,이 폴더에는 아직 현상된 프레임이 없습니다.,src/lib/tabs/Roll.svelte,hint
 roll.filmEdge,Film edge,片边,片邊,フィルムエッジ,필름 엣지,src/lib/tabs/Roll.svelte,toggle
+roll.filmFormat,Film format,胶片规格,底片規格,フィルム規格,필름 규격,src/lib/tabs/Roll.svelte,135/120 segmented control label
 roll.export.button,Export contact sheet,导出印样,匯出印樣,コンタクトシートを書き出し,콘택트 시트 내보내기,src/lib/tabs/Roll.svelte,button
 roll.export.title,Export contact sheet,导出印样,匯出印樣,コンタクトシートを書き出し,콘택트 시트 내보내기,src/lib/overlay/ExportSheetDialog.svelte,heading
 roll.export.resolution,Resolution,分辨率,解析度,解像度,해상도,src/lib/overlay/ExportSheetDialog.svelte,label

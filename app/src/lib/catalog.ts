@@ -7,7 +7,7 @@ import {
   selectedFolder, gridZoom, module as moduleStore, activeId, folderBaseByPath,
   updateLastCheck, updateSkipVersion, openaiApiKey, omitPreviewJpgs,
   telemetryEnabled, telemetryDecided, debugMode,
-  rollFilmEdge, rollEdgeText, editPage, undevelopableIds, hotkeyBindings,
+  rollFilmEdge, rollEdgeText, rollFilmFormat, editPage, undevelopableIds, hotkeyBindings,
 } from "./store";
 import { locale, LOCALES, type Locale } from "./i18n";
 import { installDebugHooks } from "./debug";
@@ -81,6 +81,8 @@ export function applySnapshot(snap: CatalogSnapshot): void {
     rollFilmEdge.set(snap.prefs.roll_film_edge !== "false");
   if (typeof snap.prefs.roll_edge_text === "string" && snap.prefs.roll_edge_text)
     rollEdgeText.set(snap.prefs.roll_edge_text);
+  if (snap.prefs.roll_film_format === "135" || snap.prefs.roll_film_format === "120")
+    rollFilmFormat.set(snap.prefs.roll_film_format);
   if (snap.prefs.develop_edit_page === "all" || snap.prefs.develop_edit_page === "basic"
     || snap.prefs.develop_edit_page === "curves" || snap.prefs.develop_edit_page === "color")
     editPage.set(snap.prefs.develop_edit_page);
@@ -215,7 +217,7 @@ export function initPersistence(): () => void {
   wireRecord(dustById, dust.save);
   wireRecord(metaById, meta.save);
 
-  let first = { loc: true, sf: true, gz: true, mod: true, aid: true, usv: true, ulc: true, oak: true, opj: true, rfe: true, ret: true, uid: true, hkb: true, obd: true, dep: true };
+  let first = { loc: true, sf: true, gz: true, mod: true, aid: true, usv: true, ulc: true, oak: true, opj: true, rfe: true, ret: true, rff: true, uid: true, hkb: true, obd: true, dep: true };
   locale.subscribe((l) => { if (first.loc) { first.loc = false; return; } prefs.save("locale", l); });
   onboardingDone.subscribe((b) => { if (first.obd) { first.obd = false; return; } prefs.save("onboarding_done", String(b)); });
   openaiApiKey.subscribe((k) => { if (first.oak) { first.oak = false; return; } prefs.save("openai_api_key", k); });
@@ -223,6 +225,7 @@ export function initPersistence(): () => void {
   omitPreviewJpgs.subscribe((b) => { if (first.opj) { first.opj = false; return; } prefs.save("omit_preview_jpgs", String(b)); });
   rollFilmEdge.subscribe((b) => { if (first.rfe) { first.rfe = false; return; } prefs.save("roll_film_edge", String(b)); });
   rollEdgeText.subscribe((v) => { if (first.ret) { first.ret = false; return; } prefs.save("roll_edge_text", v); });
+  rollFilmFormat.subscribe((v) => { if (first.rff) { first.rff = false; return; } prefs.save("roll_film_format", v); });
   editPage.subscribe((p) => { if (first.dep) { first.dep = false; return; } prefs.save("develop_edit_page", p); });
   selectedFolder.subscribe((p) => { if (first.sf) { first.sf = false; return; } state.save("selected_folder", p ?? ""); });
   gridZoom.subscribe((z) => { if (first.gz) { first.gz = false; return; } state.save("grid_zoom", String(z)); });

@@ -15,10 +15,11 @@
   import { imageDir } from "$lib/library/folderScope";
   import { api, defaultParams } from "$lib/api";
   import { debounce } from "$lib/catalog";
-  import { rollFilmEdge, rollEdgeText } from "$lib/store";
+  import { rollFilmEdge, rollEdgeText, rollFilmFormat } from "$lib/store";
   import FramePreview from "$lib/roll/FramePreview.svelte";
   import BaseView from "$lib/develop/BaseView.svelte";
-  import { exportContactSheet, type ExportSheetOpts } from "$lib/roll/exportSheet";
+  import { exportContactSheet, FRAME_W, FRAME_GAP, FRAME_PAD, type ExportSheetOpts } from "$lib/roll/exportSheet";
+  import { perfLayout, perfTileDataUri } from "$lib/roll/sprockets";
   import ExportSheetDialog from "$lib/overlay/ExportSheetDialog.svelte";
   import { pickTileAspect } from "$lib/roll/contactSheet";
   import Viewport from "$lib/viewport/Viewport.svelte";
@@ -94,6 +95,14 @@
   // clearly editable and applies to the whole roll); the strip renders it read-only.
   // Each strip's bottom rebate shows the marking REPEATS times, evenly distributed.
   const EDGE_REPEATS = 3;
+
+  // Sprocket-hole geometry — issue #23 (upstream). Computed by the shared module
+  // in the sheet's design space (FRAME_W-wide frames, same constants as
+  // exportSheet.ts) so the on-screen strip and the exported sheet stay visually
+  // identical. The band renders as a repeat-x SVG tile of one KS-1870 hole;
+  // "120" scales from the tile short edge, so it tracks tileAspect.
+  $: perf = perfLayout($rollFilmFormat, FRAME_W, Math.round(FRAME_W / tileAspect), FRAME_GAP, FRAME_PAD);
+  $: perfTile = perfTileDataUri(perf);
 
   // --- Live apply -------------------------------------------------------------
   // Component-local map of id → data-URL for draft-look thumbnails (shown in the grid).
@@ -592,6 +601,17 @@
         <div class="toolbar-actions">
           <!-- Editable film-edge marking for the whole roll -->
           {#if $rollFilmEdge}
+            <!-- Film format for the sprocket holes: 135 (KS-1870, 8 perfs/frame)
+                 or 120 (short-edge-scaled) — issue #23 (upstream). Only shown in
+                 filmstrip mode; the proof grid has no rebates. -->
+            <div class="format-seg" role="group" aria-label={$t('roll.filmFormat')} title={$t('roll.filmFormat')}>
+              <button class="seg" class:on={$rollFilmFormat === '135'}
+                      aria-pressed={$rollFilmFormat === '135'}
+                      on:click={() => rollFilmFormat.set('135')}>135</button>
+              <button class="seg" class:on={$rollFilmFormat === '120'}
+                      aria-pressed={$rollFilmFormat === '120'}
+                      on:click={() => rollFilmFormat.set('120')}>120</button>
+            </div>
             <label class="edge-field">
               <span class="edge-field-label">{$t('roll.edgeText')}</span>
               <input
@@ -622,7 +642,8 @@
       {:else}
         {#key $rollFilmEdge}
           <div class="sheet-anim" in:fade={{ duration: 180 }}>
-            <div class="strips-container" style="--tile-aspect: {tileAspect}">
+            <div class="strips-container"
+                 style="--tile-aspect: {tileAspect}; --sprocket-h: {perf.bandH}px; --sprocket-tile: url({perfTile}); --sprocket-x: {perf.offset}px">
               {#if $rollFilmEdge}
                 <!-- ===== FILM-EDGE ON: filmstrip with rebates ===== -->
                 {#each strips as strip, stripIndex}
@@ -824,6 +845,16 @@
   /* Toggle + export grouped at the right, with a gap before the panel. */
   .toolbar-actions { display: flex; align-items: center; gap: 10px; margin-right: 12px; }
 
+  /* Film-format segmented control (135 / 120) in the toolbar */
+  .format-seg { display: flex; border: 1px solid var(--glass-brd); border-radius: 8px;
+    overflow: hidden; margin-right: 4px; background: var(--glass-hi); }
+  .format-seg .seg { padding: 6px 11px; border: none; cursor: pointer; background: transparent;
+    font: 600 12px 'Spline Sans Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+    color: var(--text-dim); transition: background 0.15s, color 0.15s; }
+  .format-seg .seg:hover:not(.on) { background: rgba(255,255,255,0.06); }
+  .format-seg .seg.on { background: rgba(244,157,78,0.14); color: var(--text);
+    box-shadow: inset 0 0 0 1px rgba(244,157,78,0.4); }
+
   /* Editable film-edge marking field in the toolbar */
   .edge-field { display: flex; align-items: center; gap: 8px; margin-right: 4px; }
   .edge-field-label { font-size: 12px; color: var(--text-faint); white-space: nowrap;
@@ -860,11 +891,14 @@
   .rebate-top { border-radius: 1px 1px 0 0; }
   .rebate-bottom { border-radius: 0 0 1px 1px; }
 
-  .sprocket-holes { height: 8px;
-    background: repeating-linear-gradient(90deg,
-      rgba(216,207,184,0) 0 9px,
-      rgba(216,207,184,.16) 9px 15px,
-      rgba(216,207,184,0) 15px 20px); }
+  /* KS-1870 perforations (issue #23, upstream): a repeat-x SVG tile of one
+     rounded-rect hole; geometry (height/tile/phase) comes from the shared
+     sprockets.ts module via CSS vars on .strips-container so this can never
+     drift from the exported sheet. Fallbacks match the 135 defaults. */
+  .sprocket-holes { height: var(--sprocket-h, 18px);
+    background-image: var(--sprocket-tile);
+    background-repeat: repeat-x;
+    background-position: var(--sprocket-x, 6px) 0; }
 
   .frame-numbers { display: flex; height: 24px; align-items: center; }
   .frame-num { flex: 1; text-align: center;
