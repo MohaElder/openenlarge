@@ -126,7 +126,7 @@ export function applyWhitePointToAll(
  *  is the no-op default; ranges mirror the Frame sliders. The structured look (tone curve, color
  *  grade, …) and base/d_max/crop stay broadcast-absolute. */
 export const ROLL_RELATIVE: { key: keyof InvertParams; neutral: number; min: number; max: number }[] = [
-  { key: "temp", neutral: 5500, min: 2000, max: 15000 },
+  { key: "temp", neutral: 5500, min: 2000, max: 25000 },
   { key: "tint", neutral: 0, min: -100, max: 100 },
   { key: "exposure", neutral: 0, min: -5, max: 5 },
   { key: "contrast", neutral: 0, min: -100, max: 100 },

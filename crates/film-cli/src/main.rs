@@ -44,7 +44,7 @@ fn main() -> Result<()> {
     let img = match ext.as_str() {
         "tif" | "tiff" => decode_tiff(&cli.input),
         "jpg" | "jpeg" | "png" => film_core::decode::decode_ldr(&cli.input),
-        _ => film_core::decode::decode_raw(&cli.input),
+        _ => film_core::decode::decode_raw(&cli.input, false),
     }
     .with_context(|| format!("decoding {:?}", cli.input))?;
 

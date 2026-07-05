@@ -199,7 +199,7 @@
 {/if}
 {#if confirming}
   <ConfirmDevelop count={confirmCount}
-    on:confirm={() => { confirming = false; developAll(developTarget); }}
+    on:confirm={(e) => { confirming = false; developAll(developTarget, e.detail?.filmType ?? "auto"); }}
     on:cancel={() => (confirming = false)} />
 {/if}
 {#if deleteCount > 0}

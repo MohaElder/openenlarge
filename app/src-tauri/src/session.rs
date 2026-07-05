@@ -81,6 +81,13 @@ pub struct InvertParams {
     /// this key existed.
     #[serde(default = "default_meter_border")]
     pub meter_border: String,
+    /// Auto-exposure anchor: "highlight" (bright content — 90th-pct luminance
+    /// driven to 0.80) or "midgray" (median luminance driven to 18% gray,
+    /// ≈0.46 display) — a fixed-luminance exposure normalization so frames shot
+    /// at different exposures land on a comparable brightness (issue #29).
+    /// Defaults to "highlight" for edits saved before this key existed.
+    #[serde(default = "default_meter_anchor")]
+    pub meter_anchor: String,
     // Creative finishing (UI −100..100; 0 = identity).
     pub contrast: f32,
     pub highlights: f32,
@@ -237,6 +244,9 @@ fn default_wb_baseline() -> [f32; 3] {
 }
 fn default_meter_border() -> String {
     "auto".to_string()
+}
+fn default_meter_anchor() -> String {
+    "highlight".to_string()
 }
 fn pz_default_enabled() -> bool {
     true
@@ -601,5 +611,16 @@ mod tests {
             "saturation":0.0}"#;
         let p: InvertParams = serde_json::from_str(json).expect("parse");
         assert_eq!(p.meter_border, "auto");
+    }
+
+    #[test]
+    fn meter_anchor_defaults_to_highlight() {
+        // An old saved edit with no meter_anchor key must load as "highlight".
+        let json = r#"{"mode":"c","stock":"none","exposure":0.0,"black":0.0,"gamma":1.0,
+            "auto_wb":false,"temp":5500.0,"tint":0.0,"contrast":0.0,"highlights":0.0,
+            "shadows":0.0,"whites":0.0,"blacks":0.0,"texture":0.0,"vibrance":0.0,
+            "saturation":0.0}"#;
+        let p: InvertParams = serde_json::from_str(json).expect("parse");
+        assert_eq!(p.meter_anchor, "highlight");
     }
 }
