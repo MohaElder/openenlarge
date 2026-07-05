@@ -276,9 +276,14 @@ export async function seedFrame(id: string, img: ImageEntry, solveExposure: bool
   } catch { /* not resident — re-bakes on first view */ }
 }
 
+/** Roll-level film-type choice offered at initial develop setup (upstream #26):
+ * "auto" keeps the per-frame classifier; "negative"/"positive" force every frame,
+ * so a color negative misdetected as a positive can't poison the whole roll. */
+export type FilmTypeChoice = "auto" | "negative" | "positive";
+
 /** Develop every not-yet-developed image IN THE SELECTED FOLDER sequentially,
  * updating progress, then switch to the target module. Resolves when done. */
-export async function developAll(target: "develop" | "roll" = "develop"): Promise<void> {
+export async function developAll(target: "develop" | "roll" = "develop", filmType: FilmTypeChoice = "auto"): Promise<void> {
   const ids = undevelopedIds(get(folderImages));
   if (ids.length === 0) { module.set(target); return; }
   developProgress.set({ active: true, done: 0, total: ids.length });
@@ -319,6 +324,16 @@ export async function developAll(target: "develop" | "roll" = "develop"): Promis
       const rb = await api.rollBase(developed.map((i) => i.id));
       if (rb) setFolderBase(dir, rb.base);
     } catch (e) { console.error("rollBase failed", dir, e); }
+  }
+
+  // Phase 1.75: the roll-level film-type override (#26). When the user chose a type
+  // in the develop dialog, it beats the per-frame classifier: stamp every freshly
+  // developed entry so the seeds below — and the Neg/Pos header state — carry it.
+  if (filmType !== "auto") {
+    const positive = filmType === "positive";
+    const developedIds = new Set(developed.map((i) => i.id));
+    for (const d of developed) d.positive = positive;
+    images.update((list) => list.map((i) => (developedIds.has(i.id) ? { ...i, positive } : i)));
   }
 
   // Phase 2: seed each freshly-developed frame against the roll base (only if it has no

@@ -25,6 +25,7 @@ vi.mock("./library/folderScope", () => ({ imageDir: () => "/roll", scopeToFolder
 vi.mock("./library/gridHiRes", () => ({ gridThumbView: () => ({}), GRID_STATIC_EDGE: 320 }));
 vi.mock("./telemetry", () => ({ track: () => {} }));
 
+import { get } from "svelte/store";
 import { images, editsById, module, selectedFolder } from "./store";
 import { developAll } from "./workflow";
 
@@ -48,5 +49,20 @@ describe("developAll two-phase roll base", () => {
     expect(firstSeed).toBeGreaterThan(setBase); // WB seeded AFTER the roll base is set
     // Both frames developed before the roll base was computed.
     expect(calls.indexOf("rollBase:2")).toBeGreaterThan(calls.indexOf("develop:b"));
+  });
+
+  it("roll film-type override forces positive on entries and seeded edits (#26)", async () => {
+    // The classifier (developImage mock) says negative; the user's roll-level
+    // choice must win on both the ImageEntry (header state) and the seeded params.
+    await developAll("develop", "positive");
+    expect(get(images).every((i) => i.positive)).toBe(true);
+    expect((get(editsById)["a"] as { positive: boolean }).positive).toBe(true);
+    expect((get(editsById)["b"] as { positive: boolean }).positive).toBe(true);
+  });
+
+  it("film-type auto keeps the per-frame classifier result", async () => {
+    await developAll("develop", "auto");
+    expect(get(images).every((i) => i.positive === false)).toBe(true);
+    expect((get(editsById)["a"] as { positive: boolean }).positive).toBe(false);
   });
 });
