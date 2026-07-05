@@ -512,3 +512,13 @@ settings.debug.clearLogConfirm,Turn off debug mode and clear the existing log fi
 app.debug.exportAriaLabel,Export debug log,导出调试日志,匯出偵錯記錄,デバッグログをエクスポート,디버그 로그 내보내기,src/routes/+page.svelte,aria-label
 app.debug.exported,Debug log exported,已导出调试日志,已匯出偵錯記錄,デバッグログをエクスポートしました,디버그 로그를 내보냈습니다,src/routes/+page.svelte,toast
 app.debug.exportFailed,Could not export debug log,无法导出调试日志,無法匯出偵錯記錄,デバッグログをエクスポートできませんでした,디버그 로그를 내보낼 수 없습니다,src/routes/+page.svelte,toast
+tour.base.title,Sample the film base,采样片基,取樣片基,フィルムベースをサンプリング,필름 베이스 샘플링,src/lib/onboarding/tour.ts,heading
+tour.base.body,Open the Film base tool and drag a box over a clear strip of rebate — the unexposed film edge. One sample strips the orange mask for the whole roll.,打开“片基”工具，在片边空白处（未曝光的胶片边缘）拖出取样框。整卷只需采样一次即可去除橙色片基。,開啟「片基」工具，在片邊空白處（未曝光的底片邊緣）拖出取樣框。整卷只需取樣一次即可去除橙色片基。,「フィルムベース」ツールを開き、未露光のフィルム縁の透明な部分をドラッグで囲みます。一度のサンプリングでロール全体のオレンジマスクを除去します。,필름 베이스 도구를 열고 노출되지 않은 필름 가장자리의 투명한 부분을 드래그해 지정하세요. 한 번의 샘플링으로 롤 전체의 오렌지 마스크가 제거됩니다.,src/lib/onboarding/tour.ts,paragraph
+tour.crop.title,Crop the whole roll,裁剪整卷,裁切整卷,ロール全体をクロップ,롤 전체 자르기,src/lib/onboarding/tour.ts,heading
+tour.crop.body,Open the Crop tool and trim the frame edges once — the crop and rotation apply to every frame in the roll.,打开“裁剪”工具修掉画面边缘，一次设置即可应用到整卷的每一帧。,開啟「裁切」工具修掉畫面邊緣，一次設定即可套用到整卷的每一格。,「クロップ」ツールでフレームの縁を一度トリミングすれば、クロップと回転がロール内のすべてのフレームに適用されます。,자르기 도구로 프레임 가장자리를 한 번만 다듬으면 자르기와 회전이 롤의 모든 프레임에 적용됩니다.,src/lib/onboarding/tour.ts,paragraph
+tour.tune.title,Finish each frame,精修单帧,精修單格,フレームごとに仕上げる,프레임별 마무리,src/lib/onboarding/tour.ts,heading
+tour.tune.body,When the roll looks right — open the Frame tab to fine-tune single frames with exposure · white balance · curves and dust removal.,整卷调好后，进入“单帧”页对单张进行精修：曝光、白平衡、曲线与除尘。,整卷調好後，進入「單格」頁對單張進行精修：曝光、白平衡、曲線與除塵。,ロール全体が整ったら「フレーム」タブで1枚ずつ微調整します。露出・ホワイトバランス・カーブ・ダスト除去が使えます。,롤 전체가 정리되면 프레임 탭에서 한 장씩 미세 조정하세요. 노출·화이트 밸런스·커브·먼지 제거를 사용할 수 있습니다.,src/lib/onboarding/tour.ts,paragraph
+tour.next,Next,下一步,下一步,次へ,다음,src/lib/onboarding/tourTarget.ts,button
+tour.done,Done,完成,完成,完了,완료,src/lib/onboarding/tourTarget.ts,button
+tour.skip,Skip tour,跳过引导,跳過導覽,ツアーをスキップ,투어 건너뛰기,src/lib/onboarding/tourTarget.ts,button
+settings.showTutorial,Show tutorial,显示新手引导,顯示新手導覽,チュートリアルを表示,튜토리얼 보기,src/lib/settings/SettingsMenu.svelte,button
