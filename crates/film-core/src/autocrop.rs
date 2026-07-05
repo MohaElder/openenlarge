@@ -37,7 +37,11 @@ fn luma(p: [f32; 3]) -> f32 {
 /// Per-line bright fraction and mean luma along one axis. `lines` is the number
 /// of lines (rows or cols); `along` is the length of each line. `at(line, k)`
 /// returns the pixel at position `k` along `line`.
-fn line_stats(lines: usize, along: usize, at: impl Fn(usize, usize) -> [f32; 3]) -> (Vec<f32>, Vec<f32>) {
+fn line_stats(
+    lines: usize,
+    along: usize,
+    at: impl Fn(usize, usize) -> [f32; 3],
+) -> (Vec<f32>, Vec<f32>) {
     let mut bf = vec![0.0f32; lines];
     let mut mean = vec![0.0f32; lines];
     for l in 0..lines {
@@ -65,8 +69,8 @@ fn sprocket_edges(n: usize, bf: &[f32]) -> (usize, usize, usize, usize) {
     let zone = ((n as f32 * REBATE_ZONE) as usize).max(1).min(n);
     let mut lo_inner = 0usize;
     let mut lo_count = 0usize;
-    for i in 0..zone {
-        if bf[i] >= BF_SPROCKET {
+    for (i, &v) in bf.iter().enumerate().take(zone) {
+        if v >= BF_SPROCKET {
             lo_inner = i + 1;
             lo_count += 1;
         }
@@ -106,7 +110,7 @@ pub fn detect_film_frame_crop(img: &Image) -> Option<[f32; 4]> {
     let px = |x: usize, y: usize| img.pixels[y * w + x];
 
     let (row_bf, row_mean) = line_stats(h, w, |y, x| px(x, y));
-    let (col_bf, col_mean) = line_stats(w, h, |x, y| px(x, y));
+    let (col_bf, col_mean) = line_stats(w, h, px);
 
     // Sprocket bands per axis, and the strip fingerprint: a sprocket band on BOTH
     // ends of an axis. Only an axis that passes the fingerprint is allowed to
@@ -125,10 +129,26 @@ pub fn detect_film_frame_crop(img: &Image) -> Option<[f32; 4]> {
     // its sprocket band.
     let (dark_top, dark_bottom) = dark_edges(h, &row_mean);
     let (dark_left, dark_right) = dark_edges(w, &col_mean);
-    let top = if v_strip { v_lo.max(dark_top) } else { dark_top };
-    let bottom = if v_strip { v_hi.min(dark_bottom) } else { dark_bottom };
-    let left = if h_strip { hz_lo.max(dark_left) } else { dark_left };
-    let right = if h_strip { hz_hi.min(dark_right) } else { dark_right };
+    let top = if v_strip {
+        v_lo.max(dark_top)
+    } else {
+        dark_top
+    };
+    let bottom = if v_strip {
+        v_hi.min(dark_bottom)
+    } else {
+        dark_bottom
+    };
+    let left = if h_strip {
+        hz_lo.max(dark_left)
+    } else {
+        dark_left
+    };
+    let right = if h_strip {
+        hz_hi.min(dark_right)
+    } else {
+        dark_right
+    };
 
     // Non-degenerate frame.
     if top + 1 >= bottom || left + 1 >= right {
@@ -140,7 +160,11 @@ pub fn detect_film_frame_crop(img: &Image) -> Option<[f32; 4]> {
     let trim_bottom = (h - bottom) as f32 / h as f32;
     let trim_left = left as f32 / w as f32;
     let trim_right = (w - right) as f32 / w as f32;
-    if trim_top >= MAX_TRIM || trim_bottom >= MAX_TRIM || trim_left >= MAX_TRIM || trim_right >= MAX_TRIM {
+    if trim_top >= MAX_TRIM
+        || trim_bottom >= MAX_TRIM
+        || trim_left >= MAX_TRIM
+        || trim_right >= MAX_TRIM
+    {
         return None;
     }
     let kept = (right - left) as f32 / w as f32 * (bottom - top) as f32 / h as f32;
@@ -221,7 +245,11 @@ mod tests {
         let mut img = Image::new(320, 214);
         for y in 0..214 {
             for x in 0..320 {
-                img.pixels[y * 320 + x] = if y < 24 { [0.95, 0.95, 0.95] } else { [0.3, 0.3, 0.3] };
+                img.pixels[y * 320 + x] = if y < 24 {
+                    [0.95, 0.95, 0.95]
+                } else {
+                    [0.3, 0.3, 0.3]
+                };
             }
         }
         assert_eq!(detect_film_frame_crop(&img), None);
@@ -239,7 +267,10 @@ mod tests {
             }
         }
         let [_, y, _, rh] = detect_film_frame_crop(&img).expect("should still detect");
-        assert!((y - 24.0 / 214.0).abs() < 0.05, "y={y} (should crop at rebate, not the mid band)");
+        assert!(
+            (y - 24.0 / 214.0).abs() < 0.05,
+            "y={y} (should crop at rebate, not the mid band)"
+        );
         assert!(rh > 0.6, "rh={rh} (frame not eaten by the mid bright band)");
     }
 
@@ -259,7 +290,10 @@ mod tests {
         // Right edge stays at the ~20px dark margin (x≈0.0625, w≈0.875), NOT pulled
         // in to the bright region at x≈210/320≈0.656.
         assert!((x - 20.0 / 320.0).abs() < 0.03, "x={x}");
-        assert!(rw > 0.82, "rw={rw} (right edge wrongly pulled in by bright content)");
+        assert!(
+            rw > 0.82,
+            "rw={rw} (right edge wrongly pulled in by bright content)"
+        );
     }
 
     #[test]

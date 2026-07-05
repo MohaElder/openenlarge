@@ -288,7 +288,11 @@ fn bin_cfa_2x2(
             }
             let mut px = [0.0f32; 3];
             for c in 0..3 {
-                let v = if cnt[c] > 0 { sum[c] / cnt[c] as f32 } else { 0.0 };
+                let v = if cnt[c] > 0 {
+                    sum[c] / cnt[c] as f32
+                } else {
+                    0.0
+                };
                 px[c] = ((v - black[c]) * scale[c]).clamp(0.0, 1.0);
             }
             out[by * bw + bx] = px;
@@ -361,12 +365,25 @@ pub fn decode_raw(path: &Path, apply_camera_matrix: bool) -> Result<Image, Decod
                 }
             }
             let black = [
-                if bcnt[0] > 0 { bsum[0] / bcnt[0] as f32 } else { 0.0 },
-                if bcnt[1] > 0 { bsum[1] / bcnt[1] as f32 } else { 0.0 },
-                if bcnt[2] > 0 { bsum[2] / bcnt[2] as f32 } else { 0.0 },
+                if bcnt[0] > 0 {
+                    bsum[0] / bcnt[0] as f32
+                } else {
+                    0.0
+                },
+                if bcnt[1] > 0 {
+                    bsum[1] / bcnt[1] as f32
+                } else {
+                    0.0
+                },
+                if bcnt[2] > 0 {
+                    bsum[2] / bcnt[2] as f32
+                } else {
+                    0.0
+                },
             ];
             let wl = &raw.whitelevel.0;
-            let wl_at = |c: usize| -> f32 { wl.get(c).or_else(|| wl.first()).copied().unwrap_or(0) as f32 };
+            let wl_at =
+                |c: usize| -> f32 { wl.get(c).or_else(|| wl.first()).copied().unwrap_or(0) as f32 };
             let white = [wl_at(0), wl_at(1), wl_at(2)];
 
             let (bw, bh, binned) = bin_cfa_2x2(data, raw.width, raw.height, cfa, black, white);
@@ -385,7 +402,12 @@ pub fn decode_raw(path: &Path, apply_camera_matrix: bool) -> Result<Image, Decod
                 ),
                 None => (bw, bh, binned),
             };
-            return Ok(Image { width, height, pixels, ir: None });
+            return Ok(Image {
+                width,
+                height,
+                pixels,
+                ir: None,
+            });
         }
     }
 
@@ -488,18 +510,23 @@ fn cam_to_adobe(raw: &rawler::RawImage) -> Option<[[f32; 3]; 3]> {
     // `xyz_to_cam` rows = camera channels, cols = XYZ. Use the first 3 rows.
     let x2c = &raw.xyz_to_cam;
     let xyz2cam = Matrix3::new(
-        x2c[0][0], x2c[0][1], x2c[0][2],
-        x2c[1][0], x2c[1][1], x2c[1][2],
-        x2c[2][0], x2c[2][1], x2c[2][2],
+        x2c[0][0], x2c[0][1], x2c[0][2], x2c[1][0], x2c[1][1], x2c[1][2], x2c[2][0], x2c[2][1],
+        x2c[2][2],
     );
     if !xyz2cam.iter().all(|v| v.is_finite()) || xyz2cam.iter().all(|&v| v == 0.0) {
         return None;
     }
     // Adobe RGB (1998), D65 linear → XYZ (D65).
     let adobe2xyz = Matrix3::new(
-        0.576_730_9, 0.185_554_0, 0.188_185_2,
-        0.297_376_9, 0.627_349_1, 0.075_274_1,
-        0.027_034_3, 0.070_687_2, 0.991_108_5,
+        0.576_730_9,
+        0.185_554,
+        0.188_185_2,
+        0.297_376_9,
+        0.627_349_1,
+        0.075_274_1,
+        0.027_034_3,
+        0.070_687_2,
+        0.991_108_5,
     );
     // Adobe-linear → camera, then normalise each row to sum 1 (neutral white → camera neutral).
     let mut rgb2cam = xyz2cam * adobe2xyz;
@@ -672,7 +699,14 @@ mod tests {
         // B@(1,1)=350 (black100,white600 → 0.5).
         let cfa = rawler::CFA::new("RGGB");
         let data = vec![1100u16, 600, 600, 350];
-        let (_, _, px) = bin_cfa_2x2(&data, 2, 2, &cfa, [100.0, 100.0, 100.0], [1100.0, 600.0, 600.0]);
+        let (_, _, px) = bin_cfa_2x2(
+            &data,
+            2,
+            2,
+            &cfa,
+            [100.0, 100.0, 100.0],
+            [1100.0, 600.0, 600.0],
+        );
         let p = px[0];
         assert!((p[0] - 1.0).abs() < 1e-4, "R = {}", p[0]);
         assert!((p[1] - 1.0).abs() < 1e-4, "G = {}", p[1]);

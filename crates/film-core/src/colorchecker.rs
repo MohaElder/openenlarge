@@ -138,8 +138,8 @@ mod tests {
         assert!(lab[18][0] > 94.0, "white L*={}", lab[18][0]);
         assert!(lab[23][0] < 25.0, "black L*={}", lab[23][0]);
         // Neutrals (19..24) are near-achromatic.
-        for i in 18..24 {
-            let c = (lab[i][1].powi(2) + lab[i][2].powi(2)).sqrt();
+        for (i, patch) in lab.iter().enumerate().take(24).skip(18) {
+            let c = (patch[1].powi(2) + patch[2].powi(2)).sqrt();
             assert!(c < 3.0, "patch {} chroma {}", i + 1, c);
         }
         // Each patch differs from its neighbor by a visible amount.

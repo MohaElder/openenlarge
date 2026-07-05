@@ -232,11 +232,15 @@ pub fn auto_wb_gains_masked(img: &Image, mask: Option<&[bool]>) -> [f32; 3] {
 /// Like [`auto_wb_gains_strength`] but restricts the gray-world estimate to
 /// pixels whose mask entry is `true`. `None` = include all (identical to
 /// [`auto_wb_gains_strength`]).
-pub fn auto_wb_gains_strength_masked(img: &Image, strength: f32, mask: Option<&[bool]>) -> [f32; 3] {
+pub fn auto_wb_gains_strength_masked(
+    img: &Image,
+    strength: f32,
+    mask: Option<&[bool]>,
+) -> [f32; 3] {
     if img.pixels.is_empty() {
         return [1.0, 1.0, 1.0];
     }
-    let mask_ok = |idx: usize| mask.map_or(true, |m| m.get(idx).copied().unwrap_or(true));
+    let mask_ok = |idx: usize| mask.is_none_or(|m| m.get(idx).copied().unwrap_or(true));
     // Exposure-invariant brightness gates. The gray-world gains are channel
     // ratios, so a uniform exposure nudge cancels out — *except* through which
     // pixels survive the bright/dark gate. Deriving the gate from the image's own
@@ -245,7 +249,10 @@ pub fn auto_wb_gains_strength_masked(img: &Image, strength: f32, mask: Option<&[
     // which is what made auto-WB jump on small exposure changes (B4). Computed
     // once, deterministically (a total sort), so re-runs are bit-identical.
     let percentile = |key: &dyn Fn(&[f32; 3]) -> f32, q: f32| -> f32 {
-        let mut v: Vec<f32> = img.pixels.iter().enumerate()
+        let mut v: Vec<f32> = img
+            .pixels
+            .iter()
+            .enumerate()
             .filter(|(idx, _)| mask_ok(*idx))
             .map(|(_, p)| key(p))
             .collect();
@@ -365,7 +372,7 @@ pub fn per_zone_wb_gains(img: &Image, strength: f32, mask: Option<&[bool]>) -> [
         return [identity; 3];
     }
     let k = strength.clamp(0.0, 1.0);
-    let mask_ok = |idx: usize| mask.map_or(true, |m| m.get(idx).copied().unwrap_or(true));
+    let mask_ok = |idx: usize| mask.is_none_or(|m| m.get(idx).copied().unwrap_or(true));
     // Accumulate a saturation-gated, weighted channel sum per zone.
     // weights: [shadow, mid, highlight] from the luma smoothstep masks.
     let mut sum = [[0.0f64; 3]; 3];
@@ -438,7 +445,7 @@ pub fn sample_dmax_spread(
     const HIGH_PCT: f32 = 0.99; // 99th percentile (brightest transmission = base-ish)
     let small = downscale_for_detect(img, SAMPLE_CAP);
     let r = scaled_rect(rect, img, &small);
-    let mask_ok = |idx: usize| mask.map_or(true, |m| m.get(idx).copied().unwrap_or(true));
+    let mask_ok = |idx: usize| mask.is_none_or(|m| m.get(idx).copied().unwrap_or(true));
     let mut chans: [Vec<f32>; 3] = [Vec::new(), Vec::new(), Vec::new()];
     for yy in r.y..(r.y + r.h).min(small.height) {
         for xx in r.x..(r.x + r.w).min(small.width) {
@@ -718,10 +725,18 @@ fn border_connected_exclude(cand: &[bool], w: usize, h: usize) -> (Vec<bool>, us
     }
     while let Some(i) = stack.pop() {
         let (x, y) = (i % w, i / w);
-        if x > 0 { push(i - 1, &mut stack, &mut excluded); }
-        if x + 1 < w { push(i + 1, &mut stack, &mut excluded); }
-        if y > 0 { push(i - w, &mut stack, &mut excluded); }
-        if y + 1 < h { push(i + w, &mut stack, &mut excluded); }
+        if x > 0 {
+            push(i - 1, &mut stack, &mut excluded);
+        }
+        if x + 1 < w {
+            push(i + 1, &mut stack, &mut excluded);
+        }
+        if y > 0 {
+            push(i - w, &mut stack, &mut excluded);
+        }
+        if y + 1 < h {
+            push(i + w, &mut stack, &mut excluded);
+        }
     }
     let n_excl = excluded.iter().filter(|&&e| e).count();
     let keep: Vec<bool> = excluded.iter().map(|&e| !e).collect();
@@ -768,7 +783,11 @@ pub fn detect_photo_mask(scan: &Image, base: [f32; 3], positive: bool) -> PhotoM
     let small = downscale_for_detect(scan, SAMPLE_CAP);
     let n = small.pixels.len();
     if n == 0 {
-        return PhotoMask { mask: Vec::new(), excluded_fraction: 0.0, confidence: 0.0 };
+        return PhotoMask {
+            mask: Vec::new(),
+            excluded_fraction: 0.0,
+            confidence: 0.0,
+        };
     }
     let cand: Vec<bool> = if positive {
         positive_candidates(&small)
@@ -780,10 +799,22 @@ pub fn detect_photo_mask(scan: &Image, base: [f32; 3], positive: bool) -> PhotoM
     let cand_count = cand.iter().filter(|&&c| c).count();
     let (keep, n_excl) = border_connected_exclude(&cand, small.width, small.height);
     let excluded_fraction = n_excl as f32 / n as f32;
-    let border_ratio = if cand_count == 0 { 0.0 } else { n_excl as f32 / cand_count as f32 };
+    let border_ratio = if cand_count == 0 {
+        0.0
+    } else {
+        n_excl as f32 / cand_count as f32
+    };
     let uniformity = excluded_uniformity(&small, &keep);
-    let confidence = if n_excl == 0 { 0.0 } else { border_ratio * uniformity };
-    PhotoMask { mask: keep, excluded_fraction, confidence }
+    let confidence = if n_excl == 0 {
+        0.0
+    } else {
+        border_ratio * uniformity
+    };
+    PhotoMask {
+        mask: keep,
+        excluded_fraction,
+        confidence,
+    }
 }
 
 /// How the user's `meter_border` choice maps onto masking.
@@ -1224,10 +1255,16 @@ mod tests {
         let gains_full = auto_wb_gains(&img);
         let gains_masked = auto_wb_gains_masked(&img, Some(&keep));
         // Full estimate is skewed by the blue border: R gain > B gain (warm correction).
-        assert!(gains_full[0] > gains_full[2], "full: expected R>B gains, got {gains_full:?}");
+        assert!(
+            gains_full[0] > gains_full[2],
+            "full: expected R>B gains, got {gains_full:?}"
+        );
         // Masked estimate sees only neutral pixels → gains near [1,1,1], R ≈ B.
         let diff = (gains_masked[0] - gains_masked[2]).abs();
-        assert!(diff < 0.05, "masked: expected near-equal R/B, got {gains_masked:?}");
+        assert!(
+            diff < 0.05,
+            "masked: expected near-equal R/B, got {gains_masked:?}"
+        );
     }
 
     #[test]
@@ -1444,8 +1481,12 @@ mod tests {
     fn high_conf_mask() -> PhotoMask {
         // 100 px, 30 excluded, confident.
         let mut mask = vec![true; 100];
-        for i in 0..30 { mask[i] = false; }
-        PhotoMask { mask, excluded_fraction: 0.30, confidence: 0.9 }
+        mask[..30].fill(false);
+        PhotoMask {
+            mask,
+            excluded_fraction: 0.30,
+            confidence: 0.9,
+        }
     }
 
     #[test]
@@ -1481,7 +1522,11 @@ mod tests {
 
     #[test]
     fn gate_rejects_all_masked() {
-        let pm = PhotoMask { mask: vec![false; 100], excluded_fraction: 1.0, confidence: 1.0 };
+        let pm = PhotoMask {
+            mask: vec![false; 100],
+            excluded_fraction: 1.0,
+            confidence: 1.0,
+        };
         assert!(gate_photo_mask(pm, MeterBorder::Exclude).is_none());
     }
 
@@ -1496,16 +1541,32 @@ mod tests {
     #[test]
     fn gate_exclude_no_border_returns_none() {
         // Exclude applies only when excluded_fraction > 0.0; a no-border mask returns None.
-        let pm = PhotoMask { mask: vec![true; 100], excluded_fraction: 0.0, confidence: 0.9 };
+        let pm = PhotoMask {
+            mask: vec![true; 100],
+            excluded_fraction: 0.0,
+            confidence: 0.9,
+        };
         assert!(gate_photo_mask(pm, MeterBorder::Exclude).is_none());
     }
 
     #[test]
     fn meter_border_parse() {
-        assert!(matches!(MeterBorder::from_str_lenient("exclude"), MeterBorder::Exclude));
-        assert!(matches!(MeterBorder::from_str_lenient("include"), MeterBorder::Include));
-        assert!(matches!(MeterBorder::from_str_lenient("auto"), MeterBorder::Auto));
-        assert!(matches!(MeterBorder::from_str_lenient("garbage"), MeterBorder::Auto));
+        assert!(matches!(
+            MeterBorder::from_str_lenient("exclude"),
+            MeterBorder::Exclude
+        ));
+        assert!(matches!(
+            MeterBorder::from_str_lenient("include"),
+            MeterBorder::Include
+        ));
+        assert!(matches!(
+            MeterBorder::from_str_lenient("auto"),
+            MeterBorder::Auto
+        ));
+        assert!(matches!(
+            MeterBorder::from_str_lenient("garbage"),
+            MeterBorder::Auto
+        ));
     }
 }
 
@@ -1619,7 +1680,7 @@ mod per_zone_tests {
         for zone in &z {
             for &g in zone {
                 assert!(
-                    g <= PER_ZONE_MAX_GAIN + 1e-4 && g >= 1.0 / PER_ZONE_MAX_GAIN - 1e-4,
+                    (1.0 / PER_ZONE_MAX_GAIN - 1e-4..=PER_ZONE_MAX_GAIN + 1e-4).contains(&g),
                     "gain out of clamp: {g} in {z:?}"
                 );
             }
@@ -1711,7 +1772,12 @@ mod per_zone_tests {
             }
         }
         let pm = detect_photo_mask(&img, base, false);
-        assert!(pm.confidence < 0.5 || pm.excluded_fraction < 0.02, "frac={} conf={}", pm.excluded_fraction, pm.confidence);
+        assert!(
+            pm.confidence < 0.5 || pm.excluded_fraction < 0.02,
+            "frac={} conf={}",
+            pm.excluded_fraction,
+            pm.confidence
+        );
     }
 
     #[test]

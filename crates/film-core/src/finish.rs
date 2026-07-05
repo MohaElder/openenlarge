@@ -654,26 +654,26 @@ fn linear_to_srgb(c: f32) -> f32 {
 }
 #[inline]
 fn linear_to_oklab(r: f32, g: f32, b: f32) -> [f32; 3] {
-    let l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
-    let m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
-    let s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+    let l = 0.412_221_46 * r + 0.536_332_55 * g + 0.051_445_995 * b;
+    let m = 0.211_903_5 * r + 0.680_699_5 * g + 0.107_396_96 * b;
+    let s = 0.088_302_46 * r + 0.281_718_85 * g + 0.629_978_7 * b;
     let (l_, m_, s_) = (l.cbrt(), m.cbrt(), s.cbrt());
     [
-        0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
-        1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
-        0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_,
+        0.210_454_26 * l_ + 0.793_617_8 * m_ - 0.004_072_047 * s_,
+        1.977_998_5 * l_ - 2.428_592_2 * m_ + 0.450_593_7 * s_,
+        0.025_904_037 * l_ + 0.782_771_77 * m_ - 0.808_675_77 * s_,
     ]
 }
 #[inline]
 fn oklab_to_linear(lab: [f32; 3]) -> [f32; 3] {
-    let l_ = lab[0] + 0.3963377774 * lab[1] + 0.2158037573 * lab[2];
-    let m_ = lab[0] - 0.1055613458 * lab[1] - 0.0638541728 * lab[2];
-    let s_ = lab[0] - 0.0894841775 * lab[1] - 1.2914855480 * lab[2];
+    let l_ = lab[0] + 0.396_337_78 * lab[1] + 0.215_803_76 * lab[2];
+    let m_ = lab[0] - 0.105_561_346 * lab[1] - 0.063_854_17 * lab[2];
+    let s_ = lab[0] - 0.089_484_18 * lab[1] - 1.291_485_5 * lab[2];
     let (l, m, s) = (l_ * l_ * l_, m_ * m_ * m_, s_ * s_ * s_);
     [
-        4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-        -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-        -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
+        4.076_741_7 * l - 3.307_711_6 * m + 0.230_969_94 * s,
+        -1.268_438 * l + 2.609_757_4 * m - 0.341_319_38 * s,
+        -0.0041960863 * l - 0.703_418_6 * m + 1.707_614_7 * s,
     ]
 }
 /// Angular distance on the hue circle, in radians [0, π].
@@ -1032,7 +1032,11 @@ mod tests {
             let out = finish_pixel(px, &p);
             for c in 0..3 {
                 let want = crate::engine::display_finalize(px[c]);
-                assert!((out[c] - want).abs() < 1e-4, "v={v} c={c} out={} want={want}", out[c]);
+                assert!(
+                    (out[c] - want).abs() < 1e-4,
+                    "v={v} c={c} out={} want={want}",
+                    out[c]
+                );
             }
         }
     }
@@ -1045,7 +1049,10 @@ mod tests {
         let mid = [0.3_f32, 0.3, 0.3];
         let id = finish_pixel(mid, &FinishParams::default());
         // brightness=0 → gain=1 → body is 0.3 → display_finalize(0.3)
-        assert!((id[0] - crate::engine::display_finalize(0.3)).abs() < 1e-4, "0 = display_finalize(0.3)");
+        assert!(
+            (id[0] - crate::engine::display_finalize(0.3)).abs() < 1e-4,
+            "0 = display_finalize(0.3)"
+        );
         let up = finish_pixel(
             mid,
             &FinishParams {
@@ -1065,7 +1072,11 @@ mod tests {
         // Density curve: gain at b=0.5 is 10^(0.5·RANGE); check the lifted mid matches
         // display_finalize of the brightness-scaled body (the finalizer is now part of tone_curve).
         let g = 10f32.powf(0.5 * BRIGHTNESS_DENSITY_RANGE);
-        assert!((up[0] - crate::engine::display_finalize(0.3 * g)).abs() < 1e-4, "gain {g}: {}", up[0]);
+        assert!(
+            (up[0] - crate::engine::display_finalize(0.3 * g)).abs() < 1e-4,
+            "gain {g}: {}",
+            up[0]
+        );
     }
 
     #[test]
@@ -1187,13 +1198,24 @@ mod tests {
     fn lowering_whites_recovers_super_white_detail() {
         // Two distinct super-white bodies collapse to ~white at sliders 0, but lowering
         // Whites pulls them apart below the shoulder → recovered, distinct, lower values.
-        let mut lo = FinishParams::default();
-        lo.whites = -1.0;                          // wire range is /100; -1.0 == slider -100
+        // wire range is /100; -1.0 == slider -100
+        let lo = FinishParams {
+            whites: -1.0,
+            ..Default::default()
+        };
         let (a, b) = (1.25_f32, 1.45_f32);
-        let da0 = (tone_curve(a, &FinishParams::default()) - tone_curve(b, &FinishParams::default())).abs();
+        let da0 = (tone_curve(a, &FinishParams::default())
+            - tone_curve(b, &FinishParams::default()))
+        .abs();
         let da1 = (tone_curve(a, &lo) - tone_curve(b, &lo)).abs();
-        assert!(tone_curve(a, &lo) < tone_curve(a, &FinishParams::default()), "whites<0 must darken highlights");
-        assert!(da1 > da0 + 1e-4, "lower whites must re-separate detail: {da0} -> {da1}");
+        assert!(
+            tone_curve(a, &lo) < tone_curve(a, &FinishParams::default()),
+            "whites<0 must darken highlights"
+        );
+        assert!(
+            da1 > da0 + 1e-4,
+            "lower whites must re-separate detail: {da0} -> {da1}"
+        );
     }
 
     #[test]
@@ -1236,11 +1258,7 @@ mod tests {
         for (o, s) in out.pixels.iter().zip(src.pixels.iter()) {
             for c in 0..3 {
                 let want = crate::engine::display_finalize(s[c]);
-                assert!(
-                    (o[c] - want).abs() < 1e-4,
-                    "c={c} out={} want={want}",
-                    o[c]
-                );
+                assert!((o[c] - want).abs() < 1e-4, "c={c} out={} want={want}", o[c]);
             }
         }
     }
@@ -1266,11 +1284,7 @@ mod tests {
             for c in 0..3 {
                 // At default params (neutral input), finish_pixel = display_finalize per channel.
                 let want = crate::engine::display_finalize(s[c]);
-                assert!(
-                    (o[c] - want).abs() < 1e-5,
-                    "c={c} out={} want={want}",
-                    o[c]
-                );
+                assert!((o[c] - want).abs() < 1e-5, "c={c} out={} want={want}", o[c]);
             }
         }
     }
@@ -1369,10 +1383,16 @@ mod tests {
         assert!(m > 1.0, "expected super-white luminance, got {m}");
         assert!(m <= HDR_HEADROOM + 1e-4);
         // Chroma preserved (NOT gray): R>G>B, and the ratios match body's chromaticity.
-        assert!(out[0] > out[1] && out[1] > out[2], "warm order lost: {out:?}");
+        assert!(
+            out[0] > out[1] && out[1] > out[2],
+            "warm order lost: {out:?}"
+        );
         let rg_body = body[0] / body[1];
         let rg_out = out[0] / out[1];
-        assert!((rg_body - rg_out).abs() < 1e-3, "hue drift: body R/G {rg_body} vs out {rg_out}");
+        assert!(
+            (rg_body - rg_out).abs() < 1e-3,
+            "hue drift: body R/G {rg_body} vs out {rg_out}"
+        );
     }
 
     #[test]
@@ -1381,7 +1401,12 @@ mod tests {
         let body = [0.8001, 0.6, 0.4];
         let sdr = [0.8, 0.6, 0.4];
         let out = hdr_finish(body, sdr);
-        for c in 0..3 { assert!((out[c] - sdr[c]).abs() < 1e-2, "kink at knee: {out:?} vs {sdr:?}"); }
+        for c in 0..3 {
+            assert!(
+                (out[c] - sdr[c]).abs() < 1e-2,
+                "kink at knee: {out:?} vs {sdr:?}"
+            );
+        }
     }
 
     /// Neutral FinishParams matching the existing finish/tone tests' defaults:
@@ -1419,7 +1444,10 @@ mod tests {
         let sdr = finish_pixel(rgb, &p);
         let mh = hdr[0].max(hdr[1]).max(hdr[2]);
         let ms = sdr[0].max(sdr[1]).max(sdr[2]);
-        assert!(mh > 1.0 && mh > ms, "hdr {mh} should exceed sdr {ms} and 1.0");
+        assert!(
+            mh > 1.0 && mh > ms,
+            "hdr {mh} should exceed sdr {ms} and 1.0"
+        );
     }
 
     #[test]
@@ -1529,9 +1557,11 @@ mod tests {
         let finished = Image {
             width: w,
             height: h,
-            pixels: img.pixels.iter().map(|&px| {
-                std::array::from_fn(|c| crate::engine::display_finalize(px[c]))
-            }).collect(),
+            pixels: img
+                .pixels
+                .iter()
+                .map(|&px| std::array::from_fn(|c| crate::engine::display_finalize(px[c])))
+                .collect(),
             ir: None,
         };
         let want = blur(&finished, sigma, radius);
@@ -1703,7 +1733,11 @@ mod tests {
             let out = finish_pixel(px, &p);
             for c in 0..3 {
                 let want = crate::engine::display_finalize(px[c]);
-                assert!((out[c] - want).abs() < 1e-4, "v={v} c={c} out={} want={want}", out[c]);
+                assert!(
+                    (out[c] - want).abs() < 1e-4,
+                    "v={v} c={c} out={} want={want}",
+                    out[c]
+                );
             }
         }
     }
@@ -1740,9 +1774,15 @@ mod tests {
     fn tone_curve_unfinalized_matches_legacy_clamped_curve() {
         // finalize_body=false must reproduce the pre-headroom tone_curve exactly:
         // leading clamp(0,1) + same slider ops + trailing clamp(0,1), NO display_finalize.
-        let mut p = FinishParams::default();
-        p.finalize_body = false;
-        p.whites = -0.5; p.contrast = 0.3; p.highlights = 0.4; p.shadows = -0.2; p.blacks = 0.1;
+        let p = FinishParams {
+            finalize_body: false,
+            whites: -0.5,
+            contrast: 0.3,
+            highlights: 0.4,
+            shadows: -0.2,
+            blacks: 0.1,
+            ..Default::default()
+        };
         let legacy = |v: f32, p: &FinishParams| -> f32 {
             let mut v = v.clamp(0.0, 1.0);
             v += p.whites * 0.20 * v.powi(3);
@@ -1763,8 +1803,14 @@ mod tests {
         // input finalizes (rolls off below 1.0) vs. clamps (hard 1.0).
         // At v=1.1 the Faithful shoulder maps to ~0.991 while the clamped path gives 1.0
         // (difference ~0.009 >> 1e-3).
-        let mut pf = FinishParams::default(); pf.finalize_body = true;
-        let mut pu = FinishParams::default(); pu.finalize_body = false;
+        let pf = FinishParams {
+            finalize_body: true,
+            ..Default::default()
+        };
+        let pu = FinishParams {
+            finalize_body: false,
+            ..Default::default()
+        };
         assert!((tone_curve(1.1, &pf) - tone_curve(1.1, &pu)).abs() > 1e-3);
     }
 

@@ -66,8 +66,8 @@ pub fn score_color(neg: &Image, base: [f32; 3], corners: &[[f32; 2]; 4]) -> Colo
             mean_g[c] += patches[i][c];
         }
     }
-    for c in 0..3 {
-        mean_g[c] /= NEUTRAL_INDICES.len() as f32;
+    for g in &mut mean_g {
+        *g /= NEUTRAL_INDICES.len() as f32;
     }
     let eps = 1e-5;
     let neut_gain = [

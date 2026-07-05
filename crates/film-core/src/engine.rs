@@ -360,7 +360,8 @@ fn invert_d_impl(rgb: [f32; 3], p: &InversionParams, produce_body: bool) -> [f32
         //  - Gain:        post-curve display multiply  →  filmic_s(t) · wb[c]
         //  - Subtractive: pre-curve density multiply    →  filmic_s(t · wb[c]^CMY_STRENGTH)
         //    Anchored at black (t=0 → 0 for any filter), coupled to the filmic slope.
-        let v = match p.tone_mode {
+
+        match p.tone_mode {
             ToneMode::Filmic => {
                 let v = match p.wb_mode {
                     WbMode::Gain => {
@@ -417,8 +418,9 @@ fn invert_d_impl(rgb: [f32; 3], p: &InversionParams, produce_body: bool) -> [f32
                     // intended highlight change for the DISPLAY pipeline only.
                     match p.wb_mode {
                         WbMode::Gain => gamma_body(t_eff) * p.wb[c],
-                        WbMode::Subtractive =>
-                            gamma_body(t_eff * p.wb[c].max(EPS).powf(CMY_STRENGTH)),
+                        WbMode::Subtractive => {
+                            gamma_body(t_eff * p.wb[c].max(EPS).powf(CMY_STRENGTH))
+                        }
                     }
                 } else {
                     // Analysis / back-compat display value: BYTE-IDENTICAL to the original invert_d
@@ -427,14 +429,14 @@ fn invert_d_impl(rgb: [f32; 3], p: &InversionParams, produce_body: bool) -> [f32
                     let hr = p.hi_recovery;
                     let core = match p.wb_mode {
                         WbMode::Gain => gamma_shoulder(t_eff, 1.0, hr) * p.wb[c],
-                        WbMode::Subtractive =>
-                            gamma_shoulder(t_eff * p.wb[c].max(EPS).powf(CMY_STRENGTH), 1.0, hr),
+                        WbMode::Subtractive => {
+                            gamma_shoulder(t_eff * p.wb[c].max(EPS).powf(CMY_STRENGTH), 1.0, hr)
+                        }
                     };
                     look_s(core, p.lo_recovery)
                 }
             }
-        };
-        v
+        }
     })
 }
 
@@ -475,8 +477,17 @@ pub fn invert_image(img: &crate::Image, p: &InversionParams, _mode: Mode) -> cra
 /// Like `invert_image` but returns the super-white BODY (no display finalize). Used
 /// only by the display path (feeds `finish_image`, which finalizes after the tone tools).
 pub fn invert_image_core(img: &crate::Image, p: &InversionParams, _mode: Mode) -> crate::Image {
-    let pixels = img.pixels.par_iter().map(|&px| invert_d_core(px, p)).collect();
-    crate::Image { width: img.width, height: img.height, pixels, ir: img.ir.clone() }
+    let pixels = img
+        .pixels
+        .par_iter()
+        .map(|&px| invert_d_core(px, p))
+        .collect();
+    crate::Image {
+        width: img.width,
+        height: img.height,
+        pixels,
+        ir: img.ir.clone(),
+    }
 }
 
 #[cfg(test)]
@@ -1286,7 +1297,11 @@ mod tests {
             "0.5->0.5: {}",
             look_s(0.5, 0.0)
         );
-        assert!((look_s(1.0, 0.0) - 1.0).abs() < 1e-6, "1->1: {}", look_s(1.0, 0.0));
+        assert!(
+            (look_s(1.0, 0.0) - 1.0).abs() < 1e-6,
+            "1->1: {}",
+            look_s(1.0, 0.0)
+        );
         // pinned values (also pin the GPU GLSL mirror) for LOOK_K = 2.0
         assert!(
             (look_s(0.25, 0.0) - 0.196_61).abs() < 1e-4,
@@ -1359,8 +1374,11 @@ mod tests {
             let got = gamma_shoulder(x, 1.0, 0.0);
             let raw = x.max(0.0).powf(1.0 / FAITHFUL_GAMMA);
             let k = FAITHFUL_KNEE;
-            let want = if raw <= k { raw.min(1.0) }
-                       else { k + (1.0 - k) * (1.0 - (-(raw - k) / (1.0 - k)).exp()) };
+            let want = if raw <= k {
+                raw.min(1.0)
+            } else {
+                k + (1.0 - k) * (1.0 - (-(raw - k) / (1.0 - k)).exp())
+            };
             assert!((got - want).abs() < 1e-6, "x={x} got={got} want={want}");
         }
     }
@@ -1377,8 +1395,12 @@ mod tests {
     }
 
     fn faithful_params() -> InversionParams {
-        InversionParams { base: [1.0, 1.0, 1.0], d_max: 1.5,
-            tone_mode: ToneMode::Faithful, ..Default::default() }
+        InversionParams {
+            base: [1.0, 1.0, 1.0],
+            d_max: 1.5,
+            tone_mode: ToneMode::Faithful,
+            ..Default::default()
+        }
     }
 
     #[test]
@@ -1389,7 +1411,9 @@ mod tests {
             let s = (i as f32 / 100.0).max(1e-4);
             let scan = [s, s * 0.9, s * 0.8];
             let out = invert_d(scan, &p); // hi_recovery=lo_recovery=0 by default
-            for c in 0..3 { assert!(out[c].is_finite() && (0.0..=1.0).contains(&out[c])); }
+            for v in out {
+                assert!(v.is_finite() && (0.0..=1.0).contains(&v));
+            }
         }
         // (parity vs a frozen baseline is covered by the existing pinned tests;
         //  defaults are 0.0 so behavior is unchanged.)
@@ -1441,14 +1465,20 @@ mod tests {
 
     #[test]
     fn invert_d_equals_display_finalize_of_core_faithful_sdr() {
-        let mut p = faithful_params();          // existing test helper (Faithful, SDR)
-        p.hi_recovery = 0.0; p.lo_recovery = 0.0; p.wb = [1.0, 1.0, 1.0];
+        let mut p = faithful_params(); // existing test helper (Faithful, SDR)
+        p.hi_recovery = 0.0;
+        p.lo_recovery = 0.0;
+        p.wb = [1.0, 1.0, 1.0];
         for &s in &[0.05_f32, 0.2, 0.5, 0.8, 0.95] {
             let core = invert_d_core([s, s, s], &p);
             let disp = invert_d([s, s, s], &p);
             for c in 0..3 {
-                assert!((display_finalize(core[c]) - disp[c]).abs() < 1e-6,
-                    "s={s} c={c}: finalize(core)={} disp={}", display_finalize(core[c]), disp[c]);
+                assert!(
+                    (display_finalize(core[c]) - disp[c]).abs() < 1e-6,
+                    "s={s} c={c}: finalize(core)={} disp={}",
+                    display_finalize(core[c]),
+                    disp[c]
+                );
             }
         }
     }
@@ -1459,8 +1489,16 @@ mod tests {
         // A very thin negative (scan ≈ base) is a scene highlight → dense body.
         let core = invert_d_core([0.02, 0.02, 0.02], &p);
         let disp = invert_d([0.02, 0.02, 0.02], &p);
-        assert!(core[0] > 1.0, "body should exceed 1.0 (super-white), got {}", core[0]);
-        assert!(disp[0] <= 1.0 + 1e-6, "display must stay clamped, got {}", disp[0]);
+        assert!(
+            core[0] > 1.0,
+            "body should exceed 1.0 (super-white), got {}",
+            core[0]
+        );
+        assert!(
+            disp[0] <= 1.0 + 1e-6,
+            "display must stay clamped, got {}",
+            disp[0]
+        );
     }
 
     #[test]
@@ -1471,19 +1509,26 @@ mod tests {
         let mut p = faithful_params();
         p.wb_mode = WbMode::Gain;
         p.wb = [1.3, 1.0, 0.7];
-        p.hi_recovery = 0.0; p.lo_recovery = 0.0;
+        p.hi_recovery = 0.0;
+        p.lo_recovery = 0.0;
         let neg = [0.02, 0.05, 0.02]; // bright, above-the-knee highlight
         let core = invert_d_core(neg, &p);
         let disp = invert_d(neg, &p);
         for c in 0..3 {
-            let body_no_wb = core[c] / p.wb[c];                 // = gamma_body(t_eff)
+            let body_no_wb = core[c] / p.wb[c]; // = gamma_body(t_eff)
             let want = look_s(shoulder_only(body_no_wb, 1.0, 0.0) * p.wb[c], 0.0); // OLD order
-            assert!((disp[c] - want).abs() < 1e-5,
-                "c={c}: invert_d must keep shoulder-before-wb: {} vs {}", disp[c], want);
+            assert!(
+                (disp[c] - want).abs() < 1e-5,
+                "c={c}: invert_d must keep shoulder-before-wb: {} vs {}",
+                disp[c],
+                want
+            );
         }
         // And confirm the two orders genuinely differ above the knee (else the test is vacuous).
         let after: [f32; 3] = std::array::from_fn(|c| display_finalize(core[c]));
-        assert!((disp[0] - after[0]).abs() > 1e-4 || (disp[2] - after[2]).abs() > 1e-4,
-            "non-unity gain wb above the knee should differ between shoulder orders");
+        assert!(
+            (disp[0] - after[0]).abs() > 1e-4 || (disp[2] - after[2]).abs() > 1e-4,
+            "non-unity gain wb above the knee should differ between shoulder orders"
+        );
     }
 }
