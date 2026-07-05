@@ -231,6 +231,11 @@ export const rollEdgeText = writable<string>("KODAK 400TX · SAFETY FILM · 5063
  * lib/roll/sprockets.ts, issue #23 (upstream). Persisted via prefs as
  * `roll_film_format`. */
 export const rollFilmFormat = writable<"135" | "120">("135");
+/** Which workflow page of the Tune edit panel is showing (upstream #22): "all"
+ * keeps today's stacked layout; the others show one workflow step at a time
+ * (Basic → Curves → Color). Persisted via prefs as `develop_edit_page`. */
+export type EditPage = "all" | "basic" | "curves" | "color";
+export const editPage = writable<EditPage>("all");
 
 /** Film-base recalibration: armed from the Basic panel's Film Base section. While
  * true the viewport shows the drag-to-sample overlay (the sidebar stays in edit

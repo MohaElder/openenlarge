@@ -8,7 +8,7 @@ use std::path::Path;
 
 fn decode(dir: &str, file: &str) -> film_core::Image {
     let path = Path::new(dir).join(file);
-    decode_raw(&path).unwrap_or_else(|e| panic!("decode {}: {e}", path.display()))
+    decode_raw(&path, false).unwrap_or_else(|e| panic!("decode {}: {e}", path.display()))
 }
 
 pub fn run(manifest_path: &str, out_dir: &str) -> Result<(), String> {

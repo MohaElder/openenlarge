@@ -6,6 +6,7 @@
   import { setTelemetryChoice } from "../telemetry";
   import { setDebugMode } from "../debug";
   import { runManualCheck } from "../update/updater";
+  import { startTour } from "../onboarding/tour";
   import { openUrl } from "@tauri-apps/plugin-opener";
   import { onMount } from "svelte";
   import { confirm } from "@tauri-apps/plugin-dialog";
@@ -138,6 +139,12 @@
   <button class="shortcuts" on:click={() => { dispatch("close"); runManualCheck(); }}>
     <span class="kbd-icon" aria-hidden="true">↑</span>
     {$t("settings.checkUpdates")}
+  </button>
+  <!-- Replay the first-run guided tour (issue #21 upstream). Close first so the
+       menu backdrop doesn't sit over the highlighted Roll controls. -->
+  <button class="shortcuts" on:click={() => { dispatch("close"); startTour(); }}>
+    <span class="kbd-icon" aria-hidden="true">?</span>
+    {$t("settings.showTutorial")}
   </button>
 </div>
 

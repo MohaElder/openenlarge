@@ -275,6 +275,12 @@
     remeterActiveExposure(true);
   }
 
+  function setMeterAnchor(anchor: "highlight" | "midgray") {
+    params.update((p) => ({ ...p, meter_anchor: anchor }));
+    commitActive();
+    remeterActiveExposure(true);
+  }
+
   // "Apply to whole roll": open the shared picker, then push the active frame's
   // selected settings onto every developed frame in the current folder.
   let rollApplyIds: string[] | null = null;
@@ -341,6 +347,12 @@
           <button class="auto" class:on={$params.meter_border === "include"}
                   on:click={() => setMeterBorder($params.meter_border === "include" ? "auto" : "include")}
                   >{$t('basic.meterBorder.include')}</button>
+          <!-- Exposure anchor override: auto-exposure normalizes the median to 18% gray
+               instead of driving the highlights to 0.80 (issue #29). Toggle off = default. -->
+          <button class="auto" class:on={$params.meter_anchor === "midgray"}
+                  title={$t('basic.meterAnchorTitle')}
+                  on:click={() => setMeterAnchor($params.meter_anchor === "midgray" ? "highlight" : "midgray")}
+                  >{$t('basic.meterAnchor.midgray')}</button>
         </span>
       </div>
 
@@ -380,15 +392,18 @@
           </button>
         </span>
       </div>
-      <!-- Temp: 2000–15000 K on the reciprocal track — matches the engine's auto-WB
+      <!-- Temp: 2000–25000 K on the centered mired track — matches the engine's auto-WB
            CCT bounds (gains_to_cct, wb.rs) so any Auto/gray-pick estimate is always
            representable and fine-tunable on the slider (a narrower track pinned the
-           thumb at its bound and snapped away on the first drag — 意见1). The reciprocal
-           scale keeps perceptual travel even; neutral 5500 K sits ~73% along (warm now
-           extends to 2000 K, far past the old 3793). Label shown as ± offset from 5500.
+           thumb at its bound and snapped away on the first drag — 意见1). Warm end
+           extended to 25000 K — the Kim-locus limit — so heavily blue (blue-hour)
+           frames can be pulled back to neutral (issue #17). The centered piecewise-
+           mired scale pins neutral 5500 K to mid-track (it sat at ~73% on the plain
+           reciprocal scale — the other half of #17); each half stays perceptually
+           even. Label shown as ± offset from 5500.
            Tint: range trimmed to ±100 and stepped finely (0.1) to kill the
            banding a coarse 1-unit step produced across a sweep (I2). -->
-      <Slider label={$t('basic.temp')} min={2000} max={15000} step={0.5} scale="reciprocal" scrubStep={10}
+      <Slider label={$t('basic.temp')} min={2000} max={25000} step={0.5} scale="reciprocalCentered" scrubStep={10}
         bind:value={$params.temp} def={TEMP_NEUTRAL} gradient={TEMP_GRADIENT} format={(v) => relKelvin(v - TEMP_NEUTRAL)} on:input={markWbManual} />
       <Slider label={$t('basic.tint')} min={-100} max={100} step={0.1}
         bind:value={$params.tint} def={0} gradient={TINT_GRADIENT} format={signed} on:input={markWbManual} />

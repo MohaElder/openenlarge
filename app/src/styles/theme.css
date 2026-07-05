@@ -45,3 +45,32 @@ button { font: inherit; color: var(--text); cursor: pointer; }
 .editzone button:where(:not(.dot):not(.sw):not(.baseswatch):not(:disabled)):hover {
   background: var(--glass-hi);
 }
+
+/* --- Onboarding tour — issue #21 (upstream) ---------------------------------
+   Global because the highlight class is toggled by a Svelte action on elements
+   in several components, and the tooltip card is appended to <body> (it must
+   escape panel overflow/stacking contexts), so scoped styles can't reach them.
+   The glow is a 2px box-shadow ring: it follows the element's own border-radius
+   and never shifts layout. ~1.6s breathing pulse in the app accent. */
+@keyframes tour-pulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(244, 157, 78, 0.95), 0 0 14px 3px rgba(244, 157, 78, 0.45); }
+  50%      { box-shadow: 0 0 0 2px rgba(244, 157, 78, 0.30), 0 0 4px 1px rgba(244, 157, 78, 0.10); }
+}
+.tour-glow { animation: tour-pulse 1.6s ease-in-out infinite; }
+/* Above the settings backdrop/menu (z 60/61) so a replay started from the
+   Settings menu is never veiled by a lingering overlay. */
+.tour-tip { position: fixed; z-index: 80; width: 250px; padding: 12px;
+  background: var(--glass-bg); border: 1px solid rgba(244, 157, 78, 0.4); border-radius: 12px;
+  backdrop-filter: blur(20px) saturate(140%); -webkit-backdrop-filter: blur(20px) saturate(140%);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5); }
+.tour-tip-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.tour-tip-body { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+.tour-tip-actions { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.tour-tip-progress { font-size: 11px; color: var(--text-faint); margin-right: auto;
+  font-variant-numeric: tabular-nums; }
+.tour-tip-skip, .tour-tip-next { padding: 6px 10px; border-radius: 8px; font-size: 12px;
+  cursor: pointer; border: 1px solid var(--glass-brd); background: transparent;
+  color: var(--text-dim); transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease; }
+.tour-tip-skip:hover { background: var(--glass-hi); color: var(--text); }
+.tour-tip-next { color: #fff; background: rgba(244, 157, 78, 0.18); border-color: rgba(244, 157, 78, 0.5); }
+.tour-tip-next:hover { background: rgba(244, 157, 78, 0.30); border-color: rgba(244, 157, 78, 0.75); }

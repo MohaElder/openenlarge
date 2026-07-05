@@ -25,7 +25,7 @@ fn frame_points(
     out_dir: &str,
 ) -> Result<Vec<TonePoint>, String> {
     let path = Path::new(dir).join(&f.file);
-    let neg = decode_raw(&path).map_err(|e| format!("decode {}: {e}", path.display()))?;
+    let neg = decode_raw(&path, false).map_err(|e| format!("decode {}: {e}", path.display()))?;
     let base = sample_base_clearfilm(&neg, 0.92, 0.95);
     let spec = GridSpec {
         cols: 10,
