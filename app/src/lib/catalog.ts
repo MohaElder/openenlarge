@@ -7,12 +7,13 @@ import {
   selectedFolder, gridZoom, module as moduleStore, activeId, folderBaseByPath,
   updateLastCheck, updateSkipVersion, openaiApiKey, omitPreviewJpgs,
   telemetryEnabled, telemetryDecided, debugMode,
-  rollFilmEdge, rollEdgeText, rollFilmFormat, undevelopableIds, hotkeyBindings,
+  rollFilmEdge, rollEdgeText, rollFilmFormat, editPage, undevelopableIds, hotkeyBindings,
   sheetHeaderPhotographer, sheetHeaderCamera, sheetHeaderFilm, sheetHeaderDate,
 } from "./store";
 import { locale, LOCALES, type Locale } from "./i18n";
 import { installDebugHooks } from "./debug";
 import { startThumbRegen } from "./develop/thumbRegen";
+import { onboardingDone } from "./onboarding/tour";
 
 /** A debounced function with a `flush()` that fires any pending call now. */
 export interface Debounced<A extends unknown[]> {
@@ -53,6 +54,8 @@ export function applySnapshot(snap: CatalogSnapshot): void {
   for (const e of snap.edits) {
     // Backfill any fields absent from older stored blobs (e.g. tone curve /
     // color grading added later) so the frontend always has a complete schema.
+    // (The #41 exposure-baseline anchor is migrated in Rust — catalog.rs v6 —
+    // before this snapshot is ever produced.)
     if (e.params) editsMap[e.image_id] = { ...defaultParams(), ...e.params };
     if (e.crop !== undefined) cropMap[e.image_id] = e.crop;
     if (e.dust) dustMap[e.image_id] = { ...emptyDust(), ...e.dust };
@@ -91,12 +94,19 @@ export function applySnapshot(snap: CatalogSnapshot): void {
     sheetHeaderFilm.set(snap.prefs.sheet_header_film);
   if (typeof snap.prefs.sheet_header_date === "string")
     sheetHeaderDate.set(snap.prefs.sheet_header_date);
+  if (snap.prefs.develop_edit_page === "all" || snap.prefs.develop_edit_page === "basic"
+    || snap.prefs.develop_edit_page === "curves" || snap.prefs.develop_edit_page === "color")
+    editPage.set(snap.prefs.develop_edit_page);
   if (typeof snap.prefs.hotkey_bindings === "string" && snap.prefs.hotkey_bindings) {
     try {
       const b = JSON.parse(snap.prefs.hotkey_bindings);
       if (b && typeof b === "object") hotkeyBindings.set(b);
     } catch { /* skip malformed */ }
   }
+  // First-run tour — issue #21 (upstream): "true" = finished/skipped. Absent =
+  // never seen, so the tour auto-starts on the first Roll entry (lib/onboarding/tour.ts).
+  if (snap.prefs.onboarding_done !== undefined)
+    onboardingDone.set(snap.prefs.onboarding_done === "true");
   // Analytics: "on"/"off" = a recorded choice; absent = undecided (the first-run
   // prompt shows and telemetryEnabled stays false until they answer).
   if (snap.prefs.telemetry === "on") { telemetryEnabled.set(true); telemetryDecided.set(true); }
@@ -218,14 +228,16 @@ export function initPersistence(): () => void {
   wireRecord(dustById, dust.save);
   wireRecord(metaById, meta.save);
 
-  let first = { loc: true, sf: true, gz: true, mod: true, aid: true, usv: true, ulc: true, oak: true, opj: true, rfe: true, ret: true, rff: true, uid: true, hkb: true, shp: true, shc: true, shf: true, shd: true };
+  let first = { loc: true, sf: true, gz: true, mod: true, aid: true, usv: true, ulc: true, oak: true, opj: true, rfe: true, ret: true, rff: true, uid: true, hkb: true, obd: true, dep: true, shp: true, shc: true, shf: true, shd: true };
   locale.subscribe((l) => { if (first.loc) { first.loc = false; return; } prefs.save("locale", l); });
+  onboardingDone.subscribe((b) => { if (first.obd) { first.obd = false; return; } prefs.save("onboarding_done", String(b)); });
   openaiApiKey.subscribe((k) => { if (first.oak) { first.oak = false; return; } prefs.save("openai_api_key", k); });
   hotkeyBindings.subscribe((b) => { if (first.hkb) { first.hkb = false; return; } prefs.save("hotkey_bindings", JSON.stringify(b)); });
   omitPreviewJpgs.subscribe((b) => { if (first.opj) { first.opj = false; return; } prefs.save("omit_preview_jpgs", String(b)); });
   rollFilmEdge.subscribe((b) => { if (first.rfe) { first.rfe = false; return; } prefs.save("roll_film_edge", String(b)); });
   rollEdgeText.subscribe((v) => { if (first.ret) { first.ret = false; return; } prefs.save("roll_edge_text", v); });
   rollFilmFormat.subscribe((v) => { if (first.rff) { first.rff = false; return; } prefs.save("roll_film_format", v); });
+  editPage.subscribe((p) => { if (first.dep) { first.dep = false; return; } prefs.save("develop_edit_page", p); });
   sheetHeaderPhotographer.subscribe((v) => { if (first.shp) { first.shp = false; return; } prefs.save("sheet_header_photographer", v); });
   sheetHeaderCamera.subscribe((v) => { if (first.shc) { first.shc = false; return; } prefs.save("sheet_header_camera", v); });
   sheetHeaderFilm.subscribe((v) => { if (first.shf) { first.shf = false; return; } prefs.save("sheet_header_film", v); });

@@ -145,6 +145,21 @@ const FAITHFUL_KNEE: f32 = 0.892;
 /// on the one frame whose d_max happened to be 2.896 and blew highlights on every other frame
 /// (default d_max 1.5 → ~2× too bright). MUST equal shaders.ts.
 const FAITHFUL_SCALE: f32 = 1.0 / 0.700;
+/// Faithful 0 EV baseline anchor (issue #41): a fixed EV offset folded into the
+/// linear-light exposure gain so a negative at FILM BASE + 0.6D — the standard
+/// mid-gray density of a correctly exposed negative (0.6D ≈ 2 stops of light,
+/// 10^-0.6 ≈ 25% transmission) — renders at the 8-bit mid-gray 118 (L* ≈ 50)
+/// with every control at its default. Solved numerically through the full
+/// default chain (invert + finish + display finalize): −2.245 ≈ −2 EV from the
+/// 0.6D physics plus the shoulder/look layer's shift. Without it, a standard
+/// negative rendered ~2 EV bright and every frame ate its downward latitude in
+/// manual/auto exposure. Stored exposures from before this anchor are shifted
+/// by −FAITHFUL_BASELINE_EV once on load (frontend catalog migration,
+/// `exposure_baseline_06d` pref) so existing edits keep their appearance.
+/// Guarded by `faithful_baseline_anchors_base_plus_06d_to_midgray` in
+/// commands.rs. MUST equal shaders.ts (GL + WGSL) and msl.rs. Public so the
+/// catalog's v6 migration derives the stored-exposure shift from it.
+pub const FAITHFUL_BASELINE_EV: f32 = -2.25;
 
 /// Look-layer strength — the clean-punchy "MEDIUM" the user chose (~+31% mid-contrast).
 /// MUST equal shaders.ts LOOK_K.
@@ -390,7 +405,9 @@ fn invert_d_impl(rgb: [f32; 3], p: &InversionParams, produce_body: bool) -> [f32
                 // mode the auto-computed factor equalises the channels (FreeCCR's OD equalisation).
                 let dn = d * p.channel_balance[c];
                 let l = (10f32.powf(dn) - 1.0).max(0.0);
-                let lit = l * 2f32.powf(FAITHFUL_EXPO_K * ev);
+                // FAITHFUL_BASELINE_EV re-anchors 0 EV so base+0.6D lands on mid-gray
+                // (issue #41); it folds into the same photographic gain as the slider.
+                let lit = l * 2f32.powf(FAITHFUL_EXPO_K * ev + FAITHFUL_BASELINE_EV);
                 let t_eff = (lit + 1.0).log10() * FAITHFUL_SCALE;
                 if produce_body {
                     // Display path: emit the GAMMA BODY (super-white preserved). The shoulder +

@@ -44,4 +44,8 @@ pub use image::Image;
 /// removed). Existing libraries were mostly decoded without it, so every thumbnail regenerates
 /// to pick up the matrix-corrected decode — paired with an .oecache version bump that forces a
 /// re-decode rather than rehydrating the old matrix-less sidecar (2026-06-30).
-pub const ENGINE_VERSION: u32 = 6;
+/// 7 = 0 EV baseline anchored to base+0.6D → mid-gray (FAITHFUL_BASELINE_EV, upstream #41).
+/// Stored exposures are shifted by the catalog v6 migration so edited frames re-render
+/// visually identical; thumbnails regenerate anyway so frames baked WITHOUT stored edits
+/// (auto-seed at exposure 0) pick up the anchored default look (2026-07-05).
+pub const ENGINE_VERSION: u32 = 7;
