@@ -8,6 +8,7 @@ import {
   updateLastCheck, updateSkipVersion, openaiApiKey, omitPreviewJpgs,
   telemetryEnabled, telemetryDecided, debugMode,
   rollFilmEdge, rollEdgeText, rollFilmFormat, editPage, undevelopableIds, hotkeyBindings,
+  sheetHeaderPhotographer, sheetHeaderCamera, sheetHeaderFilm, sheetHeaderDate,
 } from "./store";
 import { locale, LOCALES, type Locale } from "./i18n";
 import { installDebugHooks } from "./debug";
@@ -85,6 +86,14 @@ export function applySnapshot(snap: CatalogSnapshot): void {
     rollEdgeText.set(snap.prefs.roll_edge_text);
   if (snap.prefs.roll_film_format === "135" || snap.prefs.roll_film_format === "120")
     rollFilmFormat.set(snap.prefs.roll_film_format);
+  if (typeof snap.prefs.sheet_header_photographer === "string")
+    sheetHeaderPhotographer.set(snap.prefs.sheet_header_photographer);
+  if (typeof snap.prefs.sheet_header_camera === "string")
+    sheetHeaderCamera.set(snap.prefs.sheet_header_camera);
+  if (typeof snap.prefs.sheet_header_film === "string")
+    sheetHeaderFilm.set(snap.prefs.sheet_header_film);
+  if (typeof snap.prefs.sheet_header_date === "string")
+    sheetHeaderDate.set(snap.prefs.sheet_header_date);
   if (snap.prefs.develop_edit_page === "all" || snap.prefs.develop_edit_page === "basic"
     || snap.prefs.develop_edit_page === "curves" || snap.prefs.develop_edit_page === "color")
     editPage.set(snap.prefs.develop_edit_page);
@@ -219,7 +228,7 @@ export function initPersistence(): () => void {
   wireRecord(dustById, dust.save);
   wireRecord(metaById, meta.save);
 
-  let first = { loc: true, sf: true, gz: true, mod: true, aid: true, usv: true, ulc: true, oak: true, opj: true, rfe: true, ret: true, rff: true, uid: true, hkb: true, obd: true, dep: true };
+  let first = { loc: true, sf: true, gz: true, mod: true, aid: true, usv: true, ulc: true, oak: true, opj: true, rfe: true, ret: true, rff: true, uid: true, hkb: true, obd: true, dep: true, shp: true, shc: true, shf: true, shd: true };
   locale.subscribe((l) => { if (first.loc) { first.loc = false; return; } prefs.save("locale", l); });
   onboardingDone.subscribe((b) => { if (first.obd) { first.obd = false; return; } prefs.save("onboarding_done", String(b)); });
   openaiApiKey.subscribe((k) => { if (first.oak) { first.oak = false; return; } prefs.save("openai_api_key", k); });
@@ -229,6 +238,10 @@ export function initPersistence(): () => void {
   rollEdgeText.subscribe((v) => { if (first.ret) { first.ret = false; return; } prefs.save("roll_edge_text", v); });
   rollFilmFormat.subscribe((v) => { if (first.rff) { first.rff = false; return; } prefs.save("roll_film_format", v); });
   editPage.subscribe((p) => { if (first.dep) { first.dep = false; return; } prefs.save("develop_edit_page", p); });
+  sheetHeaderPhotographer.subscribe((v) => { if (first.shp) { first.shp = false; return; } prefs.save("sheet_header_photographer", v); });
+  sheetHeaderCamera.subscribe((v) => { if (first.shc) { first.shc = false; return; } prefs.save("sheet_header_camera", v); });
+  sheetHeaderFilm.subscribe((v) => { if (first.shf) { first.shf = false; return; } prefs.save("sheet_header_film", v); });
+  sheetHeaderDate.subscribe((v) => { if (first.shd) { first.shd = false; return; } prefs.save("sheet_header_date", v); });
   selectedFolder.subscribe((p) => { if (first.sf) { first.sf = false; return; } state.save("selected_folder", p ?? ""); });
   gridZoom.subscribe((z) => { if (first.gz) { first.gz = false; return; } state.save("grid_zoom", String(z)); });
   updateSkipVersion.subscribe((v) => { if (first.usv) { first.usv = false; return; } state.save("update_skip_version", v); });
