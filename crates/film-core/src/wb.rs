@@ -23,9 +23,9 @@ const XYZ_TO_RGB: [[f32; 3]; 3] = [
 ];
 
 /// CIE Planckian-locus chromaticity (x, y) for a CCT in Kelvin — Kim et al. (1999)
-/// cubic-spline approximation, accurate over ~1667–25000 K (covers the 2000–15000 K
-/// slider range). This is the actual blackbody track, unlike the Tanner-Helland
-/// display approximation it replaces.
+/// cubic-spline approximation, accurate over ~1667–25000 K (covers the full
+/// 2000–25000 K slider range). This is the actual blackbody track, unlike the
+/// Tanner-Helland display approximation it replaces.
 #[allow(clippy::excessive_precision)]
 fn cct_to_xy(temp_k: f32) -> (f32, f32) {
     let t = temp_k.clamp(1667.0, 25000.0);
@@ -79,9 +79,12 @@ pub fn wb_from_kelvin(temp_k: f32, tint: f32) -> [f32; 3] {
 }
 
 /// Lower/upper bound of the CCT search — covers all realistic film-scan
-/// illuminants. Manual gains outside this range saturate at the bound.
+/// illuminants, including deep blue-hour skies at the top (issue #17: the old
+/// 15000 K cap starved the warm-correction range and clamped auto-WB estimates
+/// of very blue frames). 25000 K is the Kim et al. locus validity limit.
+/// Manual gains outside this range saturate at the bound.
 const CCT_LO: f32 = 2000.0;
-const CCT_HI: f32 = 15000.0;
+const CCT_HI: f32 = 25000.0;
 
 /// Estimate (temp_k, tint) from a set of WB gains (inverse of wb_from_kelvin).
 ///
@@ -160,7 +163,7 @@ mod tests {
         // (Kim et al. CCT→xy locus + von-Kries in linear sRGB, green-normalised);
         // the old Tanner-Helland RGB-ratio model under-cut red and over-boosted
         // blue, missing these by 20–200%. Tolerance is a few % of each gain.
-        let cases: [(f32, [f32; 3]); 7] = [
+        let cases: [(f32, [f32; 3]); 8] = [
             (2000.0, [0.3016, 1.0, 28.725]),
             (3000.0, [0.5632, 1.0, 2.7544]),
             (4000.0, [0.7685, 1.0, 1.5384]),
@@ -168,6 +171,7 @@ mod tests {
             (6500.0, [1.1105, 1.0, 0.8442]),
             (9000.0, [1.2925, 1.0, 0.6573]),
             (15000.0, [1.4875, 1.0, 0.5166]),
+            (25000.0, [1.5980, 1.0, 0.4551]),
         ];
         for (k, want) in cases {
             let g = wb_from_kelvin(k, 0.0);
