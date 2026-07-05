@@ -55,7 +55,7 @@ pub struct Catalog {
     conn: Mutex<Connection>,
 }
 
-const SCHEMA_VERSION: i64 = 5;
+const SCHEMA_VERSION: i64 = 6;
 
 impl Catalog {
     /// Open (creating if absent) the catalog at `db_path`. Enables WAL and migrates.
@@ -392,6 +392,37 @@ fn migrate(conn: &Connection) -> rusqlite::Result<()> {
         // Rust because it needs gains_to_cct, not SQL.
         migrate_wb_to_absolute(conn)?;
     }
+    if version < 6 {
+        // #41 exposure-baseline anchor: engine.rs folded FAITHFUL_BASELINE_EV
+        // (−2.25 EV) into the Faithful gain so a negative at base+0.6D density
+        // renders at mid-gray (8-bit 118) by default. Stored exposures predate
+        // that anchor; adding the OPPOSITE shift reproduces each edit's old
+        // appearance exactly (the baseline enters the render identically to the
+        // slider, so engine_new(ev + shift) == engine_old(ev)) — baked thumbnails
+        // stay visually valid. Positives skip the shift: their render path never
+        // passes the negative baseline. The `baseline_v` stamp + IS NULL guard
+        // make each statement idempotent (a crash before the version bump re-runs
+        // migrate; stamped rows are never re-shifted — same philosophy as
+        // add_column_if_missing). Shifted values may pass the ±5 slider range;
+        // the engine renders raw values, the UI merely pins the thumb.
+        let shift = -film_core::engine::FAITHFUL_BASELINE_EV;
+        conn.execute_batch(&format!(
+            "UPDATE edits
+             SET params_json = json_set(params_json,
+                 '$.exposure', json_extract(params_json, '$.exposure') + {shift},
+                 '$.baseline_v', 2)
+             WHERE params_json IS NOT NULL
+               AND json_valid(params_json)
+               AND json_extract(params_json, '$.baseline_v') IS NULL
+               AND json_extract(params_json, '$.exposure') IS NOT NULL
+               AND COALESCE(json_extract(params_json, '$.positive'), 0) = 0;
+             UPDATE edits
+             SET params_json = json_set(params_json, '$.baseline_v', 2)
+             WHERE params_json IS NOT NULL
+               AND json_valid(params_json)
+               AND json_extract(params_json, '$.baseline_v') IS NULL;",
+        ))?;
+    }
     conn.pragma_update(None, "user_version", SCHEMA_VERSION)?;
     Ok(())
 }
@@ -472,9 +503,56 @@ mod tests {
         }
         let edits = cat.load_edits().unwrap();
         let p = edits.iter().find(|e| e.image_id == "x").unwrap().params.clone().unwrap();
-        assert_eq!(p.get("exposure").unwrap().as_f64().unwrap(), 0.0, "stale exposure reset to 0");
+        // v<4 resets the stale exposure to 0; the v<6 baseline anchor then shifts
+        // it by −FAITHFUL_BASELINE_EV (= +2.25) into the anchored space.
+        let shift = -film_core::engine::FAITHFUL_BASELINE_EV as f64;
+        assert!(
+            (p.get("exposure").unwrap().as_f64().unwrap() - shift).abs() < 1e-6,
+            "stale exposure reset to 0 then anchored (+{shift})"
+        );
         assert_eq!(p.get("black").unwrap().as_f64().unwrap(), 0.1, "other params preserved");
         assert_eq!(p.get("temp").unwrap().as_f64().unwrap(), 5500.0, "other params preserved");
+    }
+
+    #[test]
+    fn migration_v6_shifts_negatives_into_anchored_baseline_space() {
+        let cat = Catalog::open_in_memory().unwrap();
+        {
+            let conn = cat.conn.lock().unwrap();
+            // Pre-v6 edits: a negative with a manual −2 EV correction, and a positive.
+            conn.execute(
+                "INSERT INTO edits (image_id, params_json) VALUES ('neg', ?1)",
+                [r#"{"exposure":-2.0,"contrast":15}"#],
+            )
+            .unwrap();
+            conn.execute(
+                "INSERT INTO edits (image_id, params_json) VALUES ('pos', ?1)",
+                [r#"{"exposure":1.2,"positive":true}"#],
+            )
+            .unwrap();
+            conn.pragma_update(None, "user_version", 5i64).unwrap(); // pre-v6
+            migrate(&conn).unwrap();
+            // Crash-window idempotence: re-running migrate (version rolled back as if
+            // the bump never landed) must NOT double-shift stamped rows.
+            conn.pragma_update(None, "user_version", 5i64).unwrap();
+            migrate(&conn).unwrap();
+        }
+        let edits = cat.load_edits().unwrap();
+        let p = |id: &str| edits.iter().find(|e| e.image_id == id).unwrap().params.clone().unwrap();
+        let shift = -film_core::engine::FAITHFUL_BASELINE_EV as f64;
+        let neg = p("neg");
+        assert!(
+            (neg.get("exposure").unwrap().as_f64().unwrap() - (-2.0 + shift)).abs() < 1e-6,
+            "negative shifted once into the anchored space: {neg:?}"
+        );
+        assert_eq!(neg.get("contrast").unwrap().as_f64().unwrap(), 15.0, "other params preserved");
+        assert_eq!(neg.get("baseline_v").unwrap().as_i64().unwrap(), 2);
+        let pos = p("pos");
+        assert!(
+            (pos.get("exposure").unwrap().as_f64().unwrap() - 1.2).abs() < 1e-6,
+            "positive exposure untouched (no negative baseline in its path): {pos:?}"
+        );
+        assert_eq!(pos.get("baseline_v").unwrap().as_i64().unwrap(), 2);
     }
 
     #[test]

@@ -150,6 +150,7 @@ constant float INV_EPS = 1e-5;
 constant float LOG10 = 0.30102999566;         // log10(x) = log2(x) * LOG10
 constant float EXPO_K = 0.14;                  // MUST equal engine.rs EXPO_K
 constant float FAITHFUL_EXPO_K = 1.0;          // MUST equal engine.rs FAITHFUL_EXPO_K
+constant float FAITHFUL_BASELINE_EV = -2.25;   // 0 EV anchor: base+0.6D -> 118 mid-gray (#41); MUST equal engine.rs
 constant float CMY_STRENGTH = 1.6;             // MUST equal engine.rs CMY_STRENGTH
 constant float FAITHFUL_GAMMA = 1.590;         // MUST equal engine.rs
 constant float FAITHFUL_SCALE = 1.0 / 0.700;   // MUST equal engine.rs (1/recommended_d_max)
@@ -194,7 +195,7 @@ float3 hdr_invert(float3 rgbIn, constant HdrUniforms& u) {
         if (u.tone_mode == 1) {
             // Faithful: gamma body (unclamped); finish stage applies shoulder + look.
             float3 lScene = max(pow(float3(10.0), d * u.cam_balance) - 1.0, 0.0);
-            float3 lit = lScene * exp2(FAITHFUL_EXPO_K * ev);
+            float3 lit = lScene * exp2(FAITHFUL_EXPO_K * ev + FAITHFUL_BASELINE_EV);
             float3 te = log2(lit + 1.0) * LOG10 * FAITHFUL_SCALE;
             if (u.wb_mode == 1) {
                 float3 s = pow(max(u.wb, float3(INV_EPS)), float3(CMY_STRENGTH));

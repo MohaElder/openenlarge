@@ -206,6 +206,7 @@ const INV_EPS: f32 = 1e-5;
 const LOG10: f32 = 0.30102999566;          // log10(x) = log2(x) * LOG10
 const EXPO_K: f32 = 0.14;                  // MUST equal engine.rs EXPO_K
 const FAITHFUL_EXPO_K: f32 = 1.0;          // MUST equal engine.rs FAITHFUL_EXPO_K
+const FAITHFUL_BASELINE_EV: f32 = -2.25;   // 0 EV anchor: base+0.6D -> 118 mid-gray (#41); MUST equal engine.rs
 const CMY_STRENGTH: f32 = 1.6;             // MUST equal engine.rs CMY_STRENGTH
 const FAITHFUL_GAMMA: f32 = 1.590;         // MUST equal engine.rs
 const FAITHFUL_SCALE: f32 = 1.0 / 0.700;   // MUST equal engine.rs (1/recommended_d_max)
@@ -250,7 +251,7 @@ fn hdr_invert(rgbIn: vec3f, u: HdrUniforms) -> vec3f {
     if (u.tone_mode == 1) {
       // Faithful: gamma body (unclamped); finish stage applies shoulder + look.
       let lScene = max(pow(vec3f(10.0), d * u.cam_balance) - vec3f(1.0), vec3f(0.0));
-      let lit = lScene * exp2(FAITHFUL_EXPO_K * ev);
+      let lit = lScene * exp2(FAITHFUL_EXPO_K * ev + FAITHFUL_BASELINE_EV);
       let te = log2(lit + vec3f(1.0)) * LOG10 * FAITHFUL_SCALE;
       if (u.wb_mode == 1) {
         let s = pow(max(u.wb, vec3f(INV_EPS)), vec3f(CMY_STRENGTH));
