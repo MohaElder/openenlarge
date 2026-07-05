@@ -3768,10 +3768,12 @@ mod tests {
     fn auto_brightness_uses_full_slider_latitude() {
         // The solver's clamp must match the ±5 EV Exposure slider (issue #28): a frame
         // that is still too bright at −3 EV must keep going down instead of pinning at
-        // the old −3 floor. A dense (heavily exposed) negative renders very bright:
-        // d = log10(0.7/0.02) ≈ 1.54 → linear scene ≈ 34× — several stops over target.
+        // the old −3 floor. A VERY dense (heavily overexposed) negative renders bright:
+        // d = log10(0.7/0.003) ≈ 2.37 → linear scene ≈ 233× — several stops over target
+        // even under the #41 baseline anchor (−2.25 EV), so this fixture stays below
+        // the −3 floor whether or not that branch is merged.
         use film_core::Image;
-        let neg = Image { width: 64, height: 1, pixels: vec![[0.02f32, 0.02, 0.02]; 64], ir: None };
+        let neg = Image { width: 64, height: 1, pixels: vec![[0.003f32, 0.003, 0.003]; 64], ir: None };
         let base = [0.7f32, 0.7, 0.7];
         let ev = auto_brightness_value(&neg, &default_invert_params(), base, 2.0, None);
         assert!(
