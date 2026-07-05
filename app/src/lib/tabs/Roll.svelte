@@ -232,6 +232,9 @@
   // Writes editsById (triggers catalog write-through) + saveThumbnail for each frame.
   // Reuses whatever is already in previewMap — does NOT re-render.
   let persistToken = 0;
+  // The roll crop last reconciled with auto-WB (JSON), so the crop-dependent WB
+  // reseed below fires once per crop change, not on every slider persist.
+  let lastWbReseedCrop: string | null = null;
   const schedulePersist = debounce(async (draft: typeof $rollDraft) => {
     const token = ++persistToken;
     if (destroyed) return;
@@ -276,6 +279,25 @@
       }
     }
     if (missing.length) markThumbsStale(missing, { persist: true });
+
+    // Auto-WB is crop-dependent (as_shot_wb meters only the cropped area), so a
+    // crop change invalidates every frame's seeded WB: the previews saved above
+    // were rendered with WB measured against the OLD crop, while Develop re-meters
+    // against the new crop on entry — the two views visibly diverge (upstream #27).
+    // Reconcile here, once per distinct roll crop: re-seed every protected-free
+    // frame against the just-persisted crop (seedFrame keeps exposure, re-measures
+    // WB + per-zone WB, and bakes+saves a fresh thumbnail), then rebuild the
+    // on-screen previews — mirroring onBaseSampled's explicit refresh.
+    if (draft.crop != null) {
+      const cropJson = JSON.stringify(draft.crop);
+      if (cropJson !== lastWbReseedCrop) {
+        lastWbReseedCrop = cropJson;
+        void (async () => {
+          await reseedRollProtectedFree(get(folderImages));
+          if (!destroyed) runPreviewBatch(get(rollDraft));
+        })();
+      }
+    }
   }, 600);
 
   // Mirror every rollDraft change (tone/color/base/dmax/crop) to all frames. Inert until

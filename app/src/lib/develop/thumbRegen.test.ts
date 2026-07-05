@@ -61,6 +61,35 @@ describe("regenOne", () => {
     await regenOne(get(images)[0] as any);
     expect(api.thumbnail).not.toHaveBeenCalled();
   });
+
+  it("edit-less fallback meters auto-WB against the frame's stored crop", async () => {
+    images.set([frame("a") as any]);
+    cropById.set({
+      a: {
+        rect: { x: 0.1, y: 0.2, w: 0.5, h: 0.6 },
+        aspect: "original", orientation: "landscape",
+        rot90: 1, flipH: true, flipV: false, angle: 2,
+      } as any,
+    });
+    await regenOne(get(images)[0] as any);
+    expect(api.asShotWb).toHaveBeenCalledWith(
+      "a", expect.anything(), [0.1, 0.2, 0.5, 0.6],
+      { rot90: 1, flip_h: true, flip_v: false, angle: 2 },
+    );
+    expect(api.perZoneWb).toHaveBeenCalledWith(
+      "a", expect.anything(), [0.1, 0.2, 0.5, 0.6],
+      { rot90: 1, flip_h: true, flip_v: false, angle: 2 },
+    );
+  });
+
+  it("edit-less fallback without a stored crop meters the full frame", async () => {
+    images.set([frame("a") as any]);
+    await regenOne(get(images)[0] as any);
+    expect(api.asShotWb).toHaveBeenCalledWith(
+      "a", expect.anything(), null,
+      { rot90: 0, flip_h: false, flip_v: false, angle: 0 },
+    );
+  });
 });
 
 describe("markThumbsStale + pump", () => {
