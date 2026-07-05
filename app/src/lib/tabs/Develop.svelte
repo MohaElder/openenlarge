@@ -184,8 +184,13 @@
   const TEMP_MIN = 2000, TEMP_MAX = 15000;
   // Coarse step per parameter (Shift → ×0.1). Temp is in mireds; the ±100 tone
   // sliders share one step; exposure (±5) is finer.
+  // Temp/tint steps are perceptually balanced (issue #20): on a mid-gray through
+  // the engine's Planckian WB mapping, one press ≈ 0.65 ΔE₇₆ for BOTH axes.
+  // The old 5-mired/2-unit pair was ~4× stronger on temp (1.07 vs 0.27 ΔE):
+  // one tint unit is only a 1/300 green shift (tint/150 · 0.5), so it needs the
+  // larger raw step, not the smaller one.
   const NUDGE: Record<AdjustParam, number> = {
-    temp: 5, tint: 2, exposure: 0.1,
+    temp: 3, tint: 5, exposure: 0.1,
     contrast: 2, highlights: 2, shadows: 2, whites: 2, blacks: 2,
   };
   const clampN = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
