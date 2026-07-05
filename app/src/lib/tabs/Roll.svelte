@@ -30,6 +30,7 @@
   import type { Rect, CropRect } from "$lib/crop/types";
   import { emptyDust } from "$lib/develop/dust";
   import { markThumbsStale } from "$lib/develop/thumbRegen";
+  import { proofMode, proofRev, proofOverlay, ensureProofSolves, proofEnterFolder, proofInvalidate, type ProofMode } from "$lib/roll/proof";
   import { developRev, dustById } from "$lib/store";
   import Icon from "$lib/icons/Icon.svelte";
   import QualityMenu from "$lib/viewport/QualityMenu.svelte";
@@ -39,6 +40,7 @@
     // Keep the roll-wide slider values across re-entry to the same roll (start fresh on a
     // folder change); inert until the user edits, so it never re-applies/reverts per-frame edits.
     enterRollDraft(get(selectedFolder));
+    proofEnterFolder(get(selectedFolder));
     // No entry overwrite-confirm: roll slider edits apply RELATIVELY (applyRollDelta — each
     // scalar is a delta on top of the frame's own value, preserving per-frame tweaks), so
     // entering a roll with already-edited frames never silently replaces them. Per-frame
@@ -141,6 +143,10 @@
       const frames = get(developedFolderImages);
       // Read touched flag once at batch start — consistent across all frames in this batch.
       const touched = get(rollDraftTouched);
+      // Proof layer (#18) read once per batch: when on, each frame's OWN params are
+      // overlaid with its solved auto exposure / auto color BEFORE the roll delta,
+      // so roll sliders offset the auto baselines. Display-only — never persisted.
+      const pm = get(proofMode);
 
       // Accumulator: start from current previewMap so unrendered frames keep their old preview.
       const acc: Record<string, string> = { ...previewMap };
@@ -166,7 +172,7 @@
 
       // Build render tasks in folder order so the first (visible) frames update first.
       const tasks = frames.map((frame) => async () => {
-        const own = editsEntry(frame.id);
+        const own = proofOverlay(frame.id, editsEntry(frame.id), pm);
         // When untouched: render each frame with its own stored edits + its own stored crop
         // (the roll as-is — no revert, no reset). When touched: apply the draft look to all,
         // and use the draft crop if set (else fall back to each frame's own crop).
@@ -267,11 +273,15 @@
 
     // Persist thumbnail for each frame — reuse previewMap renders (no re-render); for
     // any frame without a preview yet, mark it stale so the shared worker rebakes it.
+    // While the proof layer (#18) is on, previewMap renders carry the DISPLAY-ONLY
+    // auto overlays — persisting them would bake a look that isn't in editsById — so
+    // every frame takes the stale path and the worker rebakes from the stored edits.
+    const proofOn = get(proofMode).on;
     const snap = previewMap;
     const missing: string[] = [];
     for (const id of ids) {
       const url = snap[id];
-      if (url) {
+      if (url && !proofOn) {
         images.update((xs) => xs.map((i) => i.id === id ? { ...i, thumbnail: url, thumb_stale: false } : i));
         api.saveThumbnail(id, url);
       } else {
@@ -304,6 +314,27 @@
   // the user actually edits a roll slider (schedulePersist no-ops while !rollDraftTouched),
   // so simply opening the roll never re-applies or reverts existing per-frame edits.
   $: { schedulePreview($rollDraft); schedulePersist($rollDraft); }
+
+  // Proof layer (#18): re-render the sheet whenever the toggle state changes or new
+  // solves land (proofRev). Renders immediately with whatever is cached (progressive:
+  // unsolved frames keep their stored look), then solves the missing frames in the
+  // background — the rev bump re-triggers this block for the final render. The
+  // `lastProofKey` guard keeps plain Roll entry render-free (139762e) unless the
+  // proof toggle was left on, in which case restoring its look on entry is the point.
+  let lastProofKey = "";
+  $: {
+    const key = JSON.stringify([$proofMode, $proofRev]);
+    if (key !== lastProofKey) {
+      const first = lastProofKey === "";
+      lastProofKey = key;
+      if (!first || $proofMode.on) onProofChange($proofMode);
+    }
+  }
+  function onProofChange(pm: ProofMode) {
+    if (destroyed) return;
+    runPreviewBatch(get(rollDraft));
+    if (pm.on) void ensureProofSolves(get(developedFolderImages), editsEntry);
+  }
 
   // --- Reference-edit mode (crop / base) ---------------------------------------
   type EditMode = "none" | "crop" | "base";
@@ -433,6 +464,9 @@
     exitEditMode();
     if (!dir) return;
     setFolderBase(dir, base);
+    // The proof solves (#18) were metered against the old base — drop them so the
+    // proof layer re-solves against the recalibrated roll.
+    proofInvalidate();
     await reseedRollProtectedFree(get(folderImages));
     // Base sampling changes editsById + folderBaseByPath but NOT rollDraft, so the
     // reactive preview trigger ($: schedulePreview($rollDraft)) never fires and the
@@ -467,6 +501,9 @@
         rollDraftTouched.set(true);
       } catch { /* not developed / analyze failed — leave d_max as-is */ }
     }
+    // Auto exposure/WB are metered inside the crop — the proof solves (#18) are
+    // stale the moment the roll crop moves.
+    proofInvalidate();
   }
 
   /** Leave crop mode WITHOUT committing — prior roll crop is preserved. */
