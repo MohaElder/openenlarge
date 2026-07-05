@@ -53,6 +53,8 @@ export function applySnapshot(snap: CatalogSnapshot): void {
   for (const e of snap.edits) {
     // Backfill any fields absent from older stored blobs (e.g. tone curve /
     // color grading added later) so the frontend always has a complete schema.
+    // (The #41 exposure-baseline anchor is migrated in Rust — catalog.rs v6 —
+    // before this snapshot is ever produced.)
     if (e.params) editsMap[e.image_id] = { ...defaultParams(), ...e.params };
     if (e.crop !== undefined) cropMap[e.image_id] = e.crop;
     if (e.dust) dustMap[e.image_id] = { ...emptyDust(), ...e.dust };

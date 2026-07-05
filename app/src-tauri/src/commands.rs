@@ -3725,6 +3725,34 @@ mod tests {
     }
 
     #[test]
+    fn faithful_baseline_anchors_base_plus_06d_to_midgray() {
+        // Issue #41: the 0 EV calibration contract. A negative at FILM BASE + 0.6D
+        // (the standard mid-gray density of a correctly exposed frame) must render
+        // at 8-bit 118 (±3) with EVERY control at its default — the anchor that
+        // FAITHFUL_BASELINE_EV in engine.rs implements. If this drifts, the whole
+        // exposure baseline (and the one-time stored-exposure migration on the
+        // frontend) is out of contract.
+        use film_core::Image;
+        let base = [0.7f32, 0.7, 0.7];
+        let scan = 0.7 * 10f32.powf(-0.6); // density d = log10(base/scan) = 0.6 exactly
+        let img = Image { width: 64, height: 1, pixels: vec![[scan, scan, scan]; 64], ir: None };
+        let p = default_invert_params();
+        let mut ip = resolve_params(&p, &img, effective_base(&p, base));
+        ip.d_max = effective_dmax(&p, 2.0);
+        let inv = invert_image_core(&img, &ip, mode_from(&p.mode));
+        let pos = finish_image(&inv, &finish_from(&p));
+        let mid = percentile_luma(&pos, 0.5, None);
+        let lo = (118.0 - 3.0) / 255.0;
+        let hi = (118.0 + 3.0) / 255.0;
+        assert!(
+            (lo..=hi).contains(&mid),
+            "base+0.6D at defaults rendered {} ({} / 255) — expected 118±3",
+            mid,
+            mid * 255.0
+        );
+    }
+
+    #[test]
     fn auto_brightness_midgray_anchor_normalizes_median() {
         // meter_anchor="midgray" (issue #29) must land the FINISHED median near the
         // 18%-gray display value (0.46), independent of the highlight anchor — a

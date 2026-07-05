@@ -8,6 +8,7 @@ describe("WGSL shaders — constants parity with the canonical pipeline", () => 
     HDR_KNEE: "0.8", HDR_HEADROOM: "2.5", HDR_W_HI: "1.2",
     FAITHFUL_GAMMA: "1.590", FAITHFUL_KNEE: "0.892",
     LOOK_K: "2.0", EXPO_K: "0.14", CMY_STRENGTH: "1.6",
+    FAITHFUL_BASELINE_EV: "-2.25",
     FILMIC_K: "5.0", FILMIC_PIVOT: "0.44", FILMIC_WHITE_T: "1.05",
   };
   for (const [name, val] of Object.entries(consts)) {

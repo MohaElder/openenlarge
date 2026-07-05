@@ -443,6 +443,9 @@ const float EXPO_K = 0.14;
 // FAITHFUL_EXPO_K. Replaces the weak shared EXPO_K for the faithful branch so auto-exposure
 // + the slider actually move brightness.
 const float FAITHFUL_EXPO_K = 1.0;
+// Faithful 0 EV baseline anchor: base+0.6D renders at 8-bit 118 mid-gray (issue #41).
+// MUST equal engine.rs FAITHFUL_BASELINE_EV.
+const float FAITHFUL_BASELINE_EV = -2.25;
 // Subtractive WB strength — MUST equal engine.rs CMY_STRENGTH.
 const float CMY_STRENGTH = 1.6;
 
@@ -539,7 +542,7 @@ vec3 invert(vec3 rgbIn) {
       // Mirror: engine.rs invert_d Faithful.
       // Per-channel density neutralise (camera-matrix mode); [1,1,1] → d·1 == d (identity).
       vec3 lScene = max(pow(vec3(10.0), d * u_cam_balance) - 1.0, 0.0);
-      vec3 lit = lScene * exp2(FAITHFUL_EXPO_K * ev);
+      vec3 lit = lScene * exp2(FAITHFUL_EXPO_K * ev + FAITHFUL_BASELINE_EV);
       vec3 te = log2(lit + 1.0) * LOG10 * FAITHFUL_SCALE;
       if (u_wb_mode == 1) {
         vec3 s = pow(max(u_wb, vec3(EPS)), vec3(CMY_STRENGTH));
