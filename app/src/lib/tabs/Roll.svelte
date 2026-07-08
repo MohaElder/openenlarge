@@ -19,7 +19,7 @@
   import FramePreview from "$lib/roll/FramePreview.svelte";
   import BaseView from "$lib/develop/BaseView.svelte";
   import { exportContactSheet, FRAME_W, FRAME_GAP, FRAME_PAD, type ExportSheetOpts } from "$lib/roll/exportSheet";
-  import { perfLayout, perfTileDataUri } from "$lib/roll/sprockets";
+  import { perfLayout, perfTileDataUri, getStripOffsets } from "$lib/roll/sprockets";
   import ExportSheetDialog from "$lib/overlay/ExportSheetDialog.svelte";
   import { pickTileAspect } from "$lib/roll/contactSheet";
   import Viewport from "$lib/viewport/Viewport.svelte";
@@ -647,11 +647,11 @@
               {#if $rollFilmEdge}
                 <!-- ===== FILM-EDGE ON: filmstrip with rebates ===== -->
                 {#each strips as strip, stripIndex}
+                  {@const offsets = getStripOffsets(strip.frames.map(f => f.img.id))}
                   <div class="filmstrip-strip">
                     <!-- Top rebate -->
                     <div class="rebate rebate-top">
-                      <div class="sprocket-holes"></div>
-                      <div class="frame-numbers">
+                      <div class="frame-numbers" style="transform: translate({offsets.topDx}px, {offsets.topDy}px);">
                         {#each strip.frames as f}
                           <div class="frame-num">{f.num}</div>
                         {/each}
@@ -659,6 +659,7 @@
                           <div class="frame-num frame-pad"></div>
                         {/each}
                       </div>
+                      <div class="sprocket-holes"></div>
                     </div>
                     <!-- Frames row -->
                     <div class="frames-row">
@@ -675,7 +676,8 @@
                     </div>
                     <!-- Bottom rebate -->
                     <div class="rebate rebate-bottom">
-                      <div class="rebate-info-row">
+                      <div class="sprocket-holes"></div>
+                      <div class="rebate-info-row" style="transform: translate({offsets.botDx}px, {offsets.botDy}px)">
                         <div class="barcode"></div>
                         <div class="edge-track">
                           {#each Array(EDGE_REPEATS) as _}
@@ -684,7 +686,6 @@
                         </div>
                         <span class="edge-arrow">→</span>
                       </div>
-                      <div class="sprocket-holes"></div>
                     </div>
                   </div>
                 {/each}
@@ -866,7 +867,7 @@
     letter-spacing: .04em; outline: none; transition: border-color 0.15s, background 0.15s; }
   .edge-field input:focus { border-color: #cf9152; background: rgba(255,255,255,0.06); }
   .edge-field input::placeholder { color: var(--text-faint); letter-spacing: 0; }
-  .sheet { flex: 1; overflow-y: auto; padding: 0; background: #111111; display: flex; flex-direction: column; }
+  .sheet { flex: 1; overflow-y: auto; overflow-x: auto; padding: 0; background: #111111; display: flex; flex-direction: column; }
   .empty { color: var(--text-faint); padding: 16px; }
 
   /* ===== Film-edge toggle ===== */
@@ -885,11 +886,11 @@
   .strips-container { padding: 24px 26px 30px; display: flex; flex-direction: column; }
 
   /* ===== Filmstrip (film-edge ON) ===== */
-  .filmstrip-strip { margin-bottom: 16px; }
+  .filmstrip-strip { margin-bottom: 16px; width: 1607px; margin-left: auto; margin-right: auto; flex: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
 
-  .rebate { background: #131210; }
-  .rebate-top { border-radius: 1px 1px 0 0; }
-  .rebate-bottom { border-radius: 0 0 1px 1px; }
+  .rebate { background: #131210; overflow: hidden; position: relative; }
+  .rebate-top { border-radius: 1px 1px 0 0; border-top: 1px solid rgba(255,255,255,0.06); }
+  .rebate-bottom { border-radius: 0 0 1px 1px; border-bottom: 1px solid rgba(255,255,255,0.06); }
 
   /* KS-1870 perforations (issue #23, upstream): a repeat-x SVG tile of one
      rounded-rect hole; geometry (height/tile/phase) comes from the shared
@@ -906,7 +907,7 @@
     color: #a39a82; letter-spacing: .14em; }
   .frame-num.frame-pad { visibility: hidden; }
 
-  .frames-row { display: flex; gap: 7px; background: #000; padding: 0 6px; align-items: flex-start; }
+  .frames-row { display: flex; gap: 7px; background: #000; padding: 6px 6px; align-items: flex-start; }
   /* Tiles share one landscape aspect derived from the roll (--tile-aspect, set on
      .strips-container; fallback 3:2). Landscape frames fill the tile; portrait crops
      fit INSIDE via object-fit:contain — uniform row height, Lightroom-style. */

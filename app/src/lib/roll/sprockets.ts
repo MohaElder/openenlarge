@@ -99,3 +99,34 @@ export function perfTileDataUri(
     .replace(/\(/g, "%28").replace(/\)/g, "%29").replace(/'/g, "%27");
   return `data:image/svg+xml,${enc}`;
 }
+
+function hashString(str: string): number {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return (Math.abs(hash) % 1000) / 1000;
+}
+
+export interface StripOffsets {
+  topDx: number;
+  topDy: number;
+  botDx: number;
+  botDy: number;
+}
+
+export function getStripOffsets(stripImageIds: string[]): StripOffsets {
+  const seed = stripImageIds.join("-");
+  const h1 = hashString(seed + "-h1");
+  const v1 = hashString(seed + "-v1");
+  const h2 = hashString(seed + "-h2");
+  const v2 = hashString(seed + "-v2");
+  
+  return {
+    topDx: Math.round(h1 * 60 - 30), // -30px to +30px
+    topDy: Math.round(v1 * 8 - 4),   // -4px to +4px
+    botDx: Math.round(h2 * 60 - 30), // -30px to +30px
+    botDy: Math.round(v2 * 8 - 4),   // -4px to +4px
+  };
+}

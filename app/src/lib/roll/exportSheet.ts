@@ -11,7 +11,7 @@ import { withEffectiveBase } from "$lib/develop/base";
 import { imageDir } from "$lib/library/folderScope";
 import { draftThumbView } from "./livePreview";
 import { pickTileAspect, fitContain } from "./contactSheet";
-import { perfLayout, type PerfLayout } from "./sprockets";
+import { perfLayout, getStripOffsets, type PerfLayout } from "./sprockets";
 import { paperPx, paginateStrips, pagePath, PAGE_MARGIN_MM, type PaperSize } from "./printLayout";
 
 // ─── Layout constants (match on-screen filmstrip) ────────────────────────────
@@ -159,11 +159,12 @@ export async function exportContactSheet(opts: ExportSheetOpts = DEFAULT_OPTS): 
   }
 
   // ── Chunk frames into strips of STRIP_SIZE ────────────────────────────────
-  const strips: { imgs: HTMLImageElement[]; nums: string[]; padCount: number }[] = [];
+  const strips: { imgs: HTMLImageElement[]; nums: string[]; ids: string[]; padCount: number }[] = [];
   for (let i = 0; i < images.length; i += STRIP_SIZE) {
     const slice = images.slice(i, i + STRIP_SIZE);
     const nums = slice.map((_, j) => String(i + j + 1).padStart(2, "0"));
-    strips.push({ imgs: slice, nums, padCount: STRIP_SIZE - slice.length });
+    const ids = frames.slice(i, i + STRIP_SIZE).map(f => f.id);
+    strips.push({ imgs: slice, nums, ids, padCount: STRIP_SIZE - slice.length });
   }
 
   // ── Tile aspect from the roll's actual frame shapes (matches on-screen) ───
@@ -181,12 +182,14 @@ export async function exportContactSheet(opts: ExportSheetOpts = DEFAULT_OPTS): 
   const REBATE_TOP_H = SPROCKET_H + FRAME_NUM_H;
   const REBATE_BOT_H = BARCODE_INFO_H + SPROCKET_H;
 
+  const FRAME_VERT_PAD = 6;
+
   // ── Compute sheet geometry (design space, 1×) ─────────────────────────────
   // Strip width: 6 frames + gaps + padding on both sides
   const stripContentW = STRIP_SIZE * FRAME_W + (STRIP_SIZE - 1) * FRAME_GAP + 2 * FRAME_PAD;
   // One strip block's height in design px (both modes are constant-height rows).
   const perStripH = filmEdge
-    ? REBATE_TOP_H + FRAME_H + REBATE_BOT_H
+    ? REBATE_TOP_H + FRAME_H + 2 * FRAME_VERT_PAD + REBATE_BOT_H
     : PROOF_PADDING * 2 + FRAME_H + PROOF_CAPTION_H;
 
   // ── Draw ONE strip block at (leftX, topY) in design coordinates ───────────
@@ -194,37 +197,53 @@ export async function exportContactSheet(opts: ExportSheetOpts = DEFAULT_OPTS): 
   // upstream), so paper layouts can never drift from the classic export.
   function drawStrip(
     ctx: CanvasRenderingContext2D,
-    strip: { imgs: HTMLImageElement[]; nums: string[]; padCount: number },
+    strip: { imgs: HTMLImageElement[]; nums: string[]; ids: string[]; padCount: number },
     leftX: number,
     topY: number,
   ): void {
-    const rowH = FRAME_H; // fixed landscape tile height for every strip
+    const rowH = FRAME_H + 2 * FRAME_VERT_PAD; // fixed landscape tile height + vertical padding for every strip
     let cursorY = topY;
 
     if (filmEdge) {
       // ── FILMSTRIP mode ──────────────────────────────────────────────────
       const stripW = stripContentW;
+      const offsets = getStripOffsets(strip.ids);
 
       // TOP REBATE (background #131210)
       ctx.fillStyle = "#131210";
       ctx.fillRect(leftX, cursorY, stripW, REBATE_TOP_H);
 
-      // Sprocket holes — top band
-      drawPerfBand(ctx, leftX, cursorY, stripW, perf);
+      // Seam line top of film strip
+      ctx.strokeStyle = "rgba(255,255,255,0.06)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(leftX, cursorY);
+      ctx.lineTo(leftX + stripW, cursorY);
+      ctx.stroke();
+
+      // Draw top text with clipping for realistic film crop
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(leftX, cursorY, stripW, REBATE_TOP_H);
+      ctx.clip();
 
       // Frame numbers
       ctx.fillStyle = "#a39a82";
       ctx.font = "600 18px 'Spline Sans Mono', ui-monospace, monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      const numY = cursorY + SPROCKET_H + FRAME_NUM_H / 2;
+      const numY = cursorY + FRAME_NUM_H / 2 + offsets.topDy;
       for (let fi = 0; fi < STRIP_SIZE; fi++) {
         const frameLeft = leftX + FRAME_PAD + fi * (FRAME_W + FRAME_GAP);
-        const frameCenterX = frameLeft + FRAME_W / 2;
+        const frameCenterX = frameLeft + FRAME_W / 2 + offsets.topDx;
         if (fi < strip.nums.length) {
           ctx.fillText(strip.nums[fi], frameCenterX, numY);
         }
       }
+      ctx.restore();
+
+      // Sprocket holes — top band (swapped below text/numbers, next to image)
+      drawPerfBand(ctx, leftX, cursorY + FRAME_NUM_H, stripW, perf);
 
       cursorY += REBATE_TOP_H;
 
@@ -237,8 +256,8 @@ export async function exportContactSheet(opts: ExportSheetOpts = DEFAULT_OPTS): 
       for (let fi = 0; fi < strip.imgs.length; fi++) {
         const img = strip.imgs[fi];
         const frameLeft = leftX + FRAME_PAD + fi * (FRAME_W + FRAME_GAP);
-        const { dx, dy, dw, dh } = fitContain(img.naturalWidth, img.naturalHeight, FRAME_W, rowH, "left");
-        ctx.drawImage(img, frameLeft + dx, cursorY + dy, dw, dh);
+        const { dx, dy, dw, dh } = fitContain(img.naturalWidth, img.naturalHeight, FRAME_W, FRAME_H, "left");
+        ctx.drawImage(img, frameLeft + dx, cursorY + FRAME_VERT_PAD + dy, dw, dh);
       }
 
       cursorY += rowH;
@@ -247,14 +266,32 @@ export async function exportContactSheet(opts: ExportSheetOpts = DEFAULT_OPTS): 
       ctx.fillStyle = "#131210";
       ctx.fillRect(leftX, cursorY, stripW, REBATE_BOT_H);
 
-      // Info row: barcode + edge text + arrow
-      const infoY = cursorY;
-      const infoMidY = infoY + BARCODE_INFO_H / 2;
+      // Seam line bottom of film strip
+      ctx.strokeStyle = "rgba(255,255,255,0.06)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(leftX, cursorY + REBATE_BOT_H);
+      ctx.lineTo(leftX + stripW, cursorY + REBATE_BOT_H);
+      ctx.stroke();
+
+      // Sprocket holes — bottom band (swapped above text/numbers, next to image)
+      drawPerfBand(ctx, leftX, cursorY, stripW, perf);
+
+      // Info row below bottom sprocket holes
+      const infoY = cursorY + SPROCKET_H;
+
+      // Draw bottom text/barcode with clipping for realistic film crop
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(leftX, infoY, stripW, BARCODE_INFO_H);
+      ctx.clip();
+
+      const infoMidY = infoY + BARCODE_INFO_H / 2 + offsets.botDy;
 
       // Barcode (34×11px)
       const barcodeW = 34;
-      const barcodeX = leftX + 12;
-      const barcodeY = infoY + (BARCODE_INFO_H - 11) / 2;
+      const barcodeX = leftX + 12 + offsets.botDx;
+      const barcodeY = infoY + (BARCODE_INFO_H - 11) / 2 + offsets.botDy;
       drawBarcode(ctx, barcodeX, barcodeY, barcodeW, 11);
 
       // Arrow "→" on the right
@@ -262,7 +299,7 @@ export async function exportContactSheet(opts: ExportSheetOpts = DEFAULT_OPTS): 
       ctx.font = "600 16px 'Spline Sans Mono', ui-monospace, monospace";
       ctx.textAlign = "right";
       ctx.textBaseline = "middle";
-      const arrowX = leftX + stripW - 12;
+      const arrowX = leftX + stripW - 12 + offsets.botDx;
       ctx.fillText("→", arrowX, infoMidY);
 
       // Edge text — repeated and evenly distributed between the barcode and arrow
@@ -270,17 +307,15 @@ export async function exportContactSheet(opts: ExportSheetOpts = DEFAULT_OPTS): 
       ctx.font = "600 15px 'Spline Sans Mono', ui-monospace, monospace";
       ctx.textAlign = "center";
       ctx.letterSpacing = "0.24em";
-      const trackLeft = barcodeX + barcodeW + 16;
-      const trackRight = arrowX - 24;
+      const trackLeft = leftX + 12 + barcodeW + 16;
+      const trackRight = leftX + stripW - 12 - 24;
       const trackW = Math.max(0, trackRight - trackLeft);
       for (let r = 0; r < EDGE_REPEATS; r++) {
-        const cx = trackLeft + (trackW * (r + 0.5)) / EDGE_REPEATS;
+        const cx = trackLeft + (trackW * (r + 0.5)) / EDGE_REPEATS + offsets.botDx;
         ctx.fillText(edgeText, cx, infoMidY);
       }
       ctx.letterSpacing = "0px";
-
-      // Sprocket holes — bottom band
-      drawPerfBand(ctx, leftX, cursorY + BARCODE_INFO_H, stripW, perf);
+      ctx.restore();
 
     } else {
       // ── PROOF GRID mode ─────────────────────────────────────────────────
