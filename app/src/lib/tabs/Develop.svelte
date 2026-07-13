@@ -597,7 +597,7 @@
     grid-template-columns: 1fr 300px; grid-template-rows: 1fr 88px;
     grid-template-areas: "center right" "bottom right"; }
   /* Workflow page strip (#22): compact tabs over the edit panels. */
-  .pagestrip { display: flex; gap: 4px; padding: 8px 10px 0; }
+  .pagestrip { display: flex; gap: 4px; padding: 4px 0 0; margin-bottom: 12px; }
   .page { flex: 1; background: transparent; border: 1px solid var(--glass-brd);
     color: var(--text-dim); border-radius: 6px; padding: 3px 0; font-size: 11px; cursor: pointer; }
   .page.on { color: var(--text); border-color: rgba(244,157,78,0.5); background: rgba(244,157,78,0.12); }
